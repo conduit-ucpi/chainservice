@@ -8,7 +8,7 @@ import org.springframework.stereotype.Service
 import org.web3j.abi.FunctionEncoder
 import org.web3j.abi.datatypes.Address
 import org.web3j.abi.datatypes.Function
-import org.web3j.abi.datatypes.Utf8String
+import org.web3j.abi.datatypes.generated.Bytes32
 import org.web3j.abi.datatypes.generated.Uint256
 import org.web3j.crypto.Credentials
 import org.web3j.crypto.RawTransaction
@@ -118,6 +118,10 @@ class TransactionRelayService(
             val gasPrice = gasProvider.getGasPrice("createContract")
             val gasLimit = gasProvider.getGasLimit("createContract")
 
+            // Convert description to bytes32 hash
+            val descriptionBytes = description.toByteArray(Charsets.UTF_8)
+            val descriptionHash = org.web3j.crypto.Hash.sha3(descriptionBytes)
+            
             // Build function call data for createEscrowContract
             val function = Function(
                 "createEscrowContract",
@@ -126,7 +130,7 @@ class TransactionRelayService(
                     Address(seller), 
                     Uint256(amount),
                     Uint256(BigInteger.valueOf(expiryTimestamp)),
-                    Utf8String(description)
+                    Bytes32(descriptionHash)
                 ),
                 emptyList()
             )
@@ -544,39 +548,34 @@ class TransactionRelayService(
         return try {
             logger.debug("Parsing contract address from receipt with ${receipt.logs.size} logs")
             
-            // For factory contract calls, look for ContractCreated events
-            // The event signature hash for ContractCreated events varies by implementation
-            // Let's look for logs with non-empty topics and try to extract contract address
+            // Look for ContractCreated event signature: ContractCreated(address,address,address,uint256,uint256)
+            val contractCreatedSignature = "0x" + org.web3j.crypto.Hash.sha3String("ContractCreated(address,address,address,uint256,uint256)").substring(2)
+            logger.debug("Looking for ContractCreated event signature: $contractCreatedSignature")
             
             for (log in receipt.logs) {
                 logger.debug("Log: topics=${log.topics.size}, data=${log.data}")
                 
-                // Check if this log has topics (event log)
                 if (log.topics.isNotEmpty()) {
                     val eventSignature = log.topics[0]
                     logger.debug("Event signature: $eventSignature")
                     
-                    // For many factory patterns, the contract address is in the first topic after signature
-                    if (log.topics.size >= 2) {
-                        val potentialAddress = log.topics[1]
-                        // Topic is 32 bytes, address is last 20 bytes (40 hex chars)
-                        if (potentialAddress.length == 66) { // 0x + 64 hex chars
-                            val address = "0x" + potentialAddress.substring(26) // Skip 0x + 24 chars = last 20 bytes
-                            logger.debug("Extracted potential contract address from topic: $address")
-                            return address
+                    // Check if this is a ContractCreated event
+                    if (eventSignature.equals(contractCreatedSignature, ignoreCase = true)) {
+                        // For ContractCreated(address indexed contractAddress, address indexed buyer, address indexed seller, uint256 amount, uint256 expiryTimestamp)
+                        // The contract address is the first indexed parameter (topic[1])
+                        if (log.topics.size >= 2) {
+                            val contractAddressTopic = log.topics[1]
+                            if (contractAddressTopic.length == 66) { // 0x + 64 hex chars
+                                val address = "0x" + contractAddressTopic.substring(26) // Last 20 bytes = address
+                                logger.info("Extracted contract address from ContractCreated event: $address")
+                                return address
+                            }
                         }
-                    }
-                    
-                    // Alternative: some events encode address in data field
-                    if (log.data.isNotEmpty() && log.data.length >= 66) {
-                        val address = "0x" + log.data.substring(26, 66)
-                        logger.debug("Extracted potential contract address from data: $address")
-                        return address
                     }
                 }
             }
             
-            logger.warn("No contract address found in transaction receipt logs")
+            logger.warn("ContractCreated event not found in transaction receipt logs")
             null
         } catch (e: Exception) {
             logger.error("Error parsing contract address from receipt", e)
