@@ -5,6 +5,6 @@ WORKDIR /app
 COPY build/libs/*.jar app.jar
 #COPY .env .env
 
-EXPOSE 8977
+EXPOSE 8978
 
 ENTRYPOINT ["java", "-jar", "app.jar"]
