@@ -1,9 +1,12 @@
 package com.conduit.chainservice.config
 
 import io.swagger.v3.oas.models.OpenAPI
+import io.swagger.v3.oas.models.Components
 import io.swagger.v3.oas.models.info.Contact
 import io.swagger.v3.oas.models.info.Info
 import io.swagger.v3.oas.models.info.License
+import io.swagger.v3.oas.models.security.SecurityRequirement
+import io.swagger.v3.oas.models.security.SecurityScheme
 import io.swagger.v3.oas.models.servers.Server
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
@@ -32,10 +35,12 @@ class OpenApiConfig {
                         - **Fund Claims**: Enables sellers to claim escrowed funds
                         
                         ## Authentication
-                        This service currently operates without authentication. In production, implement proper API key or JWT-based authentication.
+                        All API endpoints require authentication via Bearer token obtained from the user service.
+                        - **Bearer Token**: Include in Authorization header as `Bearer <token>`
+                        - **Session Cookie**: HTTP-only session cookie for additional validation
                         
                         ## Rate Limiting
-                        Consider implementing rate limiting per IP address to prevent abuse of the gas-paying service.
+                        Rate limiting is implemented to prevent abuse of the gas-paying service.
                         """.trimIndent()
                     )
                     .version("1.0.0")
@@ -59,6 +64,17 @@ class OpenApiConfig {
                 Server()
                     .url("https://api.conduit.com")
                     .description("Production server")
+            )
+            .addSecurityItem(SecurityRequirement().addList("bearerAuth"))
+            .components(
+                Components()
+                    .addSecuritySchemes("bearerAuth", 
+                        SecurityScheme()
+                            .type(SecurityScheme.Type.HTTP)
+                            .scheme("bearer")
+                            .bearerFormat("JWT")
+                            .description("Bearer token obtained from user service")
+                    )
             )
     }
 }

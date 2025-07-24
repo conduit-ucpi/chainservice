@@ -23,6 +23,10 @@ blockchain:
     limit-resolve: 200000
     price-multiplier: 1.2
 
+auth:
+  user-service-url: ${USER_SERVICE_URL}
+  enabled: ${AUTH_ENABLED:true}
+
 management:
   endpoints:
     web:
