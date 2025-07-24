@@ -17,6 +17,12 @@ class UserServiceClient(
         .baseUrl(authProperties.userServiceUrl)
         .build()
 
+    data class UserIdentityResponse(
+        val userId: String,
+        val email: String,
+        val walletAddress: String
+    )
+    
     data class TokenValidationResponse(
         val valid: Boolean,
         val userId: String? = null,
@@ -26,8 +32,8 @@ class UserServiceClient(
 
     fun validateToken(authToken: String, httpOnlyToken: String?): Mono<TokenValidationResponse> {
         return try {
-            val request = webClient.post()
-                .uri("/api/auth/validate")
+            val request = webClient.get()
+                .uri("/api/user/identity")
                 .header("Authorization", authToken)
                 
             // Add http-only token as header if provided
@@ -39,7 +45,15 @@ class UserServiceClient(
                 
             requestWithCookie
                 .retrieve()
-                .bodyToMono(TokenValidationResponse::class.java)
+                .bodyToMono(UserIdentityResponse::class.java)
+                .map { userIdentity ->
+                    TokenValidationResponse(
+                        valid = true,
+                        userId = userIdentity.userId,
+                        email = userIdentity.email,
+                        walletAddress = userIdentity.walletAddress
+                    )
+                }
                 .doOnSuccess { response ->
                     logger.debug("Token validation successful for user: ${response.userId}")
                 }
