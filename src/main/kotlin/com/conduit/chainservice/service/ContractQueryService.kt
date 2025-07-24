@@ -9,6 +9,7 @@ import org.web3j.abi.EventEncoder
 import org.web3j.abi.TypeReference
 import org.web3j.abi.datatypes.Address
 import org.web3j.abi.datatypes.Event
+import org.web3j.abi.datatypes.Utf8String
 import org.web3j.abi.datatypes.generated.Uint256
 import org.web3j.protocol.Web3j
 import org.web3j.protocol.core.DefaultBlockParameterName
@@ -151,8 +152,8 @@ class ContractQueryService(
                     org.web3j.abi.TypeReference.create(Address::class.java),     // seller
                     org.web3j.abi.TypeReference.create(Uint256::class.java),     // amount
                     org.web3j.abi.TypeReference.create(Uint256::class.java),     // expiryTimestamp
-                    org.web3j.abi.TypeReference.create(org.web3j.abi.datatypes.generated.Bytes32::class.java), // descriptionHash
-                    org.web3j.abi.TypeReference.create(org.web3j.abi.datatypes.generated.Uint8::class.java),   // state
+                    org.web3j.abi.TypeReference.create(Utf8String::class.java),  // description
+                    org.web3j.abi.TypeReference.create(org.web3j.abi.datatypes.generated.Uint8::class.java),   // currentState
                     org.web3j.abi.TypeReference.create(Uint256::class.java)      // currentTimestamp
                 )
             )
@@ -171,7 +172,7 @@ class ContractQueryService(
             }
 
             val result = org.web3j.abi.FunctionReturnDecoder.decode(ethCall.result, function.outputParameters)
-            parseOptimizedContractResult(result)
+            parseNewContractResult(result)
 
         } catch (e: Exception) {
             logger.error("Error calling getContractInfo on $contractAddress", e)
@@ -189,16 +190,16 @@ class ContractQueryService(
         }
     }
 
-    private fun parseOptimizedContractResult(result: List<org.web3j.abi.datatypes.Type<*>>): Map<String, Any> {
+    private fun parseNewContractResult(result: List<org.web3j.abi.datatypes.Type<*>>): Map<String, Any> {
         return try {
-            // Parse the optimized contract result
-            // getContractInfo returns: (address buyer, address seller, uint256 amount, uint256 expiryTimestamp, bytes32 descriptionHash, uint8 state, uint256 currentTimestamp)
+            // Parse the new contract result
+            // getContractInfo returns: (address _buyer, address _seller, uint256 _amount, uint256 _expiryTimestamp, string _description, uint8 _currentState, uint256 _currentTimestamp)
             
             val buyer = (result[0] as Address).value
             val seller = (result[1] as Address).value
             val amount = (result[2] as Uint256).value
             val expiryTimestamp = (result[3] as Uint256).value.toLong()
-            val descriptionHash = (result[4] as org.web3j.abi.datatypes.generated.Bytes32).value
+            val description = (result[4] as Utf8String).value
             val state = (result[5] as org.web3j.abi.datatypes.generated.Uint8).value.toInt()
             val currentTimestamp = (result[6] as Uint256).value.toLong()
             
@@ -213,7 +214,7 @@ class ContractQueryService(
                 "seller" to seller,
                 "amount" to amount,
                 "expiryTimestamp" to expiryTimestamp,
-                "description" to descriptionHash.toString(), // Return hash as string for now
+                "description" to description,
                 "funded" to funded,
                 "disputed" to disputed,
                 "resolved" to resolved,
@@ -221,7 +222,7 @@ class ContractQueryService(
             )
             
         } catch (e: Exception) {
-            logger.error("Error parsing optimized contract result", e)
+            logger.error("Error parsing new contract result", e)
             mapOf(
                 "buyer" to "0x0000000000000000000000000000000000000000",
                 "seller" to "0x0000000000000000000000000000000000000000",

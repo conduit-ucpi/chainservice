@@ -8,7 +8,7 @@ import org.springframework.stereotype.Service
 import org.web3j.abi.FunctionEncoder
 import org.web3j.abi.datatypes.Address
 import org.web3j.abi.datatypes.Function
-import org.web3j.abi.datatypes.generated.Bytes32
+import org.web3j.abi.datatypes.Utf8String
 import org.web3j.abi.datatypes.generated.Uint256
 import org.web3j.crypto.Credentials
 import org.web3j.crypto.RawTransaction
@@ -118,11 +118,7 @@ class TransactionRelayService(
             val gasPrice = gasProvider.getGasPrice("createContract")
             val gasLimit = gasProvider.getGasLimit("createContract")
 
-            // Convert description to bytes32 hash
-            val descriptionBytes = description.toByteArray(Charsets.UTF_8)
-            val descriptionHash = org.web3j.crypto.Hash.sha3(descriptionBytes)
-            
-            // Build function call data for createEscrowContract
+            // Build function call data for createEscrowContract with string description
             val function = Function(
                 "createEscrowContract",
                 listOf(
@@ -130,7 +126,7 @@ class TransactionRelayService(
                     Address(seller), 
                     Uint256(amount),
                     Uint256(BigInteger.valueOf(expiryTimestamp)),
-                    Bytes32(descriptionHash)
+                    Utf8String(description)
                 ),
                 emptyList()
             )
