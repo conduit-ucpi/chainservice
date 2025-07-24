@@ -24,11 +24,11 @@ class UserServiceClient(
         val walletAddress: String? = null
     )
 
-    fun validateToken(bearerToken: String, httpOnlyToken: String?): Mono<TokenValidationResponse> {
+    fun validateToken(authToken: String, httpOnlyToken: String?): Mono<TokenValidationResponse> {
         return try {
             val request = webClient.post()
                 .uri("/api/auth/validate")
-                .header("Authorization", bearerToken)
+                .header("Authorization", authToken)
                 
             // Add http-only token as header if provided
             val requestWithCookie = if (httpOnlyToken != null) {

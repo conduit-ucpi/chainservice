@@ -39,16 +39,18 @@ class AuthenticationFilter(
 
         try {
             val bearerToken = extractBearerToken(request)
+            val authToken = extractAuthToken(request)
             val httpOnlyToken = extractHttpOnlyToken(request)
 
-            if (bearerToken == null) {
-                logger.warn("No bearer token provided for protected endpoint: ${request.requestURI}")
-                sendUnauthorizedResponse(response, "Bearer token required")
+            val tokenToValidate = bearerToken ?: authToken
+            if (tokenToValidate == null) {
+                logger.warn("No auth token provided for protected endpoint: ${request.requestURI}")
+                sendUnauthorizedResponse(response, "Auth token required")
                 return
             }
 
             // Validate with user service
-            val validationResult = userServiceClient.validateToken(bearerToken, httpOnlyToken).block()
+            val validationResult = userServiceClient.validateToken(tokenToValidate, httpOnlyToken).block()
 
             if (validationResult?.valid == true) {
                 // Set authentication context
@@ -93,6 +95,10 @@ class AuthenticationFilter(
         return if (authHeader?.startsWith("Bearer ") == true) {
             authHeader.substring(7)
         } else null
+    }
+
+    private fun extractAuthToken(request: HttpServletRequest): String? {
+        return request.cookies?.find { it.name == "AUTH-TOKEN" }?.value
     }
 
     private fun extractHttpOnlyToken(request: HttpServletRequest): String? {
