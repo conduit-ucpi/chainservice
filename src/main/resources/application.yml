@@ -9,8 +9,8 @@ spring:
       enabled: false
 
 blockchain:
-  rpc-url: ${RPC_URL:https://api.avax-test.network/ext/bc/C/rpc}
-  usdc-contract-address: ${USDC_CONTRACT_ADDRESS:0x5425890298aed601595a70AB815c96711a31Bc65}
+  rpc-url: ${RPC_URL}
+  usdc-contract-address: ${USDC_CONTRACT_ADDRESS}
   contract-factory-address: ${CONTRACT_FACTORY_ADDRESS}
   relayer:
     private-key: ${RELAYER_PRIVATE_KEY}
