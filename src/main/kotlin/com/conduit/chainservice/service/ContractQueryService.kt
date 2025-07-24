@@ -142,12 +142,26 @@ class ContractQueryService(
 
     private suspend fun callGetContractInfo(contractAddress: String): Map<String, Any> {
         return try {
-            // Call getContractInfo() function - signature: 0x...
-            val functionHash = "0xab5b3a82"  // getContractInfo() function selector
+            // Use Web3j to properly encode the function call
+            val function = org.web3j.abi.datatypes.Function(
+                "getContractInfo",
+                emptyList(),
+                listOf(
+                    org.web3j.abi.TypeReference.create(Address::class.java),     // buyer
+                    org.web3j.abi.TypeReference.create(Address::class.java),     // seller
+                    org.web3j.abi.TypeReference.create(Uint256::class.java),     // amount
+                    org.web3j.abi.TypeReference.create(Uint256::class.java),     // expiryTimestamp
+                    org.web3j.abi.TypeReference.create(org.web3j.abi.datatypes.generated.Bytes32::class.java), // descriptionHash
+                    org.web3j.abi.TypeReference.create(org.web3j.abi.datatypes.generated.Uint8::class.java),   // state
+                    org.web3j.abi.TypeReference.create(Uint256::class.java)      // currentTimestamp
+                )
+            )
+            
+            val encodedFunction = org.web3j.abi.FunctionEncoder.encode(function)
 
             val ethCall: EthCall = web3j.ethCall(
                 org.web3j.protocol.core.methods.request.Transaction.createEthCallTransaction(
-                    null, contractAddress, functionHash
+                    null, contractAddress, encodedFunction
                 ),
                 DefaultBlockParameterName.LATEST
             ).send()
@@ -156,8 +170,8 @@ class ContractQueryService(
                 throw RuntimeException("Contract call failed: ${ethCall.error.message}")
             }
 
-            val result = ethCall.result
-            parseGetContractInfoResult(result)
+            val result = org.web3j.abi.FunctionReturnDecoder.decode(ethCall.result, function.outputParameters)
+            parseOptimizedContractResult(result)
 
         } catch (e: Exception) {
             logger.error("Error calling getContractInfo on $contractAddress", e)
@@ -175,38 +189,31 @@ class ContractQueryService(
         }
     }
 
-    private fun parseGetContractInfoResult(result: String): Map<String, Any> {
+    private fun parseOptimizedContractResult(result: List<org.web3j.abi.datatypes.Type<*>>): Map<String, Any> {
         return try {
-            // Parse the ABI-encoded return data
-            // getContractInfo returns: (address, address, uint256, uint256, string, bool, bool, bool, bool, uint256)
+            // Parse the optimized contract result
+            // getContractInfo returns: (address buyer, address seller, uint256 amount, uint256 expiryTimestamp, bytes32 descriptionHash, uint8 state, uint256 currentTimestamp)
             
-            val data = result.removePrefix("0x")
+            val buyer = (result[0] as Address).value
+            val seller = (result[1] as Address).value
+            val amount = (result[2] as Uint256).value
+            val expiryTimestamp = (result[3] as Uint256).value.toLong()
+            val descriptionHash = (result[4] as org.web3j.abi.datatypes.generated.Bytes32).value
+            val state = (result[5] as org.web3j.abi.datatypes.generated.Uint8).value.toInt()
+            val currentTimestamp = (result[6] as Uint256).value.toLong()
             
-            // Each slot is 32 bytes (64 hex chars)
-            val buyer = "0x" + data.substring(24, 64)
-            val seller = "0x" + data.substring(88, 128)
-            val amount = BigInteger(data.substring(128, 192), 16)
-            val expiryTimestamp = BigInteger(data.substring(192, 256), 16).toLong()
-            
-            // String offset and length parsing
-            val stringOffset = BigInteger(data.substring(256, 320), 16).toInt() * 2
-            val stringLength = BigInteger(data.substring(stringOffset, stringOffset + 64), 16).toInt() * 2
-            val description = if (stringLength > 0) {
-                val hexString = data.substring(stringOffset + 64, stringOffset + 64 + stringLength)
-                String(hexString.chunked(2).map { it.toInt(16).toByte() }.toByteArray()).trim('\u0000')
-            } else ""
-            
-            val funded = data.substring(383, 384) == "1"
-            val disputed = data.substring(447, 448) == "1"
-            val resolved = data.substring(511, 512) == "1" 
-            val claimed = data.substring(575, 576) == "1"
+            // Map state values: 0=unfunded, 1=funded, 2=disputed, 3=resolved, 4=claimed
+            val funded = state >= 1
+            val disputed = state == 2
+            val resolved = state == 3
+            val claimed = state == 4
             
             mapOf(
                 "buyer" to buyer,
                 "seller" to seller,
                 "amount" to amount,
                 "expiryTimestamp" to expiryTimestamp,
-                "description" to description,
+                "description" to descriptionHash.toString(), // Return hash as string for now
                 "funded" to funded,
                 "disputed" to disputed,
                 "resolved" to resolved,
@@ -214,7 +221,7 @@ class ContractQueryService(
             )
             
         } catch (e: Exception) {
-            logger.error("Error parsing getContractInfo result", e)
+            logger.error("Error parsing optimized contract result", e)
             mapOf(
                 "buyer" to "0x0000000000000000000000000000000000000000",
                 "seller" to "0x0000000000000000000000000000000000000000",
