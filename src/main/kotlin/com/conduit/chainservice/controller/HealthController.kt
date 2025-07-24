@@ -167,13 +167,16 @@ class HealthController(
                     
                     val isLowBalance = balanceInEth < BigDecimal("0.01")
                     
-                    mapOf(
+                    mutableMapOf<String, Any>(
                         "status" to if (isLowBalance) "WARN" else "UP",
                         "address" to relayerCredentials.address,
                         "balance" to balanceInEth.toString(),
-                        "balanceWei" to balance.balance.toString(),
-                        "warning" to if (isLowBalance) "Low balance - may not be able to relay transactions" else null
-                    ).filterValues { it != null }
+                        "balanceWei" to balance.balance.toString()
+                    ).apply {
+                        if (isLowBalance) {
+                            put("warning", "Low balance - may not be able to relay transactions")
+                        }
+                    }
                 }
             }
         } catch (e: Exception) {

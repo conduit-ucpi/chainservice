@@ -193,12 +193,12 @@ class EventParsingService(
             val description = (nonIndexedValues[2] as Utf8String).value
 
             val blockInfo = web3j.ethGetBlockByNumber(
-                org.web3j.protocol.core.DefaultBlockParameter.valueOf(log.blockNumber),
+                org.web3j.protocol.core.DefaultBlockParameter.valueOf(log.blockNumber.toString()),
                 false
             ).send()
 
             val timestamp = Instant.ofEpochSecond(
-                Numeric.decodeQuantity(blockInfo.block.timestamp).toLong()
+                blockInfo.block.timestamp.toLong()
             )
 
             ContractEvent(
@@ -232,12 +232,12 @@ class EventParsingService(
             val eventTimestamp = (nonIndexedValues[0] as Uint256).value
 
             val blockInfo = web3j.ethGetBlockByNumber(
-                org.web3j.protocol.core.DefaultBlockParameter.valueOf(log.blockNumber),
+                org.web3j.protocol.core.DefaultBlockParameter.valueOf(log.blockNumber.toString()),
                 false
             ).send()
 
             val timestamp = Instant.ofEpochSecond(
-                Numeric.decodeQuantity(blockInfo.block.timestamp).toLong()
+                blockInfo.block.timestamp.toLong()
             )
 
             ContractEvent(
@@ -267,12 +267,12 @@ class EventParsingService(
             val eventTimestamp = (nonIndexedValues[1] as Uint256).value
 
             val blockInfo = web3j.ethGetBlockByNumber(
-                org.web3j.protocol.core.DefaultBlockParameter.valueOf(log.blockNumber),
+                org.web3j.protocol.core.DefaultBlockParameter.valueOf(log.blockNumber.toString()),
                 false
             ).send()
 
             val timestamp = Instant.ofEpochSecond(
-                Numeric.decodeQuantity(blockInfo.block.timestamp).toLong()
+                blockInfo.block.timestamp.toLong()
             )
 
             ContractEvent(
@@ -304,12 +304,12 @@ class EventParsingService(
             val eventTimestamp = (nonIndexedValues[2] as Uint256).value
 
             val blockInfo = web3j.ethGetBlockByNumber(
-                org.web3j.protocol.core.DefaultBlockParameter.valueOf(log.blockNumber),
+                org.web3j.protocol.core.DefaultBlockParameter.valueOf(log.blockNumber.toString()),
                 false
             ).send()
 
             val timestamp = Instant.ofEpochSecond(
-                Numeric.decodeQuantity(blockInfo.block.timestamp).toLong()
+                blockInfo.block.timestamp.toLong()
             )
 
             ContractEvent(
@@ -342,12 +342,12 @@ class EventParsingService(
             val eventTimestamp = (nonIndexedValues[2] as Uint256).value
 
             val blockInfo = web3j.ethGetBlockByNumber(
-                org.web3j.protocol.core.DefaultBlockParameter.valueOf(log.blockNumber),
+                org.web3j.protocol.core.DefaultBlockParameter.valueOf(log.blockNumber.toString()),
                 false
             ).send()
 
             val timestamp = Instant.ofEpochSecond(
-                Numeric.decodeQuantity(blockInfo.block.timestamp).toLong()
+                blockInfo.block.timestamp.toLong()
             )
 
             ContractEvent(
