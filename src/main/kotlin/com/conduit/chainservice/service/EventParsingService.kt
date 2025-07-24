@@ -108,21 +108,84 @@ class EventParsingService(
             val walletPaddedHex = "0x" + "0".repeat(24) + walletAddress.substring(2)
             logger.debug("Wallet padded for topic filtering: $walletPaddedHex")
             
-            // Get current block number and search recent blocks only
+            // Get current block number and search in chunks due to RPC 2048 block limit
             val currentBlock = web3j.ethBlockNumber().send().blockNumber
-            val fromBlock = currentBlock.subtract(BigInteger.valueOf(10000)) // Last ~10k blocks
-            logger.warn("Searching from block $fromBlock to $currentBlock (current)")
+            val searchRange = BigInteger.valueOf(20000) // Search last 20k blocks
+            val fromBlock = currentBlock.subtract(searchRange)
+            val chunkSize = BigInteger.valueOf(2000) // Stay under 2048 limit
             
-            // First, let's check what events are ACTUALLY being emitted by the factory
-            val allEventsFilter = EthFilter(
-                org.web3j.protocol.core.DefaultBlockParameter.valueOf(fromBlock),
-                org.web3j.protocol.core.DefaultBlockParameter.valueOf(currentBlock),
-                blockchainProperties.contractFactoryAddress
-            )
-            // Don't filter by topic - get ALL events from this factory
+            logger.warn("Searching from block $fromBlock to $currentBlock in chunks of $chunkSize")
             
-            val allEventLogs = web3j.ethGetLogs(allEventsFilter).send().logs ?: emptyList()
+            val allEventLogs = mutableListOf<org.web3j.protocol.core.methods.response.Log>()
+            
+            // Search in chunks to avoid RPC block limit
+            var chunkStart = fromBlock
+            while (chunkStart <= currentBlock) {
+                val chunkEnd = minOf(chunkStart.add(chunkSize), currentBlock)
+                
+                try {
+                    val chunkFilter = EthFilter(
+                        org.web3j.protocol.core.DefaultBlockParameter.valueOf(chunkStart),
+                        org.web3j.protocol.core.DefaultBlockParameter.valueOf(chunkEnd),
+                        blockchainProperties.contractFactoryAddress
+                    )
+                    
+                    val chunkLogs = web3j.ethGetLogs(chunkFilter).send().logs ?: emptyList()
+                    allEventLogs.addAll(chunkLogs.map { it as org.web3j.protocol.core.methods.response.Log })
+                    
+                    if (chunkLogs.isNotEmpty()) {
+                        logger.warn("Chunk $chunkStart-$chunkEnd: Found ${chunkLogs.size} events")
+                    }
+                    
+                } catch (e: Exception) {
+                    logger.warn("Error searching chunk $chunkStart-$chunkEnd: ${e.message}")
+                }
+                
+                chunkStart = chunkEnd.add(BigInteger.ONE)
+            }
+            
             logger.warn("Total events from factory (any type): ${allEventLogs.size}")
+            
+            // Let's check if we can see recent transactions TO this factory
+            logger.warn("Let's check recent transactions to the factory directly...")
+            
+            // Get recent blocks and check transactions
+            for (i in 0..10) {
+                val blockNum = currentBlock.subtract(BigInteger.valueOf(i.toLong()))
+                try {
+                    val block = web3j.ethGetBlockByNumber(
+                        org.web3j.protocol.core.DefaultBlockParameter.valueOf(blockNum), 
+                        true
+                    ).send().block
+                    
+                    if (block != null) {
+                        val factoryTxs = block.transactions.filter { tx ->
+                            val transaction = tx as org.web3j.protocol.core.methods.response.Transaction
+                            transaction.to?.equals(blockchainProperties.contractFactoryAddress, ignoreCase = true) == true
+                        }
+                        
+                        if (factoryTxs.isNotEmpty()) {
+                            logger.warn("Block ${blockNum}: Found ${factoryTxs.size} transactions to factory")
+                            factoryTxs.take(2).forEach { tx ->
+                                val transaction = tx as org.web3j.protocol.core.methods.response.Transaction
+                                logger.warn("TX: ${transaction.hash}, from: ${transaction.from}, input: ${transaction.input?.take(20)}...")
+                                
+                                // Get the transaction receipt to see events
+                                val receipt = web3j.ethGetTransactionReceipt(transaction.hash).send().transactionReceipt
+                                if (receipt.isPresent) {
+                                    logger.warn("Receipt logs count: ${receipt.get().logs.size}")
+                                    receipt.get().logs.take(2).forEach { log ->
+                                        logger.warn("Log topics[0]: ${log.topics.getOrNull(0)}")
+                                    }
+                                }
+                            }
+                            break // Found some, stop searching
+                        }
+                    }
+                } catch (e: Exception) {
+                    logger.warn("Error checking block $blockNum: ${e.message}")
+                }
+            }
             
             // Show what events are actually being emitted
             allEventLogs.take(3).forEach { log ->
@@ -144,20 +207,57 @@ class EventParsingService(
             logger.warn("Events matching our expected signature: ${matchingEvents.size}")
             
 
+            // Now filter the events for buyer/seller matches using chunked approach
+            fun searchWalletEvents(topicPosition: Int, role: String): List<org.web3j.protocol.core.methods.response.Log> {
+                val matchingLogs = mutableListOf<org.web3j.protocol.core.methods.response.Log>()
+                
+                var chunkStart = fromBlock
+                while (chunkStart <= currentBlock) {
+                    val chunkEnd = minOf(chunkStart.add(chunkSize), currentBlock)
+                    
+                    try {
+                        val filter = EthFilter(
+                            org.web3j.protocol.core.DefaultBlockParameter.valueOf(chunkStart),
+                            org.web3j.protocol.core.DefaultBlockParameter.valueOf(chunkEnd),
+                            blockchainProperties.contractFactoryAddress
+                        )
+                        
+                        // Set up topics for filtering
+                        val topics = mutableListOf<String?>(EventEncoder.encode(contractCreatedEvent))
+                        topics.add(null) // contract address - any
+                        
+                        when (topicPosition) {
+                            2 -> { // Buyer position
+                                topics.add(walletPaddedHex) // buyer = wallet
+                                topics.add(null) // seller = any
+                            }
+                            3 -> { // Seller position  
+                                topics.add(null) // buyer = any
+                                topics.add(walletPaddedHex) // seller = wallet
+                            }
+                        }
+                        
+                        filter.addOptionalTopics(*topics.toTypedArray())
+                        
+                        val chunkLogs = web3j.ethGetLogs(filter).send().logs ?: emptyList()
+                        matchingLogs.addAll(chunkLogs.map { it as org.web3j.protocol.core.methods.response.Log })
+                        
+                        if (chunkLogs.isNotEmpty()) {
+                            logger.debug("Chunk $chunkStart-$chunkEnd: Found ${chunkLogs.size} events where wallet is $role")
+                        }
+                        
+                    } catch (e: Exception) {
+                        logger.warn("Error searching $role chunk $chunkStart-$chunkEnd: ${e.message}")
+                    }
+                    
+                    chunkStart = chunkEnd.add(BigInteger.ONE)
+                }
+                
+                return matchingLogs
+            }
+            
             // Query 1: Find contracts where wallet is the buyer (topic[2])
-            val buyerFilter = EthFilter(
-                DefaultBlockParameterName.EARLIEST,
-                DefaultBlockParameterName.LATEST,
-                blockchainProperties.contractFactoryAddress
-            )
-            buyerFilter.addOptionalTopics(
-                EventEncoder.encode(contractCreatedEvent), // Event signature
-                null,                                      // Any contract address
-                walletPaddedHex,                          // Buyer = wallet
-                null                                      // Any seller
-            )
-
-            val buyerLogs = web3j.ethGetLogs(buyerFilter).send().logs ?: emptyList()
+            val buyerLogs = searchWalletEvents(2, "buyer")
             logger.debug("Found ${buyerLogs.size} contracts where wallet is buyer")
 
             // Extract contract addresses from buyer logs
@@ -175,19 +275,7 @@ class EventParsingService(
             }
 
             // Query 2: Find contracts where wallet is the seller (topic[3])
-            val sellerFilter = EthFilter(
-                DefaultBlockParameterName.EARLIEST,
-                DefaultBlockParameterName.LATEST,
-                blockchainProperties.contractFactoryAddress
-            )
-            sellerFilter.addOptionalTopics(
-                EventEncoder.encode(contractCreatedEvent), // Event signature
-                null,                                      // Any contract address
-                null,                                      // Any buyer
-                walletPaddedHex                           // Seller = wallet
-            )
-
-            val sellerLogs = web3j.ethGetLogs(sellerFilter).send().logs ?: emptyList()
+            val sellerLogs = searchWalletEvents(3, "seller")
             logger.debug("Found ${sellerLogs.size} contracts where wallet is seller")
 
             // Extract contract addresses from seller logs
