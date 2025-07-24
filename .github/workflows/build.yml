@@ -72,6 +72,6 @@ jobs:
              -e CONTRACT_FACTORY_ADDRESS=${{ vars.CONTRACT_FACTORY_ADDRESS }} \
              -e RPC_URL=${{ vars.RPC_URL }} \
              -e RELAYER_WALLET_ADDRESS=${{ vars.RELAYER_WALLET_ADDRESS }} \
-             -e RELAYER_PRIVATE_KEY=${{ vars.RELAYER_PRIVATE_KEY }} \
+             -e RELAYER_PRIVATE_KEY=${{ secrets.RELAYER_PRIVATE_KEY }} \
              ghcr.io/${{ env.REPO_LOWER }}:latest
          '
