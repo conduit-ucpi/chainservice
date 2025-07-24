@@ -18,6 +18,7 @@ data class BlockchainProperties(
     var rpcUrl: String = "",
     var usdcContractAddress: String = "",
     var contractFactoryAddress: String = "",
+    var chainId: Long = 43113,
     var relayer: RelayerProperties = RelayerProperties(),
     var gas: GasProperties = GasProperties()
 )
@@ -96,6 +97,24 @@ class Web3Config(private val blockchainProperties: BlockchainProperties) {
         } catch (e: Exception) {
             logger.error("Failed to create relayer credentials: ${e.message}")
             throw IllegalStateException("Invalid RELAYER_PRIVATE_KEY: ${e.message}", e)
+        }
+    }
+
+    @Bean
+    fun chainId(web3j: Web3j): Long {
+        return try {
+            val chainIdResponse = web3j.ethChainId().send()
+            if (chainIdResponse.hasError()) {
+                logger.warn("Failed to retrieve chain ID from RPC: ${chainIdResponse.error.message}, using configured value: ${blockchainProperties.chainId}")
+                blockchainProperties.chainId
+            } else {
+                val rpcChainId = chainIdResponse.chainId.toLong()
+                logger.info("Retrieved chain ID from RPC: $rpcChainId")
+                rpcChainId
+            }
+        } catch (e: Exception) {
+            logger.warn("Error retrieving chain ID from RPC: ${e.message}, using configured value: ${blockchainProperties.chainId}")
+            blockchainProperties.chainId
         }
     }
 

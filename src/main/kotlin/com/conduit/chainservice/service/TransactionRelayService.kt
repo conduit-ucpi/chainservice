@@ -25,7 +25,8 @@ class TransactionRelayService(
     private val web3j: Web3j,
     private val relayerCredentials: Credentials,
     private val gasProvider: ContractGasProvider,
-    private val blockchainProperties: BlockchainProperties
+    private val blockchainProperties: BlockchainProperties,
+    private val chainId: Long
 ) {
 
     private val logger = LoggerFactory.getLogger(TransactionRelayService::class.java)
@@ -55,6 +56,7 @@ class TransactionRelayService(
 
             val signedTransaction = org.web3j.crypto.TransactionEncoder.signMessage(
                 rawTransaction,
+                chainId,
                 relayerCredentials
             )
 
@@ -142,6 +144,7 @@ class TransactionRelayService(
 
             val signedTransaction = org.web3j.crypto.TransactionEncoder.signMessage(
                 rawTransaction,
+                chainId,
                 relayerCredentials
             )
 
@@ -234,6 +237,7 @@ class TransactionRelayService(
 
             val signedTransaction = org.web3j.crypto.TransactionEncoder.signMessage(
                 rawTransaction,
+                chainId,
                 relayerCredentials
             )
 
@@ -334,6 +338,7 @@ class TransactionRelayService(
 
             val signedTransaction = org.web3j.crypto.TransactionEncoder.signMessage(
                 rawTransaction,
+                chainId,
                 relayerCredentials
             )
 
@@ -409,6 +414,7 @@ class TransactionRelayService(
 
             val signedTransaction = org.web3j.crypto.TransactionEncoder.signMessage(
                 rawTransaction,
+                chainId,
                 relayerCredentials
             )
 
@@ -484,6 +490,7 @@ class TransactionRelayService(
 
             val signedTransaction = org.web3j.crypto.TransactionEncoder.signMessage(
                 rawTransaction,
+                chainId,
                 relayerCredentials
             )
 
