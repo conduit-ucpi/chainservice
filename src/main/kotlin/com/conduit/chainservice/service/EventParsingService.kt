@@ -102,36 +102,72 @@ class EventParsingService(
             logger.info("Finding contracts for participant: $walletAddress")
 
             val contractAddresses = mutableSetOf<String>()
+            
+            // Pad wallet address to 32 bytes (64 hex chars) for topic filtering
+            val walletPaddedHex = "0x" + "0".repeat(24) + walletAddress.substring(2)
+            logger.debug("Wallet padded for topic filtering: $walletPaddedHex")
 
-            val filter = EthFilter(
+            // Query 1: Find contracts where wallet is the buyer (topic[2])
+            val buyerFilter = EthFilter(
                 DefaultBlockParameterName.EARLIEST,
                 DefaultBlockParameterName.LATEST,
                 blockchainProperties.contractFactoryAddress
             )
+            buyerFilter.addOptionalTopics(
+                EventEncoder.encode(contractCreatedEvent), // Event signature
+                null,                                      // Any contract address
+                walletPaddedHex,                          // Buyer = wallet
+                null                                      // Any seller
+            )
 
-            filter.addSingleTopic(EventEncoder.encode(contractCreatedEvent))
+            val buyerLogs = web3j.ethGetLogs(buyerFilter).send().logs ?: emptyList()
+            logger.debug("Found ${buyerLogs.size} contracts where wallet is buyer")
 
-            val logs = web3j.ethGetLogs(filter).send().logs ?: emptyList()
-
-            for (log in logs) {
-                val logEntry = log as Log
+            // Extract contract addresses from buyer logs
+            buyerLogs.forEach { log ->
                 try {
-                    val topics = logEntry.topics
-                    if (topics.size >= 4) {
-                        val contractAddress = "0x" + topics[1].substring(26)
-                        val buyer = "0x" + topics[2].substring(26)
-                        val seller = "0x" + topics[3].substring(26)
-                        
-                        if (buyer.equals(walletAddress, ignoreCase = true) || 
-                            seller.equals(walletAddress, ignoreCase = true)) {
-                            contractAddresses.add(contractAddress)
-                        }
+                    val logEntry = log as Log
+                    if (logEntry.topics.size >= 2) {
+                        val contractAddress = "0x" + logEntry.topics[1].substring(26)
+                        contractAddresses.add(contractAddress)
+                        logger.debug("Added contract $contractAddress (wallet as buyer)")
                     }
                 } catch (e: Exception) {
-                    logger.warn("Error parsing contract created log", e)
+                    logger.warn("Error parsing buyer log", e)
                 }
             }
 
+            // Query 2: Find contracts where wallet is the seller (topic[3])
+            val sellerFilter = EthFilter(
+                DefaultBlockParameterName.EARLIEST,
+                DefaultBlockParameterName.LATEST,
+                blockchainProperties.contractFactoryAddress
+            )
+            sellerFilter.addOptionalTopics(
+                EventEncoder.encode(contractCreatedEvent), // Event signature
+                null,                                      // Any contract address
+                null,                                      // Any buyer
+                walletPaddedHex                           // Seller = wallet
+            )
+
+            val sellerLogs = web3j.ethGetLogs(sellerFilter).send().logs ?: emptyList()
+            logger.debug("Found ${sellerLogs.size} contracts where wallet is seller")
+
+            // Extract contract addresses from seller logs
+            sellerLogs.forEach { log ->
+                try {
+                    val logEntry = log as Log
+                    if (logEntry.topics.size >= 2) {
+                        val contractAddress = "0x" + logEntry.topics[1].substring(26)
+                        contractAddresses.add(contractAddress)
+                        logger.debug("Added contract $contractAddress (wallet as seller)")
+                    }
+                } catch (e: Exception) {
+                    logger.warn("Error parsing seller log", e)
+                }
+            }
+
+            logger.info("Found ${contractAddresses.size} total contracts for participant: $walletAddress")
             contractAddresses.toList()
 
         } catch (e: Exception) {
