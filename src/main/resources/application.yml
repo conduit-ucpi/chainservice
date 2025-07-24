@@ -17,6 +17,7 @@ blockchain:
     wallet-address: ${RELAYER_WALLET_ADDRESS}
   gas:
     limit-create-contract: 500000
+    limit-deposit: 250000
     limit-dispute: 300000
     limit-claim: 200000
     limit-resolve: 200000

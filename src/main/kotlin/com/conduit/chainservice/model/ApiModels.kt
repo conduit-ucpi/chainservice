@@ -1,12 +1,29 @@
 package com.conduit.chainservice.model
 
+import jakarta.validation.constraints.Min
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Pattern
+import jakarta.validation.constraints.Size
+import java.math.BigInteger
 
 data class CreateContractRequest(
-    @field:NotBlank(message = "Signed transaction is required")
-    @field:Pattern(regexp = "^0x[a-fA-F0-9]+$", message = "Invalid transaction hex format")
-    val signedTransaction: String
+    @field:NotBlank(message = "Buyer address is required")
+    @field:Pattern(regexp = "^0x[a-fA-F0-9]{40}$", message = "Invalid buyer address format")
+    val buyer: String,
+    
+    @field:NotBlank(message = "Seller address is required")
+    @field:Pattern(regexp = "^0x[a-fA-F0-9]{40}$", message = "Invalid seller address format")
+    val seller: String,
+    
+    @field:Min(value = 1, message = "Amount must be positive")
+    val amount: BigInteger,
+    
+    @field:Min(value = 1, message = "Expiry timestamp must be in the future")
+    val expiryTimestamp: Long,
+    
+    @field:NotBlank(message = "Description is required")
+    @field:Size(max = 160, message = "Description must be 160 characters or less")
+    val description: String
 )
 
 data class CreateContractResponse(
@@ -17,10 +34,6 @@ data class CreateContractResponse(
 )
 
 data class RaiseDisputeRequest(
-    @field:NotBlank(message = "Signed transaction is required")
-    @field:Pattern(regexp = "^0x[a-fA-F0-9]+$", message = "Invalid transaction hex format")
-    val signedTransaction: String,
-    
     @field:NotBlank(message = "Contract address is required")
     @field:Pattern(regexp = "^0x[a-fA-F0-9]{40}$", message = "Invalid contract address format")
     val contractAddress: String
@@ -33,16 +46,24 @@ data class RaiseDisputeResponse(
 )
 
 data class ClaimFundsRequest(
-    @field:NotBlank(message = "Signed transaction is required")
-    @field:Pattern(regexp = "^0x[a-fA-F0-9]+$", message = "Invalid transaction hex format")
-    val signedTransaction: String,
-    
     @field:NotBlank(message = "Contract address is required")
     @field:Pattern(regexp = "^0x[a-fA-F0-9]{40}$", message = "Invalid contract address format")
     val contractAddress: String
 )
 
 data class ClaimFundsResponse(
+    val success: Boolean,
+    val transactionHash: String?,
+    val error: String? = null
+)
+
+data class DepositFundsRequest(
+    @field:NotBlank(message = "Contract address is required")
+    @field:Pattern(regexp = "^0x[a-fA-F0-9]{40}$", message = "Invalid contract address format")
+    val contractAddress: String
+)
+
+data class DepositFundsResponse(
     val success: Boolean,
     val transactionHash: String?,
     val error: String? = null

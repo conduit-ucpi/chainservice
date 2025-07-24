@@ -27,6 +27,7 @@ data class RelayerProperties(
 
 data class GasProperties(
     var limitCreateContract: Long = 500000,
+    var limitDeposit: Long = 250000,
     var limitDispute: Long = 300000,
     var limitClaim: Long = 200000,
     var limitResolve: Long = 200000,
@@ -62,6 +63,7 @@ class Web3Config(private val blockchainProperties: BlockchainProperties) {
             override fun getGasLimit(contractFunc: String?): BigInteger {
                 return when (contractFunc) {
                     "createContract" -> BigInteger.valueOf(blockchainProperties.gas.limitCreateContract)
+                    "depositFunds" -> BigInteger.valueOf(blockchainProperties.gas.limitDeposit)
                     "raiseDispute" -> BigInteger.valueOf(blockchainProperties.gas.limitDispute)
                     "claimFunds" -> BigInteger.valueOf(blockchainProperties.gas.limitClaim)
                     "resolveDispute" -> BigInteger.valueOf(blockchainProperties.gas.limitResolve)

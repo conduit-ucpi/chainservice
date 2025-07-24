@@ -49,6 +49,7 @@ class ContractQueryService(
             
             val currentTime = Instant.now().epochSecond
             val expiryTime = contractData["expiryTimestamp"] as Long
+            val funded = contractData["funded"] as Boolean
             val disputed = contractData["disputed"] as Boolean
             val resolved = contractData["resolved"] as Boolean  
             val claimed = contractData["claimed"] as Boolean
@@ -57,6 +58,7 @@ class ContractQueryService(
                 claimed -> ContractStatus.CLAIMED
                 resolved -> ContractStatus.RESOLVED
                 disputed -> ContractStatus.DISPUTED
+                !funded -> ContractStatus.CREATED
                 currentTime > expiryTime -> ContractStatus.EXPIRED
                 else -> ContractStatus.ACTIVE
             }
@@ -77,6 +79,7 @@ class ContractQueryService(
             val amount = contractData["amount"] as BigInteger
             val expiryTimestamp = contractData["expiryTimestamp"] as Long
             val description = contractData["description"] as String
+            val funded = contractData["funded"] as Boolean
             
             if (buyer.equals(participantAddress, ignoreCase = true) || 
                 seller.equals(participantAddress, ignoreCase = true)) {
@@ -84,6 +87,7 @@ class ContractQueryService(
                 val status = getContractStatus(contractAddress)
                 
                 val createdEvent = eventHistory.events.find { it.eventType.name == "CONTRACT_CREATED" }
+                val fundedEvent = eventHistory.events.find { it.eventType.name == "FUNDS_DEPOSITED" }
                 val disputedEvent = eventHistory.events.find { it.eventType.name == "DISPUTE_RAISED" }
                 val resolvedEvent = eventHistory.events.find { it.eventType.name == "DISPUTE_RESOLVED" }
                 val claimedEvent = eventHistory.events.find { it.eventType.name == "FUNDS_CLAIMED" }
@@ -95,8 +99,10 @@ class ContractQueryService(
                     amount = amount,
                     expiryTimestamp = expiryTimestamp,
                     description = description,
+                    funded = funded,
                     status = status,
                     createdAt = createdEvent?.timestamp ?: Instant.now(),
+                    fundedAt = fundedEvent?.timestamp,
                     disputedAt = disputedEvent?.timestamp,
                     resolvedAt = resolvedEvent?.timestamp,
                     claimedAt = claimedEvent?.timestamp
@@ -112,39 +118,32 @@ class ContractQueryService(
     }
 
     private suspend fun queryContractState(contractAddress: String): Map<String, Any> {
-        val results = mutableMapOf<String, Any>()
-
-        try {
-            results["buyer"] = callContractFunction(contractAddress, "buyer()")
-            results["seller"] = callContractFunction(contractAddress, "seller()")
-            results["amount"] = callContractFunction(contractAddress, "amount()")
-            results["expiryTimestamp"] = callContractFunction(contractAddress, "expiryTimestamp()")
-            results["description"] = callContractFunction(contractAddress, "description()")
-            results["disputed"] = callContractFunction(contractAddress, "disputed()")
-            results["resolved"] = callContractFunction(contractAddress, "resolved()")
-            results["claimed"] = callContractFunction(contractAddress, "claimed()")
+        return try {
+            // Use the getContractInfo function to get all data in one call
+            val contractInfo = callGetContractInfo(contractAddress)
+            
+            mapOf(
+                "buyer" to contractInfo["buyer"]!!,
+                "seller" to contractInfo["seller"]!!,
+                "amount" to contractInfo["amount"]!!,
+                "expiryTimestamp" to contractInfo["expiryTimestamp"]!!,
+                "description" to contractInfo["description"]!!,
+                "funded" to contractInfo["funded"]!!,
+                "disputed" to contractInfo["disputed"]!!,
+                "resolved" to contractInfo["resolved"]!!,
+                "claimed" to contractInfo["claimed"]!!
+            )
 
         } catch (e: Exception) {
             logger.error("Error querying contract state for: $contractAddress", e)
             throw e
         }
-
-        return results
     }
 
-    private suspend fun callContractFunction(contractAddress: String, functionSignature: String): Any {
+    private suspend fun callGetContractInfo(contractAddress: String): Map<String, Any> {
         return try {
-            val functionHash = when (functionSignature) {
-                "buyer()" -> "0x7150d8ae"
-                "seller()" -> "0x08551a53"
-                "amount()" -> "0xaa8c217c"
-                "expiryTimestamp()" -> "0x156a4a24"
-                "description()" -> "0x7284e416"
-                "disputed()" -> "0x1551c99a"
-                "resolved()" -> "0x4a72584d"
-                "claimed()" -> "0x297c8b5b"
-                else -> throw IllegalArgumentException("Unknown function: $functionSignature")
-            }
+            // Call getContractInfo() function - signature: 0x...
+            val functionHash = "0xab5b3a82"  // getContractInfo() function selector
 
             val ethCall: EthCall = web3j.ethCall(
                 org.web3j.protocol.core.methods.request.Transaction.createEthCallTransaction(
@@ -153,34 +152,80 @@ class ContractQueryService(
                 DefaultBlockParameterName.LATEST
             ).send()
 
-            val result = ethCall.result
-            
-            when (functionSignature) {
-                "buyer()", "seller()" -> {
-                    "0x" + result.substring(26)
-                }
-                "amount()", "expiryTimestamp()" -> {
-                    BigInteger(result.substring(2), 16)
-                }
-                "description()" -> {
-                    val hex = result.substring(130)
-                    String(hex.chunked(2).map { it.toInt(16).toByte() }.toByteArray()).trim('\u0000')
-                }
-                "disputed()", "resolved()", "claimed()" -> {
-                    result.substring(result.length - 1) == "1"
-                }
-                else -> result
+            if (ethCall.hasError()) {
+                throw RuntimeException("Contract call failed: ${ethCall.error.message}")
             }
 
+            val result = ethCall.result
+            parseGetContractInfoResult(result)
+
         } catch (e: Exception) {
-            logger.error("Error calling contract function $functionSignature on $contractAddress", e)
-            when (functionSignature) {
-                "buyer()", "seller()" -> "0x0000000000000000000000000000000000000000"
-                "amount()", "expiryTimestamp()" -> BigInteger.ZERO
-                "description()" -> ""
-                "disputed()", "resolved()", "claimed()" -> false
-                else -> ""
-            }
+            logger.error("Error calling getContractInfo on $contractAddress", e)
+            // Return default values
+            mapOf(
+                "buyer" to "0x0000000000000000000000000000000000000000",
+                "seller" to "0x0000000000000000000000000000000000000000", 
+                "amount" to BigInteger.ZERO,
+                "expiryTimestamp" to 0L,
+                "description" to "",
+                "disputed" to false,
+                "resolved" to false,
+                "claimed" to false
+            )
+        }
+    }
+
+    private fun parseGetContractInfoResult(result: String): Map<String, Any> {
+        return try {
+            // Parse the ABI-encoded return data
+            // getContractInfo returns: (address, address, uint256, uint256, string, bool, bool, bool, bool, uint256)
+            
+            val data = result.removePrefix("0x")
+            
+            // Each slot is 32 bytes (64 hex chars)
+            val buyer = "0x" + data.substring(24, 64)
+            val seller = "0x" + data.substring(88, 128)
+            val amount = BigInteger(data.substring(128, 192), 16)
+            val expiryTimestamp = BigInteger(data.substring(192, 256), 16).toLong()
+            
+            // String offset and length parsing
+            val stringOffset = BigInteger(data.substring(256, 320), 16).toInt() * 2
+            val stringLength = BigInteger(data.substring(stringOffset, stringOffset + 64), 16).toInt() * 2
+            val description = if (stringLength > 0) {
+                val hexString = data.substring(stringOffset + 64, stringOffset + 64 + stringLength)
+                String(hexString.chunked(2).map { it.toInt(16).toByte() }.toByteArray()).trim('\u0000')
+            } else ""
+            
+            val funded = data.substring(383, 384) == "1"
+            val disputed = data.substring(447, 448) == "1"
+            val resolved = data.substring(511, 512) == "1" 
+            val claimed = data.substring(575, 576) == "1"
+            
+            mapOf(
+                "buyer" to buyer,
+                "seller" to seller,
+                "amount" to amount,
+                "expiryTimestamp" to expiryTimestamp,
+                "description" to description,
+                "funded" to funded,
+                "disputed" to disputed,
+                "resolved" to resolved,
+                "claimed" to claimed
+            )
+            
+        } catch (e: Exception) {
+            logger.error("Error parsing getContractInfo result", e)
+            mapOf(
+                "buyer" to "0x0000000000000000000000000000000000000000",
+                "seller" to "0x0000000000000000000000000000000000000000",
+                "amount" to BigInteger.ZERO,
+                "expiryTimestamp" to 0L,
+                "description" to "",
+                "funded" to false,
+                "disputed" to false,
+                "resolved" to false,
+                "claimed" to false
+            )
         }
     }
 }

@@ -11,28 +11,33 @@ data class ContractInfo(
     val amount: BigInteger,
     val expiryTimestamp: Long,
     val description: String,
+    val funded: Boolean,
     val status: ContractStatus,
     val createdAt: Instant,
+    val fundedAt: Instant? = null,
     val disputedAt: Instant? = null,
     val resolvedAt: Instant? = null,
     val claimedAt: Instant? = null
 )
 
 enum class ContractStatus {
+    @JsonProperty("CREATED")
+    CREATED,    // Contract created but not funded
+    
     @JsonProperty("ACTIVE")
-    ACTIVE,
+    ACTIVE,     // Funded and active
     
     @JsonProperty("EXPIRED")
-    EXPIRED,
+    EXPIRED,    // Funded but expired
     
     @JsonProperty("DISPUTED")
-    DISPUTED,
+    DISPUTED,   // Dispute raised
     
     @JsonProperty("RESOLVED")
-    RESOLVED,
+    RESOLVED,   // Dispute resolved
     
     @JsonProperty("CLAIMED")
-    CLAIMED
+    CLAIMED     // Funds claimed
 }
 
 data class TransactionResult(
@@ -63,6 +68,7 @@ data class ContractEvent(
 
 enum class EventType {
     CONTRACT_CREATED,
+    FUNDS_DEPOSITED,
     DISPUTE_RAISED,
     DISPUTE_RESOLVED,
     FUNDS_CLAIMED

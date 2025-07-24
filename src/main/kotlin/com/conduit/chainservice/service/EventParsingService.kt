@@ -32,11 +32,11 @@ class EventParsingService(
     private val contractCreatedEvent = Event(
         "ContractCreated",
         listOf(
+            TypeReference.create(Address::class.java, true),  // indexed contractAddress
             TypeReference.create(Address::class.java, true),  // indexed buyer
             TypeReference.create(Address::class.java, true),  // indexed seller
-            TypeReference.create(Address::class.java, false), // contract address
             TypeReference.create(Uint256::class.java, false), // amount
-            TypeReference.create(Uint256::class.java, false), // expiry
+            TypeReference.create(Uint256::class.java, false), // expiryTimestamp
             TypeReference.create(Utf8String::class.java, false) // description
         )
     )
@@ -44,8 +44,6 @@ class EventParsingService(
     private val disputeRaisedEvent = Event(
         "DisputeRaised",
         listOf(
-            TypeReference.create(Address::class.java, true),  // indexed contract
-            TypeReference.create(Address::class.java, true),  // indexed raiser
             TypeReference.create(Uint256::class.java, false)  // timestamp
         )
     )
@@ -53,8 +51,16 @@ class EventParsingService(
     private val disputeResolvedEvent = Event(
         "DisputeResolved", 
         listOf(
-            TypeReference.create(Address::class.java, true),  // indexed contract
             TypeReference.create(Address::class.java, false), // recipient
+            TypeReference.create(Uint256::class.java, false)  // timestamp
+        )
+    )
+
+    private val fundsDepositedEvent = Event(
+        "FundsDeposited",
+        listOf(
+            TypeReference.create(Address::class.java, false), // buyer
+            TypeReference.create(Uint256::class.java, false), // amount
             TypeReference.create(Uint256::class.java, false)  // timestamp
         )
     )
@@ -62,9 +68,9 @@ class EventParsingService(
     private val fundsClaimedEvent = Event(
         "FundsClaimed",
         listOf(
-            TypeReference.create(Address::class.java, true),  // indexed contract
-            TypeReference.create(Address::class.java, false), // claimer
-            TypeReference.create(Uint256::class.java, false)  // amount
+            TypeReference.create(Address::class.java, false), // recipient
+            TypeReference.create(Uint256::class.java, false), // amount
+            TypeReference.create(Uint256::class.java, false)  // timestamp
         )
     )
 
@@ -112,22 +118,14 @@ class EventParsingService(
                 val logEntry = log as Log
                 try {
                     val topics = logEntry.topics
-                    if (topics.size >= 3) {
-                        val buyer = "0x" + topics[1].substring(26)
-                        val seller = "0x" + topics[2].substring(26)
+                    if (topics.size >= 4) {
+                        val contractAddress = "0x" + topics[1].substring(26)
+                        val buyer = "0x" + topics[2].substring(26)
+                        val seller = "0x" + topics[3].substring(26)
                         
                         if (buyer.equals(walletAddress, ignoreCase = true) || 
                             seller.equals(walletAddress, ignoreCase = true)) {
-                            
-                            val nonIndexedValues = FunctionReturnDecoder.decode(
-                                logEntry.data,
-                                contractCreatedEvent.nonIndexedParameters
-                            )
-                            
-                            if (nonIndexedValues.isNotEmpty()) {
-                                val contractAddress = (nonIndexedValues[0] as Address).value
-                                contractAddresses.add(contractAddress)
-                            }
+                            contractAddresses.add(contractAddress)
                         }
                     }
                 } catch (e: Exception) {
@@ -154,6 +152,9 @@ class EventParsingService(
                 EventEncoder.encode(contractCreatedEvent) -> {
                     parseContractCreatedEvent(log)
                 }
+                EventEncoder.encode(fundsDepositedEvent) -> {
+                    parseFundsDepositedEvent(log)
+                }
                 EventEncoder.encode(disputeRaisedEvent) -> {
                     parseDisputeRaisedEvent(log)
                 }
@@ -178,18 +179,18 @@ class EventParsingService(
     private fun parseContractCreatedEvent(log: Log): ContractEvent? {
         return try {
             val topics = log.topics
-            val buyer = "0x" + topics[1].substring(26)
-            val seller = "0x" + topics[2].substring(26)
+            val contractAddress = "0x" + topics[1].substring(26)
+            val buyer = "0x" + topics[2].substring(26)
+            val seller = "0x" + topics[3].substring(26)
 
             val nonIndexedValues = FunctionReturnDecoder.decode(
                 log.data,
                 contractCreatedEvent.nonIndexedParameters
             )
 
-            val contractAddress = (nonIndexedValues[0] as Address).value
-            val amount = (nonIndexedValues[1] as Uint256).value
-            val expiry = (nonIndexedValues[2] as Uint256).value
-            val description = (nonIndexedValues[3] as Utf8String).value
+            val amount = (nonIndexedValues[0] as Uint256).value
+            val expiryTimestamp = (nonIndexedValues[1] as Uint256).value
+            val description = (nonIndexedValues[2] as Utf8String).value
 
             val blockInfo = web3j.ethGetBlockByNumber(
                 org.web3j.protocol.core.DefaultBlockParameter.valueOf(log.blockNumber),
@@ -206,11 +207,11 @@ class EventParsingService(
                 transactionHash = log.transactionHash,
                 blockNumber = log.blockNumber,
                 data = mapOf(
+                    "contractAddress" to contractAddress,
                     "buyer" to buyer,
                     "seller" to seller,
-                    "contractAddress" to contractAddress,
                     "amount" to amount,
-                    "expiry" to expiry,
+                    "expiryTimestamp" to expiryTimestamp,
                     "description" to description
                 )
             )
@@ -223,10 +224,6 @@ class EventParsingService(
 
     private fun parseDisputeRaisedEvent(log: Log): ContractEvent? {
         return try {
-            val topics = log.topics
-            val contractAddress = "0x" + topics[1].substring(26)
-            val raiser = "0x" + topics[2].substring(26)
-
             val nonIndexedValues = FunctionReturnDecoder.decode(
                 log.data,
                 disputeRaisedEvent.nonIndexedParameters
@@ -249,8 +246,6 @@ class EventParsingService(
                 transactionHash = log.transactionHash,
                 blockNumber = log.blockNumber,
                 data = mapOf(
-                    "contractAddress" to contractAddress,
-                    "raiser" to raiser,
                     "eventTimestamp" to eventTimestamp
                 )
             )
@@ -263,9 +258,6 @@ class EventParsingService(
 
     private fun parseDisputeResolvedEvent(log: Log): ContractEvent? {
         return try {
-            val topics = log.topics
-            val contractAddress = "0x" + topics[1].substring(26)
-
             val nonIndexedValues = FunctionReturnDecoder.decode(
                 log.data,
                 disputeResolvedEvent.nonIndexedParameters
@@ -289,7 +281,6 @@ class EventParsingService(
                 transactionHash = log.transactionHash,
                 blockNumber = log.blockNumber,
                 data = mapOf(
-                    "contractAddress" to contractAddress,
                     "recipient" to recipient,
                     "eventTimestamp" to eventTimestamp
                 )
@@ -301,18 +292,54 @@ class EventParsingService(
         }
     }
 
+    private fun parseFundsDepositedEvent(log: Log): ContractEvent? {
+        return try {
+            val nonIndexedValues = FunctionReturnDecoder.decode(
+                log.data,
+                fundsDepositedEvent.nonIndexedParameters
+            )
+
+            val buyer = (nonIndexedValues[0] as Address).value
+            val amount = (nonIndexedValues[1] as Uint256).value
+            val eventTimestamp = (nonIndexedValues[2] as Uint256).value
+
+            val blockInfo = web3j.ethGetBlockByNumber(
+                org.web3j.protocol.core.DefaultBlockParameter.valueOf(log.blockNumber),
+                false
+            ).send()
+
+            val timestamp = Instant.ofEpochSecond(
+                Numeric.decodeQuantity(blockInfo.block.timestamp).toLong()
+            )
+
+            ContractEvent(
+                eventType = EventType.FUNDS_DEPOSITED,
+                timestamp = timestamp,
+                transactionHash = log.transactionHash,
+                blockNumber = log.blockNumber,
+                data = mapOf(
+                    "buyer" to buyer,
+                    "amount" to amount,
+                    "eventTimestamp" to eventTimestamp
+                )
+            )
+
+        } catch (e: Exception) {
+            logger.error("Error parsing FundsDeposited event", e)
+            null
+        }
+    }
+
     private fun parseFundsClaimedEvent(log: Log): ContractEvent? {
         return try {
-            val topics = log.topics
-            val contractAddress = "0x" + topics[1].substring(26)
-
             val nonIndexedValues = FunctionReturnDecoder.decode(
                 log.data,
                 fundsClaimedEvent.nonIndexedParameters
             )
 
-            val claimer = (nonIndexedValues[0] as Address).value
+            val recipient = (nonIndexedValues[0] as Address).value
             val amount = (nonIndexedValues[1] as Uint256).value
+            val eventTimestamp = (nonIndexedValues[2] as Uint256).value
 
             val blockInfo = web3j.ethGetBlockByNumber(
                 org.web3j.protocol.core.DefaultBlockParameter.valueOf(log.blockNumber),
@@ -329,9 +356,9 @@ class EventParsingService(
                 transactionHash = log.transactionHash,
                 blockNumber = log.blockNumber,
                 data = mapOf(
-                    "contractAddress" to contractAddress,
-                    "claimer" to claimer,
-                    "amount" to amount
+                    "recipient" to recipient,
+                    "amount" to amount,
+                    "eventTimestamp" to eventTimestamp
                 )
             )
 

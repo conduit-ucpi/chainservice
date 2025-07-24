@@ -33,7 +33,7 @@ class ChainController(
     @PostMapping("/create-contract")
     @Operation(
         summary = "Create Escrow Contract",
-        description = "Deploys a new escrow contract by relaying a user-signed transaction. The service pays the gas fees."
+        description = "Deploys a new escrow contract by calling the factory contract. The service pays the gas fees."
     )
     @ApiResponses(value = [
         ApiResponse(
@@ -58,7 +58,7 @@ class ChainController(
             content = [Content(
                 examples = [ExampleObject(
                     name = "Create Contract Example",
-                    value = """{"signedTransaction": "0x02f8b382012..."}"""  
+                    value = """{"buyer": "0x1234567890abcdef1234567890abcdef12345678", "seller": "0x9876543210fedcba9876543210fedcba98765432", "amount": "1000000", "expiryTimestamp": 1735689600, "description": "Product delivery escrow"}"""  
                 )]
             )]
         )
@@ -68,7 +68,13 @@ class ChainController(
             logger.info("Create contract request received")
             
             val result = runBlocking {
-                transactionRelayService.createContract(request.signedTransaction)
+                transactionRelayService.createContract(
+                    request.buyer,
+                    request.seller,
+                    request.amount,
+                    request.expiryTimestamp,
+                    request.description
+                )
             }
 
             val response = CreateContractResponse(
@@ -121,7 +127,7 @@ class ChainController(
             content = [Content(
                 examples = [ExampleObject(
                     name = "Raise Dispute Example",
-                    value = """{"signedTransaction": "0x02f8b382012...", "contractAddress": "0x1234...abcd"}"""
+                    value = """{"contractAddress": "0x1234567890abcdef1234567890abcdef12345678"}"""
                 )]
             )]
         )
@@ -131,7 +137,7 @@ class ChainController(
             logger.info("Raise dispute request received for contract: ${request.contractAddress}")
             
             val result = runBlocking {
-                transactionRelayService.relayTransaction(request.signedTransaction)
+                transactionRelayService.raiseDispute(request.contractAddress)
             }
 
             val response = RaiseDisputeResponse(
@@ -182,7 +188,7 @@ class ChainController(
             content = [Content(
                 examples = [ExampleObject(
                     name = "Claim Funds Example",
-                    value = """{"signedTransaction": "0x02f8b382012...", "contractAddress": "0x1234...abcd"}"""
+                    value = """{"contractAddress": "0x1234567890abcdef1234567890abcdef12345678"}"""
                 )]
             )]
         )
@@ -192,7 +198,7 @@ class ChainController(
             logger.info("Claim funds request received for contract: ${request.contractAddress}")
             
             val result = runBlocking {
-                transactionRelayService.relayTransaction(request.signedTransaction)
+                transactionRelayService.claimFunds(request.contractAddress)
             }
 
             val response = ClaimFundsResponse(
@@ -212,6 +218,67 @@ class ChainController(
         } catch (e: Exception) {
             logger.error("Error in claim funds endpoint", e)
             val response = ClaimFundsResponse(
+                success = false,
+                transactionHash = null,
+                error = e.message ?: "Internal server error"
+            )
+            ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response)
+        }
+    }
+
+    @PostMapping("/deposit-funds")
+    @Operation(
+        summary = "Deposit Funds",
+        description = "Deposits funds into an escrow contract by calling the depositFunds function. The service pays the gas fees."
+    )
+    @ApiResponses(value = [
+        ApiResponse(
+            responseCode = "200",
+            description = "Funds deposited successfully",
+            content = [Content(schema = Schema(implementation = DepositFundsResponse::class))]
+        ),
+        ApiResponse(
+            responseCode = "400",
+            description = "Invalid request or transaction failed",
+            content = [Content(schema = Schema(implementation = DepositFundsResponse::class))]
+        )
+    ])
+    fun depositFunds(
+        @Valid @RequestBody
+        @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            content = [Content(
+                examples = [ExampleObject(
+                    name = "Deposit Funds Example",
+                    value = """{"contractAddress": "0x1234567890abcdef1234567890abcdef12345678"}"""
+                )]
+            )]
+        )
+        request: DepositFundsRequest
+    ): ResponseEntity<DepositFundsResponse> {
+        return try {
+            logger.info("Deposit funds request received for contract: ${request.contractAddress}")
+            
+            val result = runBlocking {
+                transactionRelayService.depositFunds(request.contractAddress)
+            }
+
+            val response = DepositFundsResponse(
+                success = result.success,
+                transactionHash = result.transactionHash,
+                error = result.error
+            )
+
+            if (result.success) {
+                logger.info("Funds deposited successfully: ${result.transactionHash}")
+                ResponseEntity.ok(response)
+            } else {
+                logger.error("Funds deposit failed: ${result.error}")
+                ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response)
+            }
+
+        } catch (e: Exception) {
+            logger.error("Error in deposit funds endpoint", e)
+            val response = DepositFundsResponse(
                 success = false,
                 transactionHash = null,
                 error = e.message ?: "Internal server error"
