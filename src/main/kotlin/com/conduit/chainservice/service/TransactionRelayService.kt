@@ -167,6 +167,9 @@ class TransactionRelayService(
 
             val receipt = waitForTransactionReceipt(txHash)
             if (receipt?.isStatusOK == true) {
+                logger.info("Transaction receipt received successfully, status: ${receipt.status}")
+                logger.debug("Receipt logs count: ${receipt.logs.size}")
+                
                 // Parse ContractCreated event to get the contract address
                 val contractAddress = parseContractAddressFromReceipt(receipt)
                 
@@ -179,6 +182,7 @@ class TransactionRelayService(
                     )
                 } else {
                     logger.error("Could not extract contract address from transaction receipt")
+                    logger.debug("Receipt logs: ${receipt.logs.joinToString { "Topic[0]: ${it.topics.getOrNull(0)}, Data: ${it.data}" }}")
                     ContractCreationResult(
                         success = false,
                         transactionHash = txHash,
@@ -187,6 +191,7 @@ class TransactionRelayService(
                     )
                 }
             } else {
+                logger.error("Transaction receipt indicates failure or not found. Status: ${receipt?.status}, Receipt: ${receipt != null}")
                 ContractCreationResult(
                     success = false,
                     transactionHash = txHash,
@@ -537,20 +542,42 @@ class TransactionRelayService(
 
     private fun parseContractAddressFromReceipt(receipt: TransactionReceipt): String? {
         return try {
-            // Look for ContractCreated event in logs
-            val contractCreatedTopic = "0x" + "a8f9d1b8a2b5c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0"
+            logger.debug("Parsing contract address from receipt with ${receipt.logs.size} logs")
             
-            receipt.logs.find { log ->
-                log.topics.isNotEmpty() && log.topics[0].startsWith(contractCreatedTopic.substring(0, 10))
-            }?.let { log ->
-                if (log.topics.size >= 1) {
-                    // Contract address is the first topic after the event signature
-                    val topicData = log.data
-                    if (topicData.length >= 66) {
-                        "0x" + topicData.substring(26, 66)
-                    } else null
-                } else null
+            // For factory contract calls, look for ContractCreated events
+            // The event signature hash for ContractCreated events varies by implementation
+            // Let's look for logs with non-empty topics and try to extract contract address
+            
+            for (log in receipt.logs) {
+                logger.debug("Log: topics=${log.topics.size}, data=${log.data}")
+                
+                // Check if this log has topics (event log)
+                if (log.topics.isNotEmpty()) {
+                    val eventSignature = log.topics[0]
+                    logger.debug("Event signature: $eventSignature")
+                    
+                    // For many factory patterns, the contract address is in the first topic after signature
+                    if (log.topics.size >= 2) {
+                        val potentialAddress = log.topics[1]
+                        // Topic is 32 bytes, address is last 20 bytes (40 hex chars)
+                        if (potentialAddress.length == 66) { // 0x + 64 hex chars
+                            val address = "0x" + potentialAddress.substring(26) // Skip 0x + 24 chars = last 20 bytes
+                            logger.debug("Extracted potential contract address from topic: $address")
+                            return address
+                        }
+                    }
+                    
+                    // Alternative: some events encode address in data field
+                    if (log.data.isNotEmpty() && log.data.length >= 66) {
+                        val address = "0x" + log.data.substring(26, 66)
+                        logger.debug("Extracted potential contract address from data: $address")
+                        return address
+                    }
+                }
             }
+            
+            logger.warn("No contract address found in transaction receipt logs")
+            null
         } catch (e: Exception) {
             logger.error("Error parsing contract address from receipt", e)
             null
