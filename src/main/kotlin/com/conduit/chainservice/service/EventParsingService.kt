@@ -11,7 +11,7 @@ import org.web3j.abi.FunctionReturnDecoder
 import org.web3j.abi.TypeReference
 import org.web3j.abi.datatypes.Address
 import org.web3j.abi.datatypes.Event
-import org.web3j.abi.datatypes.Utf8String
+import org.web3j.abi.datatypes.generated.Bytes32
 import org.web3j.abi.datatypes.generated.Uint256
 import org.web3j.protocol.Web3j
 import org.web3j.protocol.core.DefaultBlockParameterName
@@ -36,8 +36,7 @@ class EventParsingService(
             TypeReference.create(Address::class.java, true),  // indexed buyer
             TypeReference.create(Address::class.java, true),  // indexed seller
             TypeReference.create(Uint256::class.java, false), // amount
-            TypeReference.create(Uint256::class.java, false), // expiryTimestamp
-            TypeReference.create(Utf8String::class.java, false) // description
+            TypeReference.create(Uint256::class.java, false)  // expiryTimestamp
         )
     )
 
@@ -84,7 +83,7 @@ class EventParsingService(
                 contractAddress
             )
 
-            val logs = web3j.ethGetLogs(filter).send().logs
+            val logs = web3j.ethGetLogs(filter).send().logs ?: emptyList()
 
             val events = logs.mapNotNull { log ->
                 parseLogToEvent(log as Log)
@@ -112,7 +111,7 @@ class EventParsingService(
 
             filter.addSingleTopic(EventEncoder.encode(contractCreatedEvent))
 
-            val logs = web3j.ethGetLogs(filter).send().logs
+            val logs = web3j.ethGetLogs(filter).send().logs ?: emptyList()
 
             for (log in logs) {
                 val logEntry = log as Log
@@ -190,7 +189,6 @@ class EventParsingService(
 
             val amount = (nonIndexedValues[0] as Uint256).value
             val expiryTimestamp = (nonIndexedValues[1] as Uint256).value
-            val description = (nonIndexedValues[2] as Utf8String).value
 
             val blockInfo = web3j.ethGetBlockByNumber(
                 org.web3j.protocol.core.DefaultBlockParameter.valueOf(log.blockNumber.toString()),
@@ -211,8 +209,7 @@ class EventParsingService(
                     "buyer" to buyer,
                     "seller" to seller,
                     "amount" to amount,
-                    "expiryTimestamp" to expiryTimestamp,
-                    "description" to description
+                    "expiryTimestamp" to expiryTimestamp
                 )
             )
 
