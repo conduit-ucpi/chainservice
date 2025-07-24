@@ -108,10 +108,15 @@ class EventParsingService(
             val walletPaddedHex = "0x" + "0".repeat(24) + walletAddress.substring(2)
             logger.debug("Wallet padded for topic filtering: $walletPaddedHex")
             
+            // Get current block number and search recent blocks only
+            val currentBlock = web3j.ethBlockNumber().send().blockNumber
+            val fromBlock = currentBlock.subtract(BigInteger.valueOf(10000)) // Last ~10k blocks
+            logger.warn("Searching from block $fromBlock to $currentBlock (current)")
+            
             // First, let's check what events are ACTUALLY being emitted by the factory
             val allEventsFilter = EthFilter(
-                DefaultBlockParameterName.EARLIEST,
-                DefaultBlockParameterName.LATEST,
+                org.web3j.protocol.core.DefaultBlockParameter.valueOf(fromBlock),
+                org.web3j.protocol.core.DefaultBlockParameter.valueOf(currentBlock),
                 blockchainProperties.contractFactoryAddress
             )
             // Don't filter by topic - get ALL events from this factory
