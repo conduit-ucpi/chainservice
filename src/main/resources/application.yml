@@ -23,9 +23,6 @@ blockchain:
     limit-resolve: 200000
     price-multiplier: 1.2
 
-cors:
-  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
-
 management:
   endpoints:
     web:
