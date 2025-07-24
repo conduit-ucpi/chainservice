@@ -100,12 +100,30 @@ class EventParsingService(
     suspend fun findContractsByParticipant(walletAddress: String): List<String> {
         return try {
             logger.info("Finding contracts for participant: $walletAddress")
+            logger.debug("Factory contract address: ${blockchainProperties.contractFactoryAddress}")
 
             val contractAddresses = mutableSetOf<String>()
             
             // Pad wallet address to 32 bytes (64 hex chars) for topic filtering
             val walletPaddedHex = "0x" + "0".repeat(24) + walletAddress.substring(2)
             logger.debug("Wallet padded for topic filtering: $walletPaddedHex")
+            
+            // First, let's check if there are ANY ContractCreated events from this factory
+            val allEventsFilter = EthFilter(
+                DefaultBlockParameterName.EARLIEST,
+                DefaultBlockParameterName.LATEST,
+                blockchainProperties.contractFactoryAddress
+            )
+            allEventsFilter.addSingleTopic(EventEncoder.encode(contractCreatedEvent))
+            
+            val allEventLogs = web3j.ethGetLogs(allEventsFilter).send().logs ?: emptyList()
+            logger.debug("Total ContractCreated events from factory: ${allEventLogs.size}")
+            
+            if (allEventLogs.isNotEmpty()) {
+                val sampleLog = allEventLogs[0] as Log
+                logger.debug("Sample event topics: ${sampleLog.topics}")
+                logger.debug("Sample event data: ${sampleLog.data}")
+            }
 
             // Query 1: Find contracts where wallet is the buyer (topic[2])
             val buyerFilter = EthFilter(
