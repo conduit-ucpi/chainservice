@@ -5,8 +5,7 @@ build/
 !**/src/main/**/build/
 !**/src/test/**/build/
 
-# Gradle Wrapper
-gradle-wrapper.properties
+# Gradle Wrapper (keep gradle-wrapper.properties for builds)
 
 # IDE
 .idea/
