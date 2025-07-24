@@ -108,22 +108,36 @@ class EventParsingService(
             val walletPaddedHex = "0x" + "0".repeat(24) + walletAddress.substring(2)
             logger.debug("Wallet padded for topic filtering: $walletPaddedHex")
             
-            // First, let's check if there are ANY ContractCreated events from this factory
+            // First, let's check what events are ACTUALLY being emitted by the factory
             val allEventsFilter = EthFilter(
                 DefaultBlockParameterName.EARLIEST,
                 DefaultBlockParameterName.LATEST,
                 blockchainProperties.contractFactoryAddress
             )
-            allEventsFilter.addSingleTopic(EventEncoder.encode(contractCreatedEvent))
+            // Don't filter by topic - get ALL events from this factory
             
             val allEventLogs = web3j.ethGetLogs(allEventsFilter).send().logs ?: emptyList()
-            logger.debug("Total ContractCreated events from factory: ${allEventLogs.size}")
+            logger.warn("Total events from factory (any type): ${allEventLogs.size}")
             
-            if (allEventLogs.isNotEmpty()) {
-                val sampleLog = allEventLogs[0] as Log
-                logger.debug("Sample event topics: ${sampleLog.topics}")
-                logger.debug("Sample event data: ${sampleLog.data}")
+            // Show what events are actually being emitted
+            allEventLogs.take(3).forEach { log ->
+                val logEntry = log as Log
+                logger.warn("Actual event signature: ${logEntry.topics.getOrNull(0)}")
+                logger.warn("Event topics count: ${logEntry.topics.size}")
+                logger.warn("Event data: ${logEntry.data}")
             }
+            
+            // Now let's see what signature we're expecting
+            val expectedSignature = EventEncoder.encode(contractCreatedEvent)
+            logger.warn("Expected ContractCreated signature: $expectedSignature")
+            
+            // Try to find events matching our expected signature
+            val matchingEvents = allEventLogs.filter { log ->
+                val logEntry = log as Log
+                logEntry.topics.isNotEmpty() && logEntry.topics[0] == expectedSignature
+            }
+            logger.warn("Events matching our expected signature: ${matchingEvents.size}")
+            
 
             // Query 1: Find contracts where wallet is the buyer (topic[2])
             val buyerFilter = EthFilter(
