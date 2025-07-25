@@ -123,3 +123,19 @@ data class GasCostsResponse(
     val operations: List<OperationGasCost>,
     val timestamp: String
 )
+
+data class ApproveUSDCRequest(
+    @field:NotBlank(message = "User wallet address is required")
+    @field:Pattern(regexp = "^0x[a-fA-F0-9]{40}$", message = "Invalid user wallet address format")
+    val userWalletAddress: String,
+    
+    @field:NotBlank(message = "Signed transaction is required")
+    @field:Pattern(regexp = "^0x[a-fA-F0-9]+$", message = "Invalid signed transaction format")
+    val signedTransaction: String
+)
+
+data class ApproveUSDCResponse(
+    val success: Boolean,
+    val transactionHash: String?,
+    val error: String? = null
+)

@@ -444,4 +444,65 @@ class ChainController(
             )
         }
     }
+
+    @PostMapping("/approve-usdc")
+    @Operation(
+        summary = "Approve USDC Spending",
+        description = "Approves an escrow contract to spend USDC tokens on behalf of the user. The service provides gas money and forwards the user-signed transaction."
+    )
+    @ApiResponses(value = [
+        ApiResponse(
+            responseCode = "200",
+            description = "USDC approval successful",
+            content = [Content(schema = Schema(implementation = ApproveUSDCResponse::class))]
+        ),
+        ApiResponse(
+            responseCode = "400",
+            description = "Invalid request or transaction failed",
+            content = [Content(schema = Schema(implementation = ApproveUSDCResponse::class))]
+        )
+    ])
+    fun approveUSDC(
+        @Valid @RequestBody
+        @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            content = [Content(
+                examples = [ExampleObject(
+                    name = "Approve USDC Example",
+                    value = """{"userWalletAddress": "0x9876543210fedcba9876543210fedcba98765432", "signedTransaction": "0xf86c8082520894..."}"""
+                )]
+            )]
+        )
+        request: ApproveUSDCRequest
+    ): ResponseEntity<ApproveUSDCResponse> {
+        return try {
+            logger.info("Approve USDC request received for user: ${request.userWalletAddress}")
+            
+            val result = runBlocking {
+                transactionRelayService.approveUSDCWithGasTransfer(request.userWalletAddress, request.signedTransaction)
+            }
+
+            val response = ApproveUSDCResponse(
+                success = result.success,
+                transactionHash = result.transactionHash,
+                error = result.error
+            )
+
+            if (result.success) {
+                logger.info("USDC approved successfully: ${result.transactionHash}")
+                ResponseEntity.ok(response)
+            } else {
+                logger.error("USDC approval failed: ${result.error}")
+                ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response)
+            }
+
+        } catch (e: Exception) {
+            logger.error("Error in approve USDC endpoint", e)
+            val response = ApproveUSDCResponse(
+                success = false,
+                transactionHash = null,
+                error = e.message ?: "Internal server error"
+            )
+            ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response)
+        }
+    }
 }

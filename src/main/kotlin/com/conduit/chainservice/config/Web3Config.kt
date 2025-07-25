@@ -34,6 +34,7 @@ data class GasProperties(
     var limitDispute: Long = 9633, // 8757 + 10% buffer
     var limitClaim: Long = 51702, // 47002 + 10% buffer
     var limitResolve: Long = 200000,
+    var limitApproveUSDC: Long = 60000, // Standard ERC20 approve gas limit
     var priceMultiplier: Double = 1.2
 )
 
@@ -146,6 +147,7 @@ class Web3Config(private val blockchainProperties: BlockchainProperties) {
                     "raiseDispute" -> BigInteger.valueOf(blockchainProperties.gas.limitDispute)
                     "claimFunds" -> BigInteger.valueOf(blockchainProperties.gas.limitClaim)
                     "resolveDispute" -> BigInteger.valueOf(blockchainProperties.gas.limitResolve)
+                    "approveUSDC" -> BigInteger.valueOf(blockchainProperties.gas.limitApproveUSDC)
                     else -> DefaultGasProvider.GAS_LIMIT
                 }
             }
