@@ -34,6 +34,12 @@ class OpenApiConfig {
                         - **Dispute Resolution**: Supports raising and resolving contract disputes
                         - **Fund Claims**: Enables sellers to claim escrowed funds
                         
+                        ## Transaction Flow
+                        For post-creation contract interactions (deposit, claim, dispute), the frontend must:
+                        1. Have user sign the transaction with their wallet (to authorize token transfers/contract calls)
+                        2. Send the signed transaction hex to this service via the API
+                        3. Service relays the signed transaction to blockchain and pays gas fees
+                        
                         ## Authentication
                         All API endpoints require authentication via Bearer token obtained from the user service.
                         - **Bearer Token**: Include in Authorization header as `Bearer <token>`

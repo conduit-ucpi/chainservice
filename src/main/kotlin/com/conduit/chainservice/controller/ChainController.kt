@@ -107,7 +107,7 @@ class ChainController(
     @PostMapping("/raise-dispute")
     @Operation(
         summary = "Raise Dispute",
-        description = "Raises a dispute on an existing escrow contract by relaying a user-signed transaction."
+        description = "Raises a dispute on an existing escrow contract by relaying a user-signed transaction. The frontend must provide a transaction signed by the buyer or seller's wallet."
     )
     @ApiResponses(value = [
         ApiResponse(
@@ -127,7 +127,7 @@ class ChainController(
             content = [Content(
                 examples = [ExampleObject(
                     name = "Raise Dispute Example",
-                    value = """{"contractAddress": "0x1234567890abcdef1234567890abcdef12345678"}"""
+                    value = """{"contractAddress": "0x1234567890abcdef1234567890abcdef12345678", "signedTransaction": "0xf86c8082520894..."}"""
                 )]
             )]
         )
@@ -137,7 +137,7 @@ class ChainController(
             logger.info("Raise dispute request received for contract: ${request.contractAddress}")
             
             val result = runBlocking {
-                transactionRelayService.raiseDispute(request.contractAddress)
+                transactionRelayService.relayTransaction(request.signedTransaction)
             }
 
             val response = RaiseDisputeResponse(
@@ -168,7 +168,7 @@ class ChainController(
     @PostMapping("/claim-funds")
     @Operation(
         summary = "Claim Funds",
-        description = "Allows the seller to claim escrowed funds by relaying a user-signed transaction."
+        description = "Allows the seller to claim escrowed funds by relaying a user-signed transaction. The frontend must provide a transaction signed by the seller's wallet."
     )
     @ApiResponses(value = [
         ApiResponse(
@@ -188,7 +188,7 @@ class ChainController(
             content = [Content(
                 examples = [ExampleObject(
                     name = "Claim Funds Example",
-                    value = """{"contractAddress": "0x1234567890abcdef1234567890abcdef12345678"}"""
+                    value = """{"contractAddress": "0x1234567890abcdef1234567890abcdef12345678", "signedTransaction": "0xf86c8082520894..."}"""
                 )]
             )]
         )
@@ -198,7 +198,7 @@ class ChainController(
             logger.info("Claim funds request received for contract: ${request.contractAddress}")
             
             val result = runBlocking {
-                transactionRelayService.claimFunds(request.contractAddress)
+                transactionRelayService.relayTransaction(request.signedTransaction)
             }
 
             val response = ClaimFundsResponse(
@@ -229,7 +229,7 @@ class ChainController(
     @PostMapping("/deposit-funds")
     @Operation(
         summary = "Deposit Funds",
-        description = "Deposits funds into an escrow contract by calling the depositFunds function. The service pays the gas fees."
+        description = "Deposits funds into an escrow contract by relaying a user-signed transaction. The frontend must provide a transaction signed by the buyer's wallet to authorize USDC transfer. The service pays the gas fees."
     )
     @ApiResponses(value = [
         ApiResponse(
@@ -249,7 +249,7 @@ class ChainController(
             content = [Content(
                 examples = [ExampleObject(
                     name = "Deposit Funds Example",
-                    value = """{"contractAddress": "0x1234567890abcdef1234567890abcdef12345678"}"""
+                    value = """{"contractAddress": "0x1234567890abcdef1234567890abcdef12345678", "signedTransaction": "0xf86c8082520894..."}"""
                 )]
             )]
         )
@@ -259,7 +259,7 @@ class ChainController(
             logger.info("Deposit funds request received for contract: ${request.contractAddress}")
             
             val result = runBlocking {
-                transactionRelayService.depositFunds(request.contractAddress)
+                transactionRelayService.relayTransaction(request.signedTransaction)
             }
 
             val response = DepositFundsResponse(

@@ -36,7 +36,11 @@ data class CreateContractResponse(
 data class RaiseDisputeRequest(
     @field:NotBlank(message = "Contract address is required")
     @field:Pattern(regexp = "^0x[a-fA-F0-9]{40}$", message = "Invalid contract address format")
-    val contractAddress: String
+    val contractAddress: String,
+    
+    @field:NotBlank(message = "Signed transaction is required")
+    @field:Pattern(regexp = "^0x[a-fA-F0-9]+$", message = "Invalid signed transaction format")
+    val signedTransaction: String
 )
 
 data class RaiseDisputeResponse(
@@ -48,7 +52,11 @@ data class RaiseDisputeResponse(
 data class ClaimFundsRequest(
     @field:NotBlank(message = "Contract address is required")
     @field:Pattern(regexp = "^0x[a-fA-F0-9]{40}$", message = "Invalid contract address format")
-    val contractAddress: String
+    val contractAddress: String,
+    
+    @field:NotBlank(message = "Signed transaction is required")
+    @field:Pattern(regexp = "^0x[a-fA-F0-9]+$", message = "Invalid signed transaction format")
+    val signedTransaction: String
 )
 
 data class ClaimFundsResponse(
@@ -60,7 +68,11 @@ data class ClaimFundsResponse(
 data class DepositFundsRequest(
     @field:NotBlank(message = "Contract address is required")
     @field:Pattern(regexp = "^0x[a-fA-F0-9]{40}$", message = "Invalid contract address format")
-    val contractAddress: String
+    val contractAddress: String,
+    
+    @field:NotBlank(message = "Signed transaction is required")
+    @field:Pattern(regexp = "^0x[a-fA-F0-9]+$", message = "Invalid signed transaction format")
+    val signedTransaction: String
 )
 
 data class DepositFundsResponse(
