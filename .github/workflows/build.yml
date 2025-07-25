@@ -34,9 +34,10 @@ jobs:
      - name: Set up Docker Buildx
        uses: docker/setup-buildx-action@v3
 
-     - name: Lowercase the repo name
+     - name: Lowercase the repo name and set git SHA
        run: |
          echo "REPO_LOWER=$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+         echo "GIT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
 
      - name: Build and push Docker image
        uses: docker/build-push-action@v5
@@ -44,7 +45,9 @@ jobs:
          context: .
          file: ./Dockerfile
          push: true
-         tags: ghcr.io/${{ env.REPO_LOWER }}:latest
+         tags: |
+           ghcr.io/${{ env.REPO_LOWER }}:latest
+           ghcr.io/${{ env.REPO_LOWER }}:${{ env.GIT_SHA }}
          cache-from: type=gha
          cache-to: type=gha,mode=max
 
@@ -58,7 +61,7 @@ jobs:
          ssh -i ~/.ssh/deploy_key -l gituser ${{ vars.VM_IP }} -vv '
            set -e
            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-           docker pull ghcr.io/${{ env.REPO_LOWER }}:latest
+           docker pull ghcr.io/${{ env.REPO_LOWER }}:${{ env.GIT_SHA }}
            docker stop ${{ vars.SERVICE_NAME }} || true
            docker rm ${{ vars.SERVICE_NAME }} || true
            
@@ -73,5 +76,5 @@ jobs:
              -e RPC_URL=${{ vars.RPC_URL }} \
              -e RELAYER_WALLET_ADDRESS=${{ vars.RELAYER_WALLET_ADDRESS }} \
              -e RELAYER_PRIVATE_KEY=${{ secrets.RELAYER_PRIVATE_KEY }} \
-             ghcr.io/${{ env.REPO_LOWER }}:latest
+             ghcr.io/${{ env.REPO_LOWER }}:${{ env.GIT_SHA }}
          '
