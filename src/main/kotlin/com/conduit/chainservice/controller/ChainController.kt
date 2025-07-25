@@ -18,6 +18,7 @@ import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.validation.annotation.Validated
 import org.springframework.web.bind.annotation.*
+import java.time.Instant
 
 @RestController
 @RequestMapping("/api/chain")
@@ -249,7 +250,7 @@ class ChainController(
             content = [Content(
                 examples = [ExampleObject(
                     name = "Deposit Funds Example",
-                    value = """{"contractAddress": "0x1234567890abcdef1234567890abcdef12345678", "signedTransaction": "0xf86c8082520894..."}"""
+                    value = """{"contractAddress": "0x1234567890abcdef1234567890abcdef12345678", "userWalletAddress": "0x9876543210fedcba9876543210fedcba98765432", "signedTransaction": "0xf86c8082520894..."}"""
                 )]
             )]
         )
@@ -259,7 +260,7 @@ class ChainController(
             logger.info("Deposit funds request received for contract: ${request.contractAddress}")
             
             val result = runBlocking {
-                transactionRelayService.relayTransaction(request.signedTransaction)
+                transactionRelayService.depositFundsWithGasTransfer(request.userWalletAddress, request.signedTransaction)
             }
 
             val response = DepositFundsResponse(
@@ -397,6 +398,49 @@ class ChainController(
             logger.error("Error in get contracts endpoint", e)
             ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
                 GetContractsResponse(emptyList())
+            )
+        }
+    }
+
+    @GetMapping("/gas-costs")
+    @Operation(
+        summary = "Get Gas Costs",
+        description = "Returns current gas costs in nAVAX for all contract operations based on real-time network gas prices."
+    )
+    @ApiResponses(value = [
+        ApiResponse(
+            responseCode = "200",
+            description = "Gas costs retrieved successfully",
+            content = [Content(schema = Schema(implementation = GasCostsResponse::class))]
+        ),
+        ApiResponse(
+            responseCode = "500",
+            description = "Internal server error",
+            content = [Content(schema = Schema(implementation = ErrorResponse::class))]
+        )
+    ])
+    fun getGasCosts(): ResponseEntity<GasCostsResponse> {
+        return try {
+            logger.info("Gas costs request received")
+            
+            val operationCosts = transactionRelayService.getOperationGasCosts()
+            val response = GasCostsResponse(
+                operations = operationCosts,
+                timestamp = Instant.now().toString()
+            )
+            
+            logger.info("Gas costs retrieved successfully for ${operationCosts.size} operations")
+            ResponseEntity.ok(response)
+            
+        } catch (e: Exception) {
+            logger.error("Error in gas costs endpoint", e)
+            val errorResponse = ErrorResponse(
+                error = "Internal server error",
+                message = e.message ?: "Failed to retrieve gas costs",
+                timestamp = Instant.now().toString()
+            )
+            ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
+                GasCostsResponse(emptyList(), Instant.now().toString())
             )
         }
     }

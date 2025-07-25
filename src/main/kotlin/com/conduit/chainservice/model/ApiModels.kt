@@ -70,6 +70,10 @@ data class DepositFundsRequest(
     @field:Pattern(regexp = "^0x[a-fA-F0-9]{40}$", message = "Invalid contract address format")
     val contractAddress: String,
     
+    @field:NotBlank(message = "User wallet address is required")
+    @field:Pattern(regexp = "^0x[a-fA-F0-9]{40}$", message = "Invalid user wallet address format")
+    val userWalletAddress: String,
+    
     @field:NotBlank(message = "Signed transaction is required")
     @field:Pattern(regexp = "^0x[a-fA-F0-9]+$", message = "Invalid signed transaction format")
     val signedTransaction: String
@@ -104,5 +108,18 @@ data class GetContractsResponse(
 data class ErrorResponse(
     val error: String,
     val message: String,
+    val timestamp: String
+)
+
+data class OperationGasCost(
+    val operation: String,
+    val gasLimit: Long,
+    val gasPriceWei: BigInteger,
+    val totalCostWei: BigInteger,
+    val totalCostAvax: String
+)
+
+data class GasCostsResponse(
+    val operations: List<OperationGasCost>,
     val timestamp: String
 )

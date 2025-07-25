@@ -2,6 +2,7 @@ package com.conduit.chainservice.service
 
 import com.conduit.chainservice.config.BlockchainProperties
 import com.conduit.chainservice.model.ContractCreationResult
+import com.conduit.chainservice.model.OperationGasCost
 import com.conduit.chainservice.model.TransactionResult
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
@@ -13,12 +14,15 @@ import org.web3j.abi.datatypes.generated.Uint256
 import org.web3j.crypto.Credentials
 import org.web3j.crypto.RawTransaction
 import org.web3j.crypto.TransactionDecoder
+import org.web3j.crypto.Keys
 import org.web3j.protocol.Web3j
 import org.web3j.protocol.core.DefaultBlockParameterName
 import org.web3j.protocol.core.methods.response.TransactionReceipt
 import org.web3j.tx.gas.ContractGasProvider
 import org.web3j.utils.Numeric
+import java.math.BigDecimal
 import java.math.BigInteger
+import java.math.RoundingMode
 
 @Service
 class TransactionRelayService(
@@ -576,6 +580,174 @@ class TransactionRelayService(
         } catch (e: Exception) {
             logger.error("Error parsing contract address from receipt", e)
             null
+        }
+    }
+
+    fun getOperationGasCosts(): List<OperationGasCost> {
+        val operations = listOf(
+            "createContract" to "createContract",
+            "depositFunds" to "depositFunds", 
+            "raiseDispute" to "raiseDispute",
+            "claimFunds" to "claimFunds",
+            "resolveDispute" to "resolveDispute"
+        )
+
+        return operations.map { (operation, gasFunction) ->
+            val gasLimit = gasProvider.getGasLimit(gasFunction).toLong()
+            val gasPrice = gasProvider.getGasPrice(gasFunction)
+            val totalCostWei = gasPrice.multiply(BigInteger.valueOf(gasLimit))
+            val totalCostAvax = weiToAvax(totalCostWei)
+
+            OperationGasCost(
+                operation = operation,
+                gasLimit = gasLimit,
+                gasPriceWei = gasPrice,
+                totalCostWei = totalCostWei,
+                totalCostAvax = totalCostAvax
+            )
+        }
+    }
+
+    private fun weiToAvax(wei: BigInteger): String {
+        val weiDecimal = BigDecimal(wei)
+        val avaxDecimal = weiDecimal.divide(BigDecimal("1000000000000000000"), 18, RoundingMode.HALF_UP)
+        return avaxDecimal.stripTrailingZeros().toPlainString()
+    }
+
+
+    private suspend fun transferGasToUser(userAddress: String, gasAmount: BigInteger): TransactionResult {
+        return try {
+            logger.info("Transferring $gasAmount wei to user: $userAddress")
+            
+            val nonce = web3j.ethGetTransactionCount(
+                relayerCredentials.address,
+                DefaultBlockParameterName.PENDING
+            ).send().transactionCount
+            
+            val gasPrice = gasProvider.gasPrice
+            val gasLimit = BigInteger.valueOf(21000) // Standard gas limit for ETH transfer
+
+            val rawTransaction = RawTransaction.createEtherTransaction(
+                nonce,
+                gasPrice,
+                gasLimit,
+                userAddress,
+                gasAmount
+            )
+
+            val signedTransaction = org.web3j.crypto.TransactionEncoder.signMessage(
+                rawTransaction,
+                chainId,
+                relayerCredentials
+            )
+
+            val transactionHash = web3j.ethSendRawTransaction(
+                Numeric.toHexString(signedTransaction)
+            ).send()
+
+            if (transactionHash.hasError()) {
+                logger.error("Gas transfer failed: ${transactionHash.error.message}")
+                return TransactionResult(
+                    success = false,
+                    transactionHash = null,
+                    error = transactionHash.error.message
+                )
+            }
+
+            val txHash = transactionHash.transactionHash
+            logger.info("Gas transfer transaction sent: $txHash")
+
+            val receipt = waitForTransactionReceipt(txHash)
+            if (receipt?.isStatusOK == true) {
+                logger.info("Gas transferred successfully to user")
+                TransactionResult(
+                    success = true,
+                    transactionHash = txHash
+                )
+            } else {
+                TransactionResult(
+                    success = false,
+                    transactionHash = txHash,
+                    error = "Gas transfer transaction failed"
+                )
+            }
+
+        } catch (e: Exception) {
+            logger.error("Error transferring gas to user", e)
+            TransactionResult(
+                success = false,
+                transactionHash = null,
+                error = e.message ?: "Unknown error occurred"
+            )
+        }
+    }
+
+    suspend fun depositFundsWithGasTransfer(userWalletAddress: String, signedTransactionHex: String): TransactionResult {
+        return try {
+            logger.info("Processing deposit funds with gas transfer for user: $userWalletAddress")
+
+            // Calculate gas cost for depositFunds operation
+            val gasLimit = gasProvider.getGasLimit("depositFunds")
+            val gasPrice = gasProvider.getGasPrice("depositFunds")
+            val totalGasCost = gasPrice.multiply(gasLimit)
+
+            // Check user's current AVAX balance
+            val currentBalance = web3j.ethGetBalance(userWalletAddress, DefaultBlockParameterName.LATEST).send().balance
+            
+            // Only transfer gas if user doesn't have enough
+            if (currentBalance < totalGasCost) {
+                val gasNeeded = totalGasCost.subtract(currentBalance)
+                logger.info("User has $currentBalance wei, needs $totalGasCost wei, transferring $gasNeeded wei")
+                
+                val gasTransferResult = transferGasToUser(userWalletAddress, gasNeeded)
+                if (!gasTransferResult.success) {
+                    logger.error("Failed to transfer gas to user: ${gasTransferResult.error}")
+                    return TransactionResult(
+                        success = false,
+                        transactionHash = null,
+                        error = "Failed to transfer gas to user: ${gasTransferResult.error}"
+                    )
+                }
+            } else {
+                logger.info("User already has sufficient balance ($currentBalance wei >= $totalGasCost wei), skipping gas transfer")
+            }
+
+            // Forward the original signed transaction unchanged
+            val transactionHash = web3j.ethSendRawTransaction(signedTransactionHex).send()
+
+            if (transactionHash.hasError()) {
+                logger.error("Transaction forwarding failed: ${transactionHash.error.message}")
+                return TransactionResult(
+                    success = false,
+                    transactionHash = null,
+                    error = transactionHash.error.message
+                )
+            }
+
+            val txHash = transactionHash.transactionHash
+            logger.info("Transaction forwarded successfully: $txHash")
+
+            val receipt = waitForTransactionReceipt(txHash)
+            if (receipt?.isStatusOK == true) {
+                TransactionResult(
+                    success = true,
+                    transactionHash = txHash
+                )
+            } else {
+                TransactionResult(
+                    success = false,
+                    transactionHash = txHash,
+                    error = "Transaction failed on blockchain"
+                )
+            }
+
+        } catch (e: Exception) {
+            logger.error("Error processing deposit funds with gas transfer", e)
+            TransactionResult(
+                success = false,
+                transactionHash = null,
+                error = e.message ?: "Unknown error occurred"
+            )
         }
     }
 }

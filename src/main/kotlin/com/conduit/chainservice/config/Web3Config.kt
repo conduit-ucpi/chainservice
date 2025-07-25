@@ -30,9 +30,9 @@ data class RelayerProperties(
 
 data class GasProperties(
     var limitCreateContract: Long = 500000,
-    var limitDeposit: Long = 250000,
-    var limitDispute: Long = 300000,
-    var limitClaim: Long = 200000,
+    var limitDeposit: Long = 74161, // 67419 + 10% buffer
+    var limitDispute: Long = 9633, // 8757 + 10% buffer
+    var limitClaim: Long = 51702, // 47002 + 10% buffer
     var limitResolve: Long = 200000,
     var priceMultiplier: Double = 1.2
 )
@@ -119,12 +119,20 @@ class Web3Config(private val blockchainProperties: BlockchainProperties) {
     }
 
     @Bean
-    fun gasProvider(): ContractGasProvider {
+    fun gasProvider(web3j: Web3j): ContractGasProvider {
         return object : ContractGasProvider {
             override fun getGasPrice(contractFunc: String?): BigInteger {
-                return DefaultGasProvider.GAS_PRICE.multiply(
-                    BigInteger.valueOf((blockchainProperties.gas.priceMultiplier * 100).toLong())
-                ).divide(BigInteger.valueOf(100))
+                return try {
+                    val networkGasPrice = web3j.ethGasPrice().send().gasPrice
+                    networkGasPrice.multiply(
+                        BigInteger.valueOf((blockchainProperties.gas.priceMultiplier * 100).toLong())
+                    ).divide(BigInteger.valueOf(100))
+                } catch (e: Exception) {
+                    logger.warn("Failed to fetch gas price from network, using default: ${e.message}")
+                    DefaultGasProvider.GAS_PRICE.multiply(
+                        BigInteger.valueOf((blockchainProperties.gas.priceMultiplier * 100).toLong())
+                    ).divide(BigInteger.valueOf(100))
+                }
             }
 
             override fun getGasPrice(): BigInteger {
