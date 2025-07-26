@@ -690,10 +690,20 @@ class TransactionRelayService(
             // Extract gas values from user's signed transaction
             val decodedTx = TransactionDecoder.decode(signedTransactionHex)
             val userGasLimit = decodedTx.gasLimit
-            val userGasPrice = decodedTx.gasPrice
-            val totalGasCost = userGasPrice.multiply(userGasLimit)
             
-            logger.info("User's transaction gas parameters: gasLimit=$userGasLimit, gasPrice=$userGasPrice wei, totalCost=$totalGasCost wei")
+            // Handle both legacy and EIP-1559 transactions
+            val effectiveGasPrice = if (decodedTx.type == org.web3j.crypto.transaction.type.TransactionType.EIP1559.value) {
+                // For EIP-1559, use maxFeePerGas as worst-case gas price
+                val tx1559 = decodedTx as org.web3j.crypto.transaction.type.Transaction1559
+                tx1559.maxFeePerGas
+            } else {
+                // For legacy transactions, use gasPrice
+                decodedTx.gasPrice
+            }
+            
+            val totalGasCost = effectiveGasPrice.multiply(userGasLimit)
+            
+            logger.info("User's transaction gas parameters: gasLimit=$userGasLimit, effectiveGasPrice=$effectiveGasPrice wei, totalCost=$totalGasCost wei")
 
             // Check user's current AVAX balance
             val currentBalance = web3j.ethGetBalance(userWalletAddress, DefaultBlockParameterName.LATEST).send().balance
@@ -762,10 +772,20 @@ class TransactionRelayService(
             // Extract gas values from user's signed transaction
             val decodedTx = TransactionDecoder.decode(signedTransactionHex)
             val userGasLimit = decodedTx.gasLimit
-            val userGasPrice = decodedTx.gasPrice
-            val totalGasCost = userGasPrice.multiply(userGasLimit)
             
-            logger.info("User's transaction gas parameters: gasLimit=$userGasLimit, gasPrice=$userGasPrice wei, totalCost=$totalGasCost wei")
+            // Handle both legacy and EIP-1559 transactions
+            val effectiveGasPrice = if (decodedTx.type == org.web3j.crypto.transaction.type.TransactionType.EIP1559.value) {
+                // For EIP-1559, use maxFeePerGas as worst-case gas price
+                val tx1559 = decodedTx as org.web3j.crypto.transaction.type.Transaction1559
+                tx1559.maxFeePerGas
+            } else {
+                // For legacy transactions, use gasPrice
+                decodedTx.gasPrice
+            }
+            
+            val totalGasCost = effectiveGasPrice.multiply(userGasLimit)
+            
+            logger.info("User's transaction gas parameters: gasLimit=$userGasLimit, effectiveGasPrice=$effectiveGasPrice wei, totalCost=$totalGasCost wei")
 
             // Check user's current AVAX balance
             val currentBalance = web3j.ethGetBalance(userWalletAddress, DefaultBlockParameterName.LATEST).send().balance
