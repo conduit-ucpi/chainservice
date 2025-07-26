@@ -687,10 +687,13 @@ class TransactionRelayService(
         return try {
             logger.info("Processing deposit funds with gas transfer for user: $userWalletAddress")
 
-            // Calculate gas cost for depositFunds operation
-            val gasLimit = gasProvider.getGasLimit("depositFunds")
-            val gasPrice = gasProvider.getGasPrice("depositFunds")
-            val totalGasCost = gasPrice.multiply(gasLimit)
+            // Extract gas values from user's signed transaction
+            val decodedTx = TransactionDecoder.decode(signedTransactionHex)
+            val userGasLimit = decodedTx.gasLimit
+            val userGasPrice = decodedTx.gasPrice
+            val totalGasCost = userGasPrice.multiply(userGasLimit)
+            
+            logger.info("User's transaction gas parameters: gasLimit=$userGasLimit, gasPrice=$userGasPrice wei, totalCost=$totalGasCost wei")
 
             // Check user's current AVAX balance
             val currentBalance = web3j.ethGetBalance(userWalletAddress, DefaultBlockParameterName.LATEST).send().balance
@@ -756,10 +759,13 @@ class TransactionRelayService(
         return try {
             logger.info("Processing USDC approval with gas transfer for user: $userWalletAddress")
 
-            // Calculate gas cost for approveUSDC operation
-            val gasLimit = gasProvider.getGasLimit("approveUSDC")
-            val gasPrice = gasProvider.getGasPrice("approveUSDC")
-            val totalGasCost = gasPrice.multiply(gasLimit)
+            // Extract gas values from user's signed transaction
+            val decodedTx = TransactionDecoder.decode(signedTransactionHex)
+            val userGasLimit = decodedTx.gasLimit
+            val userGasPrice = decodedTx.gasPrice
+            val totalGasCost = userGasPrice.multiply(userGasLimit)
+            
+            logger.info("User's transaction gas parameters: gasLimit=$userGasLimit, gasPrice=$userGasPrice wei, totalCost=$totalGasCost wei")
 
             // Check user's current AVAX balance
             val currentBalance = web3j.ethGetBalance(userWalletAddress, DefaultBlockParameterName.LATEST).send().balance
