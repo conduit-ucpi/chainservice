@@ -687,33 +687,35 @@ class TransactionRelayService(
         return try {
             logger.info("Processing deposit funds with gas transfer for user: $userWalletAddress")
 
-            // Extract gas values from user's signed transaction
+            // Extract exact transaction cost from user's signed transaction
             val decodedTx = TransactionDecoder.decode(signedTransactionHex)
             val userGasLimit = decodedTx.gasLimit
+            val transactionValue = decodedTx.value ?: BigInteger.ZERO
             
-            // Handle both legacy and EIP-1559 transactions
-            val effectiveGasPrice = if (decodedTx.type == org.web3j.crypto.transaction.type.TransactionType.EIP1559.value) {
-                // For EIP-1559, use maxFeePerGas as worst-case gas price
+            // Calculate exact gas cost based on transaction type
+            val gasCost = try {
+                // Legacy transaction: gasPrice * gasLimit
+                decodedTx.gasPrice.multiply(userGasLimit)
+            } catch (e: UnsupportedOperationException) {
+                // EIP-1559 transaction: maxFeePerGas * gasLimit
                 val tx1559 = decodedTx as org.web3j.crypto.transaction.type.Transaction1559
-                tx1559.maxFeePerGas
-            } else {
-                // For legacy transactions, use gasPrice
-                decodedTx.gasPrice
+                tx1559.maxFeePerGas.multiply(userGasLimit)
             }
             
-            val totalGasCost = effectiveGasPrice.multiply(userGasLimit)
+            // Total amount needed = gas cost + transaction value
+            val totalAmountNeeded = gasCost.add(transactionValue)
             
-            logger.info("User's transaction gas parameters: gasLimit=$userGasLimit, effectiveGasPrice=$effectiveGasPrice wei, totalCost=$totalGasCost wei")
+            logger.info("Transaction requires: gasLimit=$userGasLimit, gasCost=$gasCost wei, transactionValue=$transactionValue wei, totalNeeded=$totalAmountNeeded wei")
 
             // Check user's current AVAX balance
             val currentBalance = web3j.ethGetBalance(userWalletAddress, DefaultBlockParameterName.LATEST).send().balance
             
-            // Only transfer gas if user doesn't have enough
-            if (currentBalance < totalGasCost) {
-                val gasNeeded = totalGasCost.subtract(currentBalance)
-                logger.info("User has $currentBalance wei, needs $totalGasCost wei, transferring $gasNeeded wei")
+            // Only transfer if user doesn't have enough for the entire transaction
+            if (currentBalance < totalAmountNeeded) {
+                val amountNeeded = totalAmountNeeded.subtract(currentBalance)
+                logger.info("User has $currentBalance wei, needs $totalAmountNeeded wei, transferring $amountNeeded wei")
                 
-                val gasTransferResult = transferGasToUser(userWalletAddress, gasNeeded)
+                val gasTransferResult = transferGasToUser(userWalletAddress, amountNeeded)
                 if (!gasTransferResult.success) {
                     logger.error("Failed to transfer gas to user: ${gasTransferResult.error}")
                     return TransactionResult(
@@ -723,7 +725,7 @@ class TransactionRelayService(
                     )
                 }
             } else {
-                logger.info("User already has sufficient balance ($currentBalance wei >= $totalGasCost wei), skipping gas transfer")
+                logger.info("User already has sufficient balance ($currentBalance wei >= $totalAmountNeeded wei), skipping transfer")
             }
 
             // Forward the original signed transaction unchanged
@@ -769,33 +771,35 @@ class TransactionRelayService(
         return try {
             logger.info("Processing USDC approval with gas transfer for user: $userWalletAddress")
 
-            // Extract gas values from user's signed transaction
+            // Extract exact transaction cost from user's signed transaction
             val decodedTx = TransactionDecoder.decode(signedTransactionHex)
             val userGasLimit = decodedTx.gasLimit
+            val transactionValue = decodedTx.value ?: BigInteger.ZERO
             
-            // Handle both legacy and EIP-1559 transactions
-            val effectiveGasPrice = if (decodedTx.type == org.web3j.crypto.transaction.type.TransactionType.EIP1559.value) {
-                // For EIP-1559, use maxFeePerGas as worst-case gas price
+            // Calculate exact gas cost based on transaction type
+            val gasCost = try {
+                // Legacy transaction: gasPrice * gasLimit
+                decodedTx.gasPrice.multiply(userGasLimit)
+            } catch (e: UnsupportedOperationException) {
+                // EIP-1559 transaction: maxFeePerGas * gasLimit
                 val tx1559 = decodedTx as org.web3j.crypto.transaction.type.Transaction1559
-                tx1559.maxFeePerGas
-            } else {
-                // For legacy transactions, use gasPrice
-                decodedTx.gasPrice
+                tx1559.maxFeePerGas.multiply(userGasLimit)
             }
             
-            val totalGasCost = effectiveGasPrice.multiply(userGasLimit)
+            // Total amount needed = gas cost + transaction value
+            val totalAmountNeeded = gasCost.add(transactionValue)
             
-            logger.info("User's transaction gas parameters: gasLimit=$userGasLimit, effectiveGasPrice=$effectiveGasPrice wei, totalCost=$totalGasCost wei")
+            logger.info("Transaction requires: gasLimit=$userGasLimit, gasCost=$gasCost wei, transactionValue=$transactionValue wei, totalNeeded=$totalAmountNeeded wei")
 
             // Check user's current AVAX balance
             val currentBalance = web3j.ethGetBalance(userWalletAddress, DefaultBlockParameterName.LATEST).send().balance
             
-            // Only transfer gas if user doesn't have enough
-            if (currentBalance < totalGasCost) {
-                val gasNeeded = totalGasCost.subtract(currentBalance)
-                logger.info("User has $currentBalance wei, needs $totalGasCost wei, transferring $gasNeeded wei")
+            // Only transfer if user doesn't have enough for the entire transaction
+            if (currentBalance < totalAmountNeeded) {
+                val amountNeeded = totalAmountNeeded.subtract(currentBalance)
+                logger.info("User has $currentBalance wei, needs $totalAmountNeeded wei, transferring $amountNeeded wei")
                 
-                val gasTransferResult = transferGasToUser(userWalletAddress, gasNeeded)
+                val gasTransferResult = transferGasToUser(userWalletAddress, amountNeeded)
                 if (!gasTransferResult.success) {
                     logger.error("Failed to transfer gas to user: ${gasTransferResult.error}")
                     return TransactionResult(
@@ -805,7 +809,7 @@ class TransactionRelayService(
                     )
                 }
             } else {
-                logger.info("User already has sufficient balance ($currentBalance wei >= $totalGasCost wei), skipping gas transfer")
+                logger.info("User already has sufficient balance ($currentBalance wei >= $totalAmountNeeded wei), skipping transfer")
             }
 
             // Forward the original signed transaction unchanged
