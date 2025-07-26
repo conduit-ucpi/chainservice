@@ -697,9 +697,16 @@ class TransactionRelayService(
                 // Legacy transaction: gasPrice * gasLimit
                 decodedTx.gasPrice.multiply(userGasLimit)
             } catch (e: UnsupportedOperationException) {
-                // EIP-1559 transaction: maxFeePerGas * gasLimit
-                val tx1559 = decodedTx as org.web3j.crypto.transaction.type.Transaction1559
-                tx1559.maxFeePerGas.multiply(userGasLimit)
+                // EIP-1559 transaction: need to access the underlying transaction
+                val transaction = decodedTx.transaction
+                if (transaction is org.web3j.crypto.transaction.type.Transaction1559) {
+                    transaction.maxFeePerGas.multiply(userGasLimit)
+                } else {
+                    // Fallback: use our gas provider estimate
+                    logger.warn("Could not determine gas cost from transaction, using fallback estimate")
+                    val fallbackGasPrice = gasProvider.getGasPrice("approveUSDC")
+                    fallbackGasPrice.multiply(userGasLimit)
+                }
             }
             
             // Total amount needed = gas cost + transaction value
@@ -781,9 +788,16 @@ class TransactionRelayService(
                 // Legacy transaction: gasPrice * gasLimit
                 decodedTx.gasPrice.multiply(userGasLimit)
             } catch (e: UnsupportedOperationException) {
-                // EIP-1559 transaction: maxFeePerGas * gasLimit
-                val tx1559 = decodedTx as org.web3j.crypto.transaction.type.Transaction1559
-                tx1559.maxFeePerGas.multiply(userGasLimit)
+                // EIP-1559 transaction: need to access the underlying transaction
+                val transaction = decodedTx.transaction
+                if (transaction is org.web3j.crypto.transaction.type.Transaction1559) {
+                    transaction.maxFeePerGas.multiply(userGasLimit)
+                } else {
+                    // Fallback: use our gas provider estimate
+                    logger.warn("Could not determine gas cost from transaction, using fallback estimate")
+                    val fallbackGasPrice = gasProvider.getGasPrice("approveUSDC")
+                    fallbackGasPrice.multiply(userGasLimit)
+                }
             }
             
             // Total amount needed = gas cost + transaction value
