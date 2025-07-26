@@ -76,5 +76,6 @@ jobs:
              -e RPC_URL=${{ vars.RPC_URL }} \
              -e RELAYER_WALLET_ADDRESS=${{ vars.RELAYER_WALLET_ADDRESS }} \
              -e RELAYER_PRIVATE_KEY=${{ secrets.RELAYER_PRIVATE_KEY }} \
+             -e MIN_GAS_WEI=${{ vars.MIN_GAS_WEI }} \
              ghcr.io/${{ env.REPO_LOWER }}:${{ env.GIT_SHA }}
          '

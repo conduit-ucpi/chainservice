@@ -35,7 +35,8 @@ data class GasProperties(
     var limitClaim: Long = 51702, // 47002 + 10% buffer
     var limitResolve: Long = 200000,
     var limitApproveUSDC: Long = 60000, // Standard ERC20 approve gas limit
-    var priceMultiplier: Double = 1.7
+    var priceMultiplier: Double = 1.7,
+    var minimumGasPriceWei: Long = 6 // Minimum gas price in wei
 )
 
 @Configuration
@@ -125,14 +126,16 @@ class Web3Config(private val blockchainProperties: BlockchainProperties) {
             override fun getGasPrice(contractFunc: String?): BigInteger {
                 return try {
                     val networkGasPrice = web3j.ethGasPrice().send().gasPrice
-                    networkGasPrice.multiply(
+                    val multipliedPrice = networkGasPrice.multiply(
                         BigInteger.valueOf((blockchainProperties.gas.priceMultiplier * 100).toLong())
                     ).divide(BigInteger.valueOf(100))
+                    
+                    // Enforce minimum gas price
+                    val minimumPrice = BigInteger.valueOf(blockchainProperties.gas.minimumGasPriceWei)
+                    maxOf(multipliedPrice, minimumPrice)
                 } catch (e: Exception) {
-                    logger.warn("Failed to fetch gas price from network, using default: ${e.message}")
-                    DefaultGasProvider.GAS_PRICE.multiply(
-                        BigInteger.valueOf((blockchainProperties.gas.priceMultiplier * 100).toLong())
-                    ).divide(BigInteger.valueOf(100))
+                    logger.warn("Failed to fetch gas price from network, using minimum: ${e.message}")
+                    BigInteger.valueOf(blockchainProperties.gas.minimumGasPriceWei)
                 }
             }
 
