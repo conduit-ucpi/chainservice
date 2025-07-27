@@ -2,6 +2,7 @@ package com.conduit.chainservice.controller
 
 import com.conduit.chainservice.model.*
 import com.conduit.chainservice.service.ContractQueryService
+import com.conduit.chainservice.service.ContractServiceClient
 import com.conduit.chainservice.service.TransactionRelayService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
@@ -11,9 +12,11 @@ import io.swagger.v3.oas.annotations.media.Schema
 import io.swagger.v3.oas.annotations.responses.ApiResponse
 import io.swagger.v3.oas.annotations.responses.ApiResponses
 import io.swagger.v3.oas.annotations.tags.Tag
+import jakarta.servlet.http.HttpServletRequest
 import jakarta.validation.Valid
 import kotlinx.coroutines.runBlocking
 import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.validation.annotation.Validated
@@ -26,10 +29,14 @@ import java.time.Instant
 @Tag(name = "Chain Service", description = "Blockchain transaction relay and contract management API")
 class ChainController(
     private val transactionRelayService: TransactionRelayService,
-    private val contractQueryService: ContractQueryService
+    private val contractQueryService: ContractQueryService,
+    private val contractServiceClient: ContractServiceClient
 ) {
 
     private val logger = LoggerFactory.getLogger(ChainController::class.java)
+    
+    @Value("\${blockchain.chain-id}")
+    private lateinit var chainId: String
 
     @PostMapping("/create-contract")
     @Operation(
@@ -230,7 +237,7 @@ class ChainController(
     @PostMapping("/deposit-funds")
     @Operation(
         summary = "Deposit Funds",
-        description = "Deposits funds into an escrow contract by relaying a user-signed transaction. The frontend must provide a transaction signed by the buyer's wallet to authorize USDC transfer. The service pays the gas fees."
+        description = "Deposits funds into an escrow contract by relaying a user-signed transaction. The frontend must provide a transaction signed by the buyer's wallet to authorize USDC transfer. The service pays the gas fees. Optionally, if a contractId is provided, the contract service will be notified of the successful deployment."
     )
     @ApiResponses(value = [
         ApiResponse(
@@ -248,13 +255,20 @@ class ChainController(
         @Valid @RequestBody
         @io.swagger.v3.oas.annotations.parameters.RequestBody(
             content = [Content(
-                examples = [ExampleObject(
-                    name = "Deposit Funds Example",
-                    value = """{"contractAddress": "0x1234567890abcdef1234567890abcdef12345678", "userWalletAddress": "0x9876543210fedcba9876543210fedcba98765432", "signedTransaction": "0xf86c8082520894..."}"""
-                )]
+                examples = [
+                    ExampleObject(
+                        name = "Deposit Funds Example with Contract ID",
+                        value = """{"contractAddress": "0x1234567890abcdef1234567890abcdef12345678", "userWalletAddress": "0x9876543210fedcba9876543210fedcba98765432", "signedTransaction": "0xf86c8082520894...", "contractId": "507f1f77bcf86cd799439011"}"""
+                    ),
+                    ExampleObject(
+                        name = "Deposit Funds Example without Contract ID",
+                        value = """{"contractAddress": "0x1234567890abcdef1234567890abcdef12345678", "userWalletAddress": "0x9876543210fedcba9876543210fedcba98765432", "signedTransaction": "0xf86c8082520894..."}"""
+                    )
+                ]
             )]
         )
-        request: DepositFundsRequest
+        request: DepositFundsRequest,
+        httpServletRequest: HttpServletRequest
     ): ResponseEntity<DepositFundsResponse> {
         return try {
             logger.info("Deposit funds request received for contract: ${request.contractAddress}")
@@ -271,6 +285,27 @@ class ChainController(
 
             if (result.success) {
                 logger.info("Funds deposited successfully: ${result.transactionHash}")
+                
+                // Update contract service with deployment details if contractId is provided
+                if (request.contractId != null) {
+                    try {
+                        runBlocking {
+                            contractServiceClient.updateContractWithDeployment(
+                                contractId = request.contractId,
+                                chainAddress = request.contractAddress,
+                                chainId = chainId,
+                                request = httpServletRequest
+                            ).block()
+                        }
+                        logger.info("Contract service updated successfully for contract ID: ${request.contractId}")
+                    } catch (e: Exception) {
+                        // Log the error but don't fail the deposit response since the blockchain transaction succeeded
+                        logger.error("Failed to update contract service for contract ID: ${request.contractId}", e)
+                    }
+                } else {
+                    logger.info("No contractId provided in deposit request, skipping contract service update")
+                }
+                
                 ResponseEntity.ok(response)
             } else {
                 logger.error("Funds deposit failed: ${result.error}")

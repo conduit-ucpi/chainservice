@@ -28,6 +28,10 @@ auth:
   user-service-url: ${USER_SERVICE_URL}
   enabled: ${AUTH_ENABLED:true}
 
+contract-service:
+  url: ${CONTRACT_SERVICE_URL:http://localhost:8080}
+  enabled: ${CONTRACT_SERVICE_ENABLED:true}
+
 management:
   endpoints:
     web:

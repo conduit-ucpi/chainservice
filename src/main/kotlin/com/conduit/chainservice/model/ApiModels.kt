@@ -76,7 +76,9 @@ data class DepositFundsRequest(
     
     @field:NotBlank(message = "Signed transaction is required")
     @field:Pattern(regexp = "^0x[a-fA-F0-9]+$", message = "Invalid signed transaction format")
-    val signedTransaction: String
+    val signedTransaction: String,
+    
+    val contractId: String? = null
 )
 
 data class DepositFundsResponse(
@@ -138,4 +140,16 @@ data class ApproveUSDCResponse(
     val success: Boolean,
     val transactionHash: String?,
     val error: String? = null
+)
+
+data class ContractServiceUpdateRequest(
+    val chainAddress: String,
+    val chainId: String
+)
+
+data class ContractServiceUpdateResponse(
+    val id: String,
+    val chainAddress: String,
+    val chainId: String,
+    val status: String
 )
