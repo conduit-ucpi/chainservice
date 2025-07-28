@@ -88,6 +88,7 @@ The application requires these environment variables to start:
 - `TRUSTED_FORWARDER_ADDRESS` - MinimalForwarder contract address for EIP-2771 meta-transactions
 - `RELAYER_PRIVATE_KEY` - Private key for gas-paying wallet (must be 0x-prefixed hex)
 - `RELAYER_WALLET_ADDRESS` - Address of the relayer wallet
+- `CREATOR_FEE_USDC_X_1M` - Fee amount in USDC multiplied by 1 million (e.g., 1000000 = 1 USDC) to be paid to the creator on contract deposit (special case: 0.001 USDC contracts always have 0 creator fee)
 - `USER_SERVICE_URL` - URL for user authentication service
 - `CONTRACT_SERVICE_URL` - URL for contract service (default: http://localhost:8080)
 - `SERVER_PORT` - Port for the service (default: 8978)

@@ -13,6 +13,7 @@ blockchain:
   usdc-contract-address: ${USDC_CONTRACT_ADDRESS}
   contract-factory-address: ${CONTRACT_FACTORY_ADDRESS}
   chain-id: ${CHAIN_ID:43113}
+  creator-fee: ${CREATOR_FEE_USDC_X_1M}
   relayer:
     private-key: ${RELAYER_PRIVATE_KEY}
     wallet-address: ${RELAYER_WALLET_ADDRESS}

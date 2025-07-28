@@ -19,6 +19,7 @@ data class BlockchainProperties(
     var usdcContractAddress: String = "",
     var contractFactoryAddress: String = "",
     var chainId: Long = 43113,
+    var creatorFee: BigInteger = BigInteger.ZERO,
     var relayer: RelayerProperties = RelayerProperties(),
     var gas: GasProperties = GasProperties()
 )
@@ -66,6 +67,10 @@ class Web3Config(private val blockchainProperties: BlockchainProperties) {
         
         if (blockchainProperties.relayer.walletAddress.isBlank()) {
             errors.add("RELAYER_WALLET_ADDRESS environment variable is required")
+        }
+        
+        if (blockchainProperties.creatorFee < BigInteger.ZERO) {
+            errors.add("CREATOR_FEE_USDC_X_1M environment variable must be non-negative")
         }
         
         if (errors.isNotEmpty()) {

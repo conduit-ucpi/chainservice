@@ -41,7 +41,7 @@ class ChainController(
     @PostMapping("/create-contract")
     @Operation(
         summary = "Create Escrow Contract",
-        description = "Deploys a new escrow contract by calling the factory contract. The service pays the gas fees."
+        description = "Deploys a new escrow contract by calling the factory contract. The service pays the gas fees. Creator fee is determined by the CREATOR_FEE environment variable, except for 0.001 USDC contracts which have zero creator fee."
     )
     @ApiResponses(value = [
         ApiResponse(

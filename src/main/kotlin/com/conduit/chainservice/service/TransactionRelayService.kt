@@ -114,6 +114,24 @@ class TransactionRelayService(
         return try {
             logger.info("Creating escrow contract for buyer: $buyer, seller: $seller, amount: $amount")
 
+            // Determine creator fee with special case logic
+            val creatorFee = if (amount == BigInteger.valueOf(1000)) { // 0.001 USDC = 1000 units (6 decimals)
+                BigInteger.ZERO
+            } else {
+                blockchainProperties.creatorFee
+            }
+
+            // Validate creator fee
+            if (creatorFee >= amount) {
+                logger.error("Creator fee ($creatorFee) must be less than contract amount ($amount)")
+                return ContractCreationResult(
+                    success = false,
+                    transactionHash = null,
+                    contractAddress = null,
+                    error = "Creator fee must be less than contract amount"
+                )
+            }
+
             val nonce = web3j.ethGetTransactionCount(
                 relayerCredentials.address,
                 DefaultBlockParameterName.PENDING
@@ -122,7 +140,7 @@ class TransactionRelayService(
             val gasPrice = gasProvider.getGasPrice("createContract")
             val gasLimit = gasProvider.getGasLimit("createContract")
 
-            // Build function call data for createEscrowContract with string description
+            // Build function call data for createEscrowContract with creator fee
             val function = Function(
                 "createEscrowContract",
                 listOf(
@@ -130,7 +148,8 @@ class TransactionRelayService(
                     Address(seller), 
                     Uint256(amount),
                     Uint256(BigInteger.valueOf(expiryTimestamp)),
-                    Utf8String(description)
+                    Utf8String(description),
+                    Uint256(creatorFee)
                 ),
                 emptyList()
             )

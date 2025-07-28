@@ -73,9 +73,11 @@ jobs:
              -e LOG_LEVEL=${{ vars.LOG_LEVEL }} \
              -e USER_SERVICE_URL=${{ vars.USER_SERVICE_URL }} \
              -e CONTRACT_FACTORY_ADDRESS=${{ vars.CONTRACT_FACTORY_ADDRESS }} \
+             -e USDC_CONTRACT_ADDRESS=${{ vars.USDC_CONTRACT_ADDRESS }} \
              -e RPC_URL=${{ vars.RPC_URL }} \
              -e RELAYER_WALLET_ADDRESS=${{ vars.RELAYER_WALLET_ADDRESS }} \
              -e RELAYER_PRIVATE_KEY=${{ secrets.RELAYER_PRIVATE_KEY }} \
+             -e CREATOR_FEE_USDC_X_1M=${{ vars.CREATOR_FEE_USDC_X_1M }} \
              -e MIN_GAS_WEI=${{ vars.MIN_GAS_WEI }} \
              ghcr.io/${{ env.REPO_LOWER }}:${{ env.GIT_SHA }}
          '
