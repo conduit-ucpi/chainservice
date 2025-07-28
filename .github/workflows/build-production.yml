@@ -1,11 +1,11 @@
 name: Build and Deploy Spring Boot
 on:
  push:
-   branches: [ "main" ]
+   branches: [ "build-production" ]
 jobs:
  build-and-deploy:
    runs-on: ubuntu-latest
-   environment: test
+   environment: production
    permissions:
      contents: read
      packages: write
