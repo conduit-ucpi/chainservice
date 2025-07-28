@@ -73,6 +73,7 @@ jobs:
              -e LOG_LEVEL=${{ vars.LOG_LEVEL }} \
              -e USER_SERVICE_URL=${{ vars.USER_SERVICE_URL }} \
              -e CONTRACT_FACTORY_ADDRESS=${{ vars.CONTRACT_FACTORY_ADDRESS }} \
+             -e CONTRACT_SERVICE_URL=${{ vars.CONTRACT_SERVICE_URL }} \
              -e USDC_CONTRACT_ADDRESS=${{ vars.USDC_CONTRACT_ADDRESS }} \
              -e RPC_URL=${{ vars.RPC_URL }} \
              -e RELAYER_WALLET_ADDRESS=${{ vars.RELAYER_WALLET_ADDRESS }} \
