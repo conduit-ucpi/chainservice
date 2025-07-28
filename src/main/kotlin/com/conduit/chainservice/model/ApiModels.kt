@@ -144,7 +144,8 @@ data class ApproveUSDCResponse(
 
 data class ContractServiceUpdateRequest(
     val chainAddress: String,
-    val chainId: String
+    val chainId: String,
+    val buyerAddress: String
 )
 
 data class ContractServiceUpdateResponse(

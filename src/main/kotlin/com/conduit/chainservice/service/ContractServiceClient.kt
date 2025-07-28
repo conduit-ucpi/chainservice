@@ -37,6 +37,7 @@ class ContractServiceClient(
         contractId: String,
         chainAddress: String,
         chainId: String,
+        buyerAddress: String,
         request: HttpServletRequest
     ): Mono<ContractServiceUpdateResponse> {
         if (!enabled) {
@@ -51,7 +52,8 @@ class ContractServiceClient(
 
         val updateRequest = ContractServiceUpdateRequest(
             chainAddress = chainAddress,
-            chainId = chainId
+            chainId = chainId,
+            buyerAddress = buyerAddress
         )
 
         logger.info("Updating contract $contractId with deployment details: chainAddress=$chainAddress, chainId=$chainId")

@@ -294,6 +294,7 @@ class ChainController(
                                 contractId = request.contractId,
                                 chainAddress = request.contractAddress,
                                 chainId = chainId,
+                                buyerAddress = request.userWalletAddress,
                                 request = httpServletRequest
                             ).block()
                         }
