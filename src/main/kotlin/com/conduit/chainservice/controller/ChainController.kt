@@ -176,7 +176,7 @@ class ChainController(
     @PostMapping("/claim-funds")
     @Operation(
         summary = "Claim Funds",
-        description = "Allows the seller to claim escrowed funds by relaying a user-signed transaction. The frontend must provide a transaction signed by the seller's wallet."
+        description = "Allows the seller to claim escrowed funds by relaying a user-signed transaction. The service provides gas money and forwards the user-signed transaction. The frontend must provide a transaction signed by the seller's wallet."
     )
     @ApiResponses(value = [
         ApiResponse(
@@ -196,7 +196,7 @@ class ChainController(
             content = [Content(
                 examples = [ExampleObject(
                     name = "Claim Funds Example",
-                    value = """{"contractAddress": "0x1234567890abcdef1234567890abcdef12345678", "signedTransaction": "0xf86c8082520894..."}"""
+                    value = """{"contractAddress": "0x1234567890abcdef1234567890abcdef12345678", "userWalletAddress": "0x9876543210fedcba9876543210fedcba98765432", "signedTransaction": "0xf86c8082520894..."}"""
                 )]
             )]
         )
@@ -206,7 +206,7 @@ class ChainController(
             logger.info("Claim funds request received for contract: ${request.contractAddress}")
             
             val result = runBlocking {
-                transactionRelayService.relayTransaction(request.signedTransaction)
+                transactionRelayService.claimFundsWithGasTransfer(request.userWalletAddress, request.signedTransaction)
             }
 
             val response = ClaimFundsResponse(
