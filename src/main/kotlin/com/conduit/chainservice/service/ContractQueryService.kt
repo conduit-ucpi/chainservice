@@ -28,14 +28,20 @@ class ContractQueryService(
 
     private val logger = LoggerFactory.getLogger(ContractQueryService::class.java)
 
-    suspend fun getContractsForWallet(walletAddress: String): List<ContractInfo> {
+    suspend fun getContractsForWallet(walletAddress: String, userType: String? = null): List<ContractInfo> {
         return try {
-            logger.info("Querying contracts for wallet: $walletAddress")
+            logger.info("Querying contracts for wallet: $walletAddress, userType: $userType")
 
-            val contractAddresses = eventParsingService.findContractsByParticipant(walletAddress)
+            val contractAddresses = if (userType == "admin") {
+                // Admin users can see all contracts
+                eventParsingService.findAllContracts()
+            } else {
+                // Regular users can only see contracts where they are buyer or seller
+                eventParsingService.findContractsByParticipant(walletAddress)
+            }
             
             contractAddresses.mapNotNull { contractAddress ->
-                getContractInfo(contractAddress, walletAddress)
+                getContractInfo(contractAddress, walletAddress, userType)
             }
 
         } catch (e: Exception) {
@@ -70,7 +76,7 @@ class ContractQueryService(
         }
     }
 
-    private suspend fun getContractInfo(contractAddress: String, participantAddress: String): ContractInfo? {
+    private suspend fun getContractInfo(contractAddress: String, participantAddress: String, userType: String? = null): ContractInfo? {
         return try {
             val contractData = queryContractState(contractAddress)
             val eventHistory = eventParsingService.parseContractEvents(contractAddress)
@@ -82,7 +88,8 @@ class ContractQueryService(
             val description = contractData["description"] as String
             val funded = contractData["funded"] as Boolean
             
-            if (buyer.equals(participantAddress, ignoreCase = true) || 
+            if (userType == "admin" || 
+                buyer.equals(participantAddress, ignoreCase = true) || 
                 seller.equals(participantAddress, ignoreCase = true)) {
                 
                 val status = getContractStatus(contractAddress)

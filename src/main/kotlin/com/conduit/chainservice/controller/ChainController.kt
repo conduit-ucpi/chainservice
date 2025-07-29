@@ -412,10 +412,13 @@ class ChainController(
             description = "Ethereum wallet address (42 character hex string starting with 0x)",
             example = "0x1234567890abcdef1234567890abcdef12345678"
         )
-        @PathVariable walletAddress: String
+        @PathVariable walletAddress: String,
+        request: HttpServletRequest
     ): ResponseEntity<GetContractsResponse> {
         return try {
-            logger.info("Get contracts request received for wallet: $walletAddress")
+            val userType = request.getAttribute("userType") as? String
+            
+            logger.info("Get contracts request received for wallet: $walletAddress, userType: $userType")
 
             if (!walletAddress.matches(Regex("^0x[a-fA-F0-9]{40}$"))) {
                 return ResponseEntity.badRequest().body(
@@ -424,7 +427,7 @@ class ChainController(
             }
 
             val contracts = runBlocking {
-                contractQueryService.getContractsForWallet(walletAddress)
+                contractQueryService.getContractsForWallet(walletAddress, userType)
             }
 
             logger.info("Found ${contracts.size} contracts for wallet: $walletAddress")

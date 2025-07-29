@@ -20,14 +20,16 @@ class UserServiceClient(
     data class UserIdentityResponse(
         val userId: String,
         val email: String,
-        val walletAddress: String
+        val walletAddress: String,
+        val userType: String
     )
     
     data class TokenValidationResponse(
         val valid: Boolean,
         val userId: String? = null,
         val email: String? = null,
-        val walletAddress: String? = null
+        val walletAddress: String? = null,
+        val userType: String? = null
     )
 
     fun validateToken(authToken: String, httpOnlyToken: String?): Mono<TokenValidationResponse> {
@@ -51,7 +53,8 @@ class UserServiceClient(
                         valid = true,
                         userId = userIdentity.userId,
                         email = userIdentity.email,
-                        walletAddress = userIdentity.walletAddress
+                        walletAddress = userIdentity.walletAddress,
+                        userType = userIdentity.userType
                     )
                 }
                 .doOnSuccess { response ->

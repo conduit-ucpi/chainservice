@@ -65,6 +65,7 @@ class AuthenticationFilter(
                 request.setAttribute("userId", validationResult.userId)
                 request.setAttribute("userEmail", validationResult.email)
                 request.setAttribute("userWallet", validationResult.walletAddress)
+                request.setAttribute("userType", validationResult.userType)
                 
                 logger.debug("Authentication successful for user: ${validationResult.userId}")
                 filterChain.doFilter(request, response)

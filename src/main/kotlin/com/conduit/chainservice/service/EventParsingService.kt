@@ -301,6 +301,67 @@ class EventParsingService(
         }
     }
 
+    suspend fun findAllContracts(): List<String> {
+        return try {
+            logger.info("Finding all contracts (admin access)")
+            
+            val contractAddresses = mutableSetOf<String>()
+            
+            // Get current block number and search in chunks due to RPC 2048 block limit
+            val currentBlock = web3j.ethBlockNumber().send().blockNumber
+            val searchRange = BigInteger.valueOf(20000) // Search last 20k blocks
+            val fromBlock = currentBlock.subtract(searchRange)
+            val chunkSize = BigInteger.valueOf(2000) // Stay under 2048 limit
+            
+            logger.warn("Searching from block $fromBlock to $currentBlock in chunks of $chunkSize")
+            
+            // Search for all ContractCreated events regardless of participants
+            var chunkStart = fromBlock
+            while (chunkStart <= currentBlock) {
+                val chunkEnd = minOf(chunkStart.add(chunkSize), currentBlock)
+                
+                try {
+                    val chunkFilter = EthFilter(
+                        org.web3j.protocol.core.DefaultBlockParameter.valueOf(chunkStart),
+                        org.web3j.protocol.core.DefaultBlockParameter.valueOf(chunkEnd),
+                        blockchainProperties.contractFactoryAddress
+                    )
+                    
+                    // Add the ContractCreated event signature
+                    chunkFilter.addSingleTopic(EventEncoder.encode(contractCreatedEvent))
+                    
+                    val chunkLogs = web3j.ethGetLogs(chunkFilter).send().logs
+                    logger.debug("Found ${chunkLogs.size} ContractCreated events in chunk $chunkStart-$chunkEnd")
+                    
+                    // Extract contract addresses from the logs
+                    chunkLogs.forEach { log ->
+                        try {
+                            if (log is Log) {
+                                val contractAddress = "0x" + log.topics[1].substring(26)
+                                contractAddresses.add(contractAddress)
+                                logger.debug("Added contract $contractAddress")
+                            }
+                        } catch (e: Exception) {
+                            logger.warn("Error parsing contract creation log", e)
+                        }
+                    }
+                    
+                } catch (e: Exception) {
+                    logger.warn("Error searching chunk $chunkStart-$chunkEnd", e)
+                }
+                
+                chunkStart = chunkEnd.add(BigInteger.ONE)
+            }
+            
+            logger.info("Found ${contractAddresses.size} total contracts")
+            contractAddresses.toList()
+            
+        } catch (e: Exception) {
+            logger.error("Error finding all contracts", e)
+            emptyList()
+        }
+    }
+
     private fun parseLogToEvent(log: Log): ContractEvent? {
         return try {
             val topics = log.topics
