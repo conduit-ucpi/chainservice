@@ -11,13 +11,16 @@ import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.Mock
-import org.mockito.MockitoAnnotations
+import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.*
 import org.springframework.http.HttpStatus
+import org.springframework.test.util.ReflectionTestUtils
 import java.math.BigInteger
 import java.time.Instant
 
+@ExtendWith(MockitoExtension::class)
 class ChainControllerTest {
 
     @Mock
@@ -44,12 +47,13 @@ class ChainControllerTest {
 
     @BeforeEach
     fun setUp() {
-        MockitoAnnotations.openMocks(this)
         chainController = ChainController(
             transactionRelayService,
             contractQueryService,
             contractServiceClient
         )
+        // Set the chainId field using reflection
+        ReflectionTestUtils.setField(chainController, "chainId", "43113")
     }
 
     @Test
@@ -188,6 +192,190 @@ class ChainControllerTest {
         assertEquals(0, result.body!!.contracts.size)
 
         verify(contractQueryService, never()).getContractsForWallet(any(), any())
+    }
+
+    @Test
+    fun `getContract - regular user can access their own contract as buyer`() = runBlocking {
+        val contractAddress = contract1
+        val contractInfo = ContractInfo(
+            contractAddress = contractAddress,
+            buyer = testWalletAddress,
+            seller = otherWalletAddress,
+            amount = BigInteger.valueOf(1000000),
+            expiryTimestamp = System.currentTimeMillis() / 1000 + 3600,
+            description = "Test contract",
+            status = ContractStatus.ACTIVE,
+            funded = true,
+            createdAt = Instant.now()
+        )
+
+        whenever(request.getAttribute("userType")).thenReturn("regular")
+        whenever(request.getAttribute("userId")).thenReturn("user123")
+        whenever(request.getAttribute("userWallet")).thenReturn(testWalletAddress)
+        whenever(contractQueryService.getContractInfo(contractAddress)).thenReturn(contractInfo)
+
+        val result = chainController.getContract(contractAddress, request)
+
+        assertEquals(HttpStatus.OK, result.statusCode)
+        assertNotNull(result.body)
+        assertTrue(result.body is ContractInfo)
+        assertEquals(contractAddress, (result.body as ContractInfo).contractAddress)
+
+        verify(contractQueryService).getContractInfo(contractAddress)
+    }
+
+    @Test
+    fun `getContract - regular user can access their own contract as seller`() = runBlocking {
+        val contractAddress = contract1
+        val contractInfo = ContractInfo(
+            contractAddress = contractAddress,
+            buyer = otherWalletAddress,
+            seller = testWalletAddress,
+            amount = BigInteger.valueOf(1000000),
+            expiryTimestamp = System.currentTimeMillis() / 1000 + 3600,
+            description = "Test contract",
+            status = ContractStatus.ACTIVE,
+            funded = true,
+            createdAt = Instant.now()
+        )
+
+        whenever(request.getAttribute("userType")).thenReturn("regular")
+        whenever(request.getAttribute("userId")).thenReturn("user123")
+        whenever(request.getAttribute("userWallet")).thenReturn(testWalletAddress)
+        whenever(contractQueryService.getContractInfo(contractAddress)).thenReturn(contractInfo)
+
+        val result = chainController.getContract(contractAddress, request)
+
+        assertEquals(HttpStatus.OK, result.statusCode)
+        assertNotNull(result.body)
+        assertTrue(result.body is ContractInfo)
+        assertEquals(contractAddress, (result.body as ContractInfo).contractAddress)
+
+        verify(contractQueryService).getContractInfo(contractAddress)
+    }
+
+    @Test
+    fun `getContract - regular user cannot access other users contract`() = runBlocking {
+        val contractAddress = contract1
+        val contractInfo = ContractInfo(
+            contractAddress = contractAddress,
+            buyer = otherWalletAddress,
+            seller = "0xddd4444444444444444444444444444444444444",
+            amount = BigInteger.valueOf(1000000),
+            expiryTimestamp = System.currentTimeMillis() / 1000 + 3600,
+            description = "Test contract",
+            status = ContractStatus.ACTIVE,
+            funded = true,
+            createdAt = Instant.now()
+        )
+
+        whenever(request.getAttribute("userType")).thenReturn("regular")
+        whenever(request.getAttribute("userId")).thenReturn("user123")
+        whenever(request.getAttribute("userWallet")).thenReturn(testWalletAddress)
+        whenever(contractQueryService.getContractInfo(contractAddress)).thenReturn(contractInfo)
+
+        val result = chainController.getContract(contractAddress, request)
+
+        assertEquals(HttpStatus.FORBIDDEN, result.statusCode)
+        assertNotNull(result.body)
+        assertTrue(result.body is Map<*, *>)
+        assertEquals("Access denied - you are not authorized to view this contract", (result.body as Map<*, *>)["error"])
+
+        verify(contractQueryService).getContractInfo(contractAddress)
+    }
+
+    @Test
+    fun `getContract - admin user can access any contract`() = runBlocking {
+        val contractAddress = contract1
+        val contractInfo = ContractInfo(
+            contractAddress = contractAddress,
+            buyer = otherWalletAddress,
+            seller = "0xddd4444444444444444444444444444444444444",
+            amount = BigInteger.valueOf(1000000),
+            expiryTimestamp = System.currentTimeMillis() / 1000 + 3600,
+            description = "Test contract",
+            status = ContractStatus.ACTIVE,
+            funded = true,
+            createdAt = Instant.now()
+        )
+
+        whenever(request.getAttribute("userType")).thenReturn("admin")
+        whenever(request.getAttribute("userId")).thenReturn("admin123")
+        whenever(contractQueryService.getContractInfo(contractAddress)).thenReturn(contractInfo)
+
+        val result = chainController.getContract(contractAddress, request)
+
+        assertEquals(HttpStatus.OK, result.statusCode)
+        assertNotNull(result.body)
+        assertTrue(result.body is ContractInfo)
+        assertEquals(contractAddress, (result.body as ContractInfo).contractAddress)
+
+        verify(contractQueryService).getContractInfo(contractAddress)
+    }
+
+    @Test
+    fun `getContract - returns 404 when contract not found`() = runBlocking {
+        val contractAddress = contract1
+
+        whenever(request.getAttribute("userType")).thenReturn("admin")
+        whenever(request.getAttribute("userId")).thenReturn("admin123")
+        whenever(contractQueryService.getContractInfo(contractAddress)).thenReturn(null)
+
+        val result = chainController.getContract(contractAddress, request)
+
+        assertEquals(HttpStatus.NOT_FOUND, result.statusCode)
+        assertNotNull(result.body)
+        assertTrue(result.body is Map<*, *>)
+        assertEquals("Contract not found", (result.body as Map<*, *>)["error"])
+
+        verify(contractQueryService).getContractInfo(contractAddress)
+    }
+
+    @Test
+    fun `getContract - rejects invalid contract address format`() = runBlocking {
+        val invalidContractAddress = "invalid-contract-address"
+
+        whenever(request.getAttribute("userType")).thenReturn("admin")
+        whenever(request.getAttribute("userId")).thenReturn("admin123")
+
+        val result = chainController.getContract(invalidContractAddress, request)
+
+        assertEquals(HttpStatus.BAD_REQUEST, result.statusCode)
+        assertNotNull(result.body)
+        assertTrue(result.body is Map<*, *>)
+        assertEquals("Invalid contract address format", (result.body as Map<*, *>)["error"])
+
+        verify(contractQueryService, never()).getContractInfo(any())
+    }
+
+    @Test
+    fun `getContract - handles user with no wallet address`() = runBlocking {
+        val contractAddress = contract1
+        val contractInfo = ContractInfo(
+            contractAddress = contractAddress,
+            buyer = testWalletAddress,
+            seller = otherWalletAddress,
+            amount = BigInteger.valueOf(1000000),
+            expiryTimestamp = System.currentTimeMillis() / 1000 + 3600,
+            description = "Test contract",
+            status = ContractStatus.ACTIVE,
+            funded = true,
+            createdAt = Instant.now()
+        )
+
+        whenever(request.getAttribute("userType")).thenReturn("regular")
+        whenever(request.getAttribute("userId")).thenReturn("user123")
+        whenever(request.getAttribute("userWallet")).thenReturn(null)
+        whenever(contractQueryService.getContractInfo(contractAddress)).thenReturn(contractInfo)
+
+        val result = chainController.getContract(contractAddress, request)
+
+        assertEquals(HttpStatus.FORBIDDEN, result.statusCode)
+        assertNotNull(result.body)
+        assertTrue(result.body is Map<*, *>)
+        assertEquals("Access denied - you are not authorized to view this contract", (result.body as Map<*, *>)["error"])
+
+        verify(contractQueryService).getContractInfo(contractAddress)
     }
 
     @Test

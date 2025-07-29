@@ -50,6 +50,48 @@ class ContractQueryService(
         }
     }
 
+    suspend fun getContractInfo(contractAddress: String): ContractInfo? {
+        return try {
+            val contractData = queryContractState(contractAddress)
+            val eventHistory = eventParsingService.parseContractEvents(contractAddress)
+            
+            val buyer = contractData["buyer"] as String
+            val seller = contractData["seller"] as String
+            val amount = contractData["amount"] as BigInteger
+            val expiryTimestamp = contractData["expiryTimestamp"] as Long
+            val description = contractData["description"] as String
+            val funded = contractData["funded"] as Boolean
+            
+            val status = getContractStatus(contractAddress)
+            
+            val createdEvent = eventHistory.events.find { it.eventType.name == "CONTRACT_CREATED" }
+            val fundedEvent = eventHistory.events.find { it.eventType.name == "FUNDS_DEPOSITED" }
+            val disputedEvent = eventHistory.events.find { it.eventType.name == "DISPUTE_RAISED" }
+            val resolvedEvent = eventHistory.events.find { it.eventType.name == "DISPUTE_RESOLVED" }
+            val claimedEvent = eventHistory.events.find { it.eventType.name == "FUNDS_CLAIMED" }
+
+            ContractInfo(
+                contractAddress = contractAddress,
+                buyer = buyer,
+                seller = seller,
+                amount = amount,
+                expiryTimestamp = expiryTimestamp,
+                description = description,
+                funded = funded,
+                status = status,
+                createdAt = createdEvent?.timestamp ?: Instant.now(),
+                fundedAt = fundedEvent?.timestamp,
+                disputedAt = disputedEvent?.timestamp,
+                resolvedAt = resolvedEvent?.timestamp,
+                claimedAt = claimedEvent?.timestamp
+            )
+
+        } catch (e: Exception) {
+            logger.error("Error getting contract info for: $contractAddress", e)
+            null
+        }
+    }
+
     suspend fun getContractStatus(contractAddress: String): ContractStatus {
         return try {
             val contractData = queryContractState(contractAddress)

@@ -385,6 +385,91 @@ class ChainController(
         }
     }
 
+    @GetMapping("/contract/{contractAddress}")
+    @Operation(
+        summary = "Get Contract Details",
+        description = "Retrieves details of a specific escrow contract by its address. Non-admin users can only access contracts where they are the buyer or seller."
+    )
+    @ApiResponses(value = [
+        ApiResponse(
+            responseCode = "200",
+            description = "Contract details retrieved successfully",
+            content = [Content(schema = Schema(implementation = ContractInfo::class))]
+        ),
+        ApiResponse(
+            responseCode = "400",
+            description = "Invalid contract address format"
+        ),
+        ApiResponse(
+            responseCode = "403",
+            description = "Access denied - user is not authorized to view this contract"
+        ),
+        ApiResponse(
+            responseCode = "404",
+            description = "Contract not found"
+        ),
+        ApiResponse(
+            responseCode = "500",
+            description = "Internal server error"
+        )
+    ])
+    fun getContract(
+        @Parameter(
+            description = "Ethereum contract address (42 character hex string starting with 0x)",
+            example = "0x1234567890abcdef1234567890abcdef12345678"
+        )
+        @PathVariable contractAddress: String,
+        request: HttpServletRequest
+    ): ResponseEntity<Any> {
+        return try {
+            val userType = request.getAttribute("userType") as? String
+            val userId = request.getAttribute("userId") as? String
+            
+            logger.info("Get contract request received for contract: $contractAddress, userType: $userType, userId: $userId")
+
+            if (!contractAddress.matches(Regex("^0x[a-fA-F0-9]{40}$"))) {
+                return ResponseEntity.badRequest().body(
+                    mapOf("error" to "Invalid contract address format")
+                )
+            }
+
+            val contract = runBlocking {
+                contractQueryService.getContractInfo(contractAddress)
+            }
+
+            if (contract == null) {
+                logger.info("Contract not found: $contractAddress")
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(
+                    mapOf("error" to "Contract not found")
+                )
+            }
+
+            // Check authorization: admins can see all contracts, others only their own
+            if (userType != "admin") {
+                // Get the user's wallet address from the user service
+                val userWalletAddress = request.getAttribute("userWallet") as? String
+                
+                if (userWalletAddress == null || 
+                    (!contract.buyer.equals(userWalletAddress, ignoreCase = true) && 
+                     !contract.seller.equals(userWalletAddress, ignoreCase = true))) {
+                    logger.warn("Access denied for user $userId to contract $contractAddress")
+                    return ResponseEntity.status(HttpStatus.FORBIDDEN).body(
+                        mapOf("error" to "Access denied - you are not authorized to view this contract")
+                    )
+                }
+            }
+
+            logger.info("Contract details retrieved successfully for: $contractAddress")
+            ResponseEntity.ok(contract)
+
+        } catch (e: Exception) {
+            logger.error("Error in get contract endpoint", e)
+            ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
+                mapOf("error" to "Internal server error", "message" to (e.message ?: "Unknown error"))
+            )
+        }
+    }
+
     @GetMapping("/contracts/{walletAddress}")
     @Operation(
         summary = "Get User Contracts",

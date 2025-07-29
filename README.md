@@ -104,6 +104,13 @@ Content-Type: application/json
 GET /api/chain/contracts/{walletAddress}
 ```
 
+### 6. Get Contract Details
+```http
+GET /api/chain/contract/{contractAddress}
+```
+
+Returns details for a specific contract. Non-admin users can only access contracts where they are the buyer or seller.
+
 ## API Documentation
 
 The service provides interactive API documentation:
