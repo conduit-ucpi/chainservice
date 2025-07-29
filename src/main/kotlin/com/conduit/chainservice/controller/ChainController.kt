@@ -115,7 +115,7 @@ class ChainController(
     @PostMapping("/raise-dispute")
     @Operation(
         summary = "Raise Dispute",
-        description = "Raises a dispute on an existing escrow contract by relaying a user-signed transaction. The frontend must provide a transaction signed by the buyer or seller's wallet."
+        description = "Raises a dispute on an existing escrow contract by relaying a user-signed transaction. The service provides gas money and forwards the user-signed transaction. The frontend must provide a transaction signed by the buyer or seller's wallet."
     )
     @ApiResponses(value = [
         ApiResponse(
@@ -135,7 +135,7 @@ class ChainController(
             content = [Content(
                 examples = [ExampleObject(
                     name = "Raise Dispute Example",
-                    value = """{"contractAddress": "0x1234567890abcdef1234567890abcdef12345678", "signedTransaction": "0xf86c8082520894..."}"""
+                    value = """{"contractAddress": "0x1234567890abcdef1234567890abcdef12345678", "userWalletAddress": "0x9876543210fedcba9876543210fedcba98765432", "signedTransaction": "0xf86c8082520894..."}"""
                 )]
             )]
         )
@@ -145,7 +145,7 @@ class ChainController(
             logger.info("Raise dispute request received for contract: ${request.contractAddress}")
             
             val result = runBlocking {
-                transactionRelayService.relayTransaction(request.signedTransaction)
+                transactionRelayService.raiseDisputeWithGasTransfer(request.userWalletAddress, request.signedTransaction)
             }
 
             val response = RaiseDisputeResponse(

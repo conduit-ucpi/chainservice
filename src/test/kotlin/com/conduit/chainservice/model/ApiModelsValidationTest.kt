@@ -237,6 +237,7 @@ class ApiModelsValidationTest {
         // Given
         val request = RaiseDisputeRequest(
             contractAddress = "0x1234567890abcdef1234567890abcdef12345678",
+            userWalletAddress = "0x9876543210fedcba9876543210fedcba98765432",
             signedTransaction = "0xf86c8082520894abcdefabcdefabcdefabcdefabcdefabcdefabcdef80801ba01234567890abcdef12"
         )
 
@@ -245,6 +246,57 @@ class ApiModelsValidationTest {
 
         // Then
         assertTrue(violations.isEmpty())
+    }
+
+    @Test
+    fun `RaiseDisputeRequest should fail validation with invalid contract address`() {
+        // Given
+        val request = RaiseDisputeRequest(
+            contractAddress = "invalid-address",
+            userWalletAddress = "0x9876543210fedcba9876543210fedcba98765432",
+            signedTransaction = "0xf86c8082520894abcdefabcdefabcdefabcdefabcdefabcdefabcdef80801ba01234567890abcdef12"
+        )
+
+        // When
+        val violations = validator.validate(request)
+
+        // Then
+        assertTrue(violations.isNotEmpty())
+        assertTrue(violations.any { it.message.contains("Invalid contract address format") })
+    }
+
+    @Test
+    fun `RaiseDisputeRequest should fail validation with invalid user wallet address`() {
+        // Given
+        val request = RaiseDisputeRequest(
+            contractAddress = "0x1234567890abcdef1234567890abcdef12345678",
+            userWalletAddress = "invalid-wallet",
+            signedTransaction = "0xf86c8082520894abcdefabcdefabcdefabcdefabcdefabcdefabcdef80801ba01234567890abcdef12"
+        )
+
+        // When
+        val violations = validator.validate(request)
+
+        // Then
+        assertTrue(violations.isNotEmpty())
+        assertTrue(violations.any { it.message.contains("Invalid user wallet address format") })
+    }
+
+    @Test
+    fun `RaiseDisputeRequest should fail validation with invalid signed transaction format`() {
+        // Given
+        val request = RaiseDisputeRequest(
+            contractAddress = "0x1234567890abcdef1234567890abcdef12345678",
+            userWalletAddress = "0x9876543210fedcba9876543210fedcba98765432",
+            signedTransaction = "invalid-transaction"
+        )
+
+        // When
+        val violations = validator.validate(request)
+
+        // Then
+        assertTrue(violations.isNotEmpty())
+        assertTrue(violations.any { it.message.contains("Invalid signed transaction format") })
     }
 
     @Test

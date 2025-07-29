@@ -76,6 +76,7 @@ class TransactionRelayServiceTest {
         assertTrue(methodNames.contains("depositFundsWithGasTransfer"))
         assertTrue(methodNames.contains("approveUSDCWithGasTransfer"))  
         assertTrue(methodNames.contains("claimFundsWithGasTransfer"))
+        assertTrue(methodNames.contains("raiseDisputeWithGasTransfer"))
         
         // Verify the methods have the correct signature (should have String and String parameters)
         val depositMethod = publicMethods.find { it.name == "depositFundsWithGasTransfer" }
@@ -86,6 +87,9 @@ class TransactionRelayServiceTest {
         
         val claimMethod = publicMethods.find { it.name == "claimFundsWithGasTransfer" }
         assertNotNull(claimMethod, "claimFundsWithGasTransfer method should exist")
+        
+        val raiseDisputeMethod = publicMethods.find { it.name == "raiseDisputeWithGasTransfer" }
+        assertNotNull(raiseDisputeMethod, "raiseDisputeWithGasTransfer method should exist")
     }
 
     @Test
@@ -129,6 +133,7 @@ class TransactionRelayServiceTest {
             "depositFundsWithGasTransfer",
             "approveUSDCWithGasTransfer",
             "claimFundsWithGasTransfer",
+            "raiseDisputeWithGasTransfer",
             "getOperationGasCosts"
         )
         

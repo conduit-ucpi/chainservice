@@ -808,4 +808,8 @@ class TransactionRelayService(
     suspend fun claimFundsWithGasTransfer(userWalletAddress: String, signedTransactionHex: String): TransactionResult {
         return processTransactionWithGasTransfer(userWalletAddress, signedTransactionHex, "claimFunds")
     }
+
+    suspend fun raiseDisputeWithGasTransfer(userWalletAddress: String, signedTransactionHex: String): TransactionResult {
+        return processTransactionWithGasTransfer(userWalletAddress, signedTransactionHex, "raiseDispute")
+    }
 }
