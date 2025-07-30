@@ -53,6 +53,6 @@ springdoc:
 logging:
   level:
     com.conduit.chainservice: ${LOG_LEVEL:INFO}
-    org.web3j: WARN
+    org.web3j:
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"

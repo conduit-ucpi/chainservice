@@ -1,6 +1,6 @@
 package com.conduit.chainservice.service
 
-import com.conduit.chainservice.config.BlockchainProperties
+import com.conduit.chainservice.config.EscrowBlockchainProperties
 import com.conduit.chainservice.model.ContractInfo
 import com.conduit.chainservice.model.ContractStatus
 import kotlinx.coroutines.runBlocking
@@ -20,7 +20,7 @@ class ContractQueryServiceTest {
     private lateinit var web3j: Web3j
     
     @Mock
-    private lateinit var blockchainProperties: BlockchainProperties
+    private lateinit var blockchainProperties: EscrowBlockchainProperties
 
     @Mock
     private lateinit var eventParsingService: EventParsingService

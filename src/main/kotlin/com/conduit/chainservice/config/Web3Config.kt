@@ -2,8 +2,10 @@ package com.conduit.chainservice.config
 
 import org.slf4j.LoggerFactory
 import org.springframework.boot.context.properties.ConfigurationProperties
+import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.context.annotation.Primary
 import org.web3j.crypto.Credentials
 import org.web3j.protocol.Web3j
 import org.web3j.protocol.http.HttpService
@@ -12,9 +14,8 @@ import org.web3j.tx.gas.DefaultGasProvider
 import java.math.BigInteger
 import jakarta.annotation.PostConstruct
 
-@Configuration
 @ConfigurationProperties(prefix = "blockchain")
-data class BlockchainProperties(
+data class EscrowBlockchainProperties(
     var rpcUrl: String = "",
     var usdcContractAddress: String = "",
     var contractFactoryAddress: String = "",
@@ -41,7 +42,8 @@ data class GasProperties(
 )
 
 @Configuration
-class Web3Config(private val blockchainProperties: BlockchainProperties) {
+@EnableConfigurationProperties(EscrowBlockchainProperties::class)
+class Web3Config(private val escrowBlockchainProperties: EscrowBlockchainProperties) {
 
     private val logger = LoggerFactory.getLogger(Web3Config::class.java)
 
@@ -49,27 +51,27 @@ class Web3Config(private val blockchainProperties: BlockchainProperties) {
     fun validateConfiguration() {
         val errors = mutableListOf<String>()
         
-        if (blockchainProperties.rpcUrl.isBlank()) {
+        if (escrowBlockchainProperties.rpcUrl.isBlank()) {
             errors.add("RPC_URL environment variable is required")
         }
         
-        if (blockchainProperties.usdcContractAddress.isBlank()) {
+        if (escrowBlockchainProperties.usdcContractAddress.isBlank()) {
             errors.add("USDC_CONTRACT_ADDRESS environment variable is required")
         }
         
-        if (blockchainProperties.contractFactoryAddress.isBlank()) {
+        if (escrowBlockchainProperties.contractFactoryAddress.isBlank()) {
             errors.add("CONTRACT_FACTORY_ADDRESS environment variable is required")
         }
         
-        if (blockchainProperties.relayer.privateKey.isBlank()) {
+        if (escrowBlockchainProperties.relayer.privateKey.isBlank()) {
             errors.add("RELAYER_PRIVATE_KEY environment variable is required")
         }
         
-        if (blockchainProperties.relayer.walletAddress.isBlank()) {
+        if (escrowBlockchainProperties.relayer.walletAddress.isBlank()) {
             errors.add("RELAYER_WALLET_ADDRESS environment variable is required")
         }
         
-        if (blockchainProperties.creatorFee < BigInteger.ZERO) {
+        if (escrowBlockchainProperties.creatorFee < BigInteger.ZERO) {
             errors.add("CREATOR_FEE_USDC_X_1M environment variable must be non-negative")
         }
         
@@ -82,15 +84,13 @@ class Web3Config(private val blockchainProperties: BlockchainProperties) {
         logger.info("Configuration validation successful")
     }
 
-    @Bean
-    fun web3j(): Web3j {
-        return Web3j.build(HttpService(blockchainProperties.rpcUrl))
-    }
+    // web3j bean is provided by blockchain-relay-utility
 
+    // relayerCredentials bean is provided by blockchain-relay-utility
     @Bean
-    fun relayerCredentials(): Credentials {
+    fun escrowRelayerCredentials(): Credentials {
         try {
-            val privateKey = blockchainProperties.relayer.privateKey
+            val privateKey = escrowBlockchainProperties.relayer.privateKey
             if (privateKey.isBlank()) {
                 throw IllegalArgumentException("RELAYER_PRIVATE_KEY is empty or not set")
             }
@@ -107,21 +107,22 @@ class Web3Config(private val blockchainProperties: BlockchainProperties) {
         }
     }
 
+    // chainId bean is provided by blockchain-relay-utility  
     @Bean
-    fun chainId(web3j: Web3j): Long {
+    fun escrowChainId(web3j: Web3j): Long {
         return try {
             val chainIdResponse = web3j.ethChainId().send()
             if (chainIdResponse.hasError()) {
-                logger.warn("Failed to retrieve chain ID from RPC: ${chainIdResponse.error.message}, using configured value: ${blockchainProperties.chainId}")
-                blockchainProperties.chainId
+                logger.warn("Failed to retrieve chain ID from RPC: ${chainIdResponse.error.message}, using configured value: ${escrowBlockchainProperties.chainId}")
+                escrowBlockchainProperties.chainId
             } else {
                 val rpcChainId = chainIdResponse.chainId.toLong()
                 logger.info("Retrieved chain ID from RPC: $rpcChainId")
                 rpcChainId
             }
         } catch (e: Exception) {
-            logger.warn("Error retrieving chain ID from RPC: ${e.message}, using configured value: ${blockchainProperties.chainId}")
-            blockchainProperties.chainId
+            logger.warn("Error retrieving chain ID from RPC: ${e.message}, using configured value: ${escrowBlockchainProperties.chainId}")
+            escrowBlockchainProperties.chainId
         }
     }
 
@@ -132,15 +133,15 @@ class Web3Config(private val blockchainProperties: BlockchainProperties) {
                 return try {
                     val networkGasPrice = web3j.ethGasPrice().send().gasPrice
                     val multipliedPrice = networkGasPrice.multiply(
-                        BigInteger.valueOf((blockchainProperties.gas.priceMultiplier * 100).toLong())
+                        BigInteger.valueOf((escrowBlockchainProperties.gas.priceMultiplier * 100).toLong())
                     ).divide(BigInteger.valueOf(100))
                     
                     // Enforce minimum gas price
-                    val minimumPrice = BigInteger.valueOf(blockchainProperties.gas.minimumGasPriceWei)
+                    val minimumPrice = BigInteger.valueOf(escrowBlockchainProperties.gas.minimumGasPriceWei)
                     maxOf(multipliedPrice, minimumPrice)
                 } catch (e: Exception) {
                     logger.warn("Failed to fetch gas price from network, using minimum: ${e.message}")
-                    BigInteger.valueOf(blockchainProperties.gas.minimumGasPriceWei)
+                    BigInteger.valueOf(escrowBlockchainProperties.gas.minimumGasPriceWei)
                 }
             }
 
@@ -150,12 +151,12 @@ class Web3Config(private val blockchainProperties: BlockchainProperties) {
 
             override fun getGasLimit(contractFunc: String?): BigInteger {
                 return when (contractFunc) {
-                    "createContract" -> BigInteger.valueOf(blockchainProperties.gas.limitCreateContract)
-                    "depositFunds" -> BigInteger.valueOf(blockchainProperties.gas.limitDeposit)
-                    "raiseDispute" -> BigInteger.valueOf(blockchainProperties.gas.limitDispute)
-                    "claimFunds" -> BigInteger.valueOf(blockchainProperties.gas.limitClaim)
-                    "resolveDispute" -> BigInteger.valueOf(blockchainProperties.gas.limitResolve)
-                    "approveUSDC" -> BigInteger.valueOf(blockchainProperties.gas.limitApproveUSDC)
+                    "createContract" -> BigInteger.valueOf(escrowBlockchainProperties.gas.limitCreateContract)
+                    "depositFunds" -> BigInteger.valueOf(escrowBlockchainProperties.gas.limitDeposit)
+                    "raiseDispute" -> BigInteger.valueOf(escrowBlockchainProperties.gas.limitDispute)
+                    "claimFunds" -> BigInteger.valueOf(escrowBlockchainProperties.gas.limitClaim)
+                    "resolveDispute" -> BigInteger.valueOf(escrowBlockchainProperties.gas.limitResolve)
+                    "approveUSDC" -> BigInteger.valueOf(escrowBlockchainProperties.gas.limitApproveUSDC)
                     else -> DefaultGasProvider.GAS_LIMIT
                 }
             }

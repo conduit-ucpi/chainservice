@@ -8,40 +8,34 @@ import org.springframework.context.annotation.Configuration
 
 @Configuration
 class UtilityServiceConfiguration(
-    private val blockchainProperties: BlockchainProperties,
+    private val escrowBlockchainProperties: EscrowBlockchainProperties,
     private val authProperties: AuthProperties
 ) {
 
     @Bean
-    fun rpcUrl(): String = blockchainProperties.rpcUrl
+    fun rpcUrl(): String = escrowBlockchainProperties.rpcUrl
 
     @Bean
-    fun relayerPrivateKey(): String = blockchainProperties.relayer.privateKey
+    fun relayerPrivateKey(): String = escrowBlockchainProperties.relayer.privateKey
 
     @Bean
-    fun fallbackChainId(): Long = blockchainProperties.chainId
+    fun fallbackChainId(): Long = escrowBlockchainProperties.chainId
 
     @Bean
-    fun gasPriceMultiplier(): Double = blockchainProperties.gas.priceMultiplier
+    fun gasPriceMultiplier(): Double = escrowBlockchainProperties.gas.priceMultiplier
 
     @Bean
-    fun minimumGasPriceWei(): Long = blockchainProperties.gas.minimumGasPriceWei
+    fun minimumGasPriceWei(): Long = escrowBlockchainProperties.gas.minimumGasPriceWei
 
     @Bean
     fun gasLimitsConfig(): Map<String, Long> = mapOf(
-        "createContract" to blockchainProperties.gas.limitCreateContract,
-        "depositFunds" to blockchainProperties.gas.limitDeposit,
-        "raiseDispute" to blockchainProperties.gas.limitDispute,
-        "claimFunds" to blockchainProperties.gas.limitClaim,
-        "resolveDispute" to blockchainProperties.gas.limitResolve,
-        "approveUSDC" to blockchainProperties.gas.limitApproveUSDC
+        "createContract" to escrowBlockchainProperties.gas.limitCreateContract,
+        "depositFunds" to escrowBlockchainProperties.gas.limitDeposit,
+        "raiseDispute" to escrowBlockchainProperties.gas.limitDispute,
+        "claimFunds" to escrowBlockchainProperties.gas.limitClaim,
+        "resolveDispute" to escrowBlockchainProperties.gas.limitResolve,
+        "approveUSDC" to escrowBlockchainProperties.gas.limitApproveUSDC
     )
 
-    @Bean
-    fun authenticationProvider(): AuthenticationProvider {
-        return HttpAuthenticationProvider(
-            userServiceUrl = authProperties.userServiceUrl,
-            enabled = authProperties.enabled
-        )
-    }
+    // authenticationProvider bean is provided by blockchain-relay-utility
 }

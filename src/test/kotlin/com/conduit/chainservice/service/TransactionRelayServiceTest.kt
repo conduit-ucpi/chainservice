@@ -1,6 +1,6 @@
 package com.conduit.chainservice.service
 
-import com.conduit.chainservice.config.BlockchainProperties
+import com.conduit.chainservice.config.EscrowBlockchainProperties
 import com.conduit.chainservice.escrow.EscrowTransactionService
 import com.utility.chainservice.BlockchainRelayService
 import org.junit.jupiter.api.BeforeEach
@@ -32,7 +32,7 @@ class TransactionRelayServiceTest {
     private lateinit var gasProvider: ContractGasProvider
 
     @Mock
-    private lateinit var blockchainProperties: BlockchainProperties
+    private lateinit var blockchainProperties: EscrowBlockchainProperties
 
     private lateinit var transactionRelayService: TransactionRelayService
 

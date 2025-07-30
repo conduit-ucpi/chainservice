@@ -1,6 +1,6 @@
 package com.conduit.chainservice.service
 
-import com.conduit.chainservice.config.BlockchainProperties
+import com.conduit.chainservice.config.EscrowBlockchainProperties
 import com.conduit.chainservice.model.ContractEvent
 import com.conduit.chainservice.model.ContractEventHistory
 import com.conduit.chainservice.model.EventType
@@ -24,7 +24,7 @@ import java.time.Instant
 @Service
 class EventParsingService(
     private val web3j: Web3j,
-    private val blockchainProperties: BlockchainProperties
+    private val blockchainProperties: EscrowBlockchainProperties
 ) {
 
     private val logger = LoggerFactory.getLogger(EventParsingService::class.java)
