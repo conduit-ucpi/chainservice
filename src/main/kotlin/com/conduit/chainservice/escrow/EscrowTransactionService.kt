@@ -239,6 +239,106 @@ class EscrowTransactionService(
         }
     }
 
+    suspend fun resolveDisputeWithPercentages(contractAddress: String, buyerPercentage: Double, sellerPercentage: Double): TransactionResult {
+        return try {
+            logger.info("Resolving dispute with percentages for contract: $contractAddress, buyer: $buyerPercentage%, seller: $sellerPercentage%")
+
+            // Validate percentages
+            if (buyerPercentage < 0 || sellerPercentage < 0) {
+                return TransactionResult(
+                    success = false,
+                    transactionHash = null,
+                    error = "Percentages cannot be negative"
+                )
+            }
+            
+            if (Math.abs(buyerPercentage + sellerPercentage - 100.0) > 0.01) {
+                return TransactionResult(
+                    success = false,
+                    transactionHash = null,
+                    error = "Percentages must sum to 100"
+                )
+            }
+
+            val nonce = web3j.ethGetTransactionCount(
+                relayerCredentials.address,
+                DefaultBlockParameterName.PENDING
+            ).send().transactionCount
+
+            val gasPrice = gasProvider.getGasPrice("resolveDispute")
+            val gasLimit = gasProvider.getGasLimit("resolveDispute")
+
+            // Convert percentages to integers (smart contract expects uint256)
+            val buyerPercentageInt = buyerPercentage.toBigDecimal().toBigInteger()
+            val sellerPercentageInt = sellerPercentage.toBigDecimal().toBigInteger()
+
+            val function = Function(
+                "resolveDispute",
+                listOf(
+                    org.web3j.abi.datatypes.generated.Uint256(buyerPercentageInt),
+                    org.web3j.abi.datatypes.generated.Uint256(sellerPercentageInt)
+                ),
+                emptyList()
+            )
+
+            val functionData = FunctionEncoder.encode(function)
+
+            val rawTransaction = RawTransaction.createTransaction(
+                nonce,
+                gasPrice,
+                gasLimit,
+                contractAddress,
+                BigInteger.ZERO,
+                functionData
+            )
+
+            val signedTransaction = org.web3j.crypto.TransactionEncoder.signMessage(
+                rawTransaction,
+                chainId,
+                relayerCredentials
+            )
+
+            val transactionHash = web3j.ethSendRawTransaction(
+                Numeric.toHexString(signedTransaction)
+            ).send()
+
+            if (transactionHash.hasError()) {
+                logger.error("Percentage-based dispute resolution failed: ${transactionHash.error.message}")
+                return TransactionResult(
+                    success = false,
+                    transactionHash = null,
+                    error = transactionHash.error.message
+                )
+            }
+
+            val txHash = transactionHash.transactionHash
+            logger.info("Percentage-based dispute resolution transaction sent: $txHash")
+
+            val receipt = blockchainRelayService.waitForTransactionReceipt(txHash)
+            if (receipt?.isStatusOK == true) {
+                logger.info("Dispute resolved successfully with percentages")
+                TransactionResult(
+                    success = true,
+                    transactionHash = txHash
+                )
+            } else {
+                TransactionResult(
+                    success = false,
+                    transactionHash = txHash,
+                    error = "Percentage-based dispute resolution transaction failed"
+                )
+            }
+
+        } catch (e: Exception) {
+            logger.error("Error resolving dispute with percentages", e)
+            TransactionResult(
+                success = false,
+                transactionHash = null,
+                error = e.message ?: "Unknown error occurred"
+            )
+        }
+    }
+
     // Delegate gas transfer operations to generic service
     suspend fun raiseDisputeWithGasTransfer(userWalletAddress: String, signedTransactionHex: String): TransactionResult {
         return blockchainRelayService.processTransactionWithGasTransfer(userWalletAddress, signedTransactionHex, "raiseDispute")

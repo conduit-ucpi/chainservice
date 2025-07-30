@@ -6,7 +6,8 @@ A Kotlin/Spring Boot microservice that acts as a transaction relayer, paying gas
 
 - **Transaction Relaying**: Pays gas fees for user-signed transactions
 - **Contract Creation**: Handles escrow contract deployment
-- **Dispute Management**: Supports raising and resolving disputes
+- **Dispute Management**: Supports raising and admin resolution of disputes
+- **Admin Resolution**: Percentage-based dispute resolution for admins
 - **Fund Claims**: Enables sellers to claim escrowed funds
 - **Contract Queries**: Provides contract status and history for users
 - **Health Monitoring**: Built-in health checks and monitoring endpoints
@@ -32,13 +33,28 @@ A Kotlin/Spring Boot microservice that acts as a transaction relayer, paying gas
 Set the following environment variables:
 
 ```bash
+# Blockchain Configuration
 export RPC_URL=https://api.avax-test.network/ext/bc/C/rpc
+export CHAIN_ID=43113
 export USDC_CONTRACT_ADDRESS=0x5425890298aed601595a70AB815c96711a31Bc65
 export CONTRACT_FACTORY_ADDRESS=0x...
+export TRUSTED_FORWARDER_ADDRESS=0x...
+
+# Relayer Wallet Configuration
 export RELAYER_PRIVATE_KEY=0x...
 export RELAYER_WALLET_ADDRESS=0x...
+
+# Service Configuration
 export SERVER_PORT=8978
+export USER_SERVICE_URL=http://localhost:8080
+export CONTRACT_SERVICE_URL=http://localhost:8080
 export CORS_ALLOWED_ORIGINS=http://localhost:3000
+
+# Fee Configuration
+export CREATOR_FEE_USDC_X_1M=1000000
+
+# Gas Configuration (optional)
+export MIN_GAS_WEI=6
 ```
 
 ### Building and Running
@@ -89,6 +105,34 @@ Content-Type: application/json
 ```
 
 ### 4. Resolve Dispute (Admin Only)
+
+#### Option A: Percentage-based Resolution (Recommended)
+```http
+POST /api/admin/contracts/{contractId}/resolve
+Content-Type: application/json
+Cookie: {admin auth cookies}
+
+{
+    "buyerPercentage": 60.0,
+    "sellerPercentage": 40.0,
+    "resolutionNote": "Admin resolution: buyer provided evidence of delivery issues"
+}
+```
+
+#### Option B: Enhanced Resolve Dispute (Supports both formats)
+```http
+POST /api/chain/resolve-dispute
+Content-Type: application/json
+
+{
+    "contractAddress": "0x...",
+    "buyerPercentage": 60.0,
+    "sellerPercentage": 40.0,
+    "resolutionNote": "Percentage-based resolution"
+}
+```
+
+#### Option C: Legacy Single Recipient (Deprecated)
 ```http
 POST /api/chain/resolve-dispute
 Content-Type: application/json
@@ -113,10 +157,27 @@ Returns details for a specific contract. Non-admin users can only access contrac
 
 ## API Documentation
 
-The service provides interactive API documentation:
+The service provides comprehensive interactive API documentation:
 
-- **Swagger UI**: `GET /swagger-ui.html` - Interactive API documentation
-- **OpenAPI Spec**: `GET /api-docs` - Raw OpenAPI 3.0 specification
+- **Swagger UI**: `GET /swagger-ui.html` - Interactive API documentation with request/response examples
+- **OpenAPI Spec**: `GET /api-docs` - Raw OpenAPI 3.0 specification in JSON format
+
+### API Features
+
+- **Comprehensive Examples**: All endpoints include request/response examples
+- **Error Documentation**: Detailed error codes and messages
+- **Authentication Info**: Documents admin vs user access requirements
+- **Validation Rules**: Parameter validation and constraints documented
+- **Response Schemas**: Complete response object definitions
+
+### Admin Endpoints
+
+The service includes dedicated admin endpoints with proper authentication:
+
+- **Admin Resolution**: `POST /api/admin/contracts/{id}/resolve`
+- **Access Control**: Validates admin privileges via forwarded authentication cookies
+- **Comprehensive Validation**: Percentage validation, contract address validation
+- **Detailed Logging**: All admin actions logged with resolution notes
 
 ## Health & Monitoring
 
@@ -128,21 +189,43 @@ The health endpoint monitors:
 - Relayer wallet balance
 - Overall service status
 
+## Admin Features
+
+### Dispute Resolution
+
+The service provides comprehensive dispute resolution capabilities:
+
+- **Percentage-based Resolution**: Split funds between buyer and seller (e.g., 60%/40%)
+- **Admin Authentication**: Requires admin privileges to resolve disputes
+- **Resolution Notes**: Optional notes for documenting admin decisions
+- **Validation**: Ensures percentages are valid (non-negative, sum to 100)
+- **Smart Contract Integration**: Calls the contract's percentage-based resolution function
+
+### Admin Endpoints
+
+- `POST /api/admin/contracts/{id}/resolve` - Primary admin resolution endpoint
+- Authentication via HTTP-only cookies forwarded from the frontend
+- Comprehensive error handling and validation
+- Transaction execution via service's relayer wallet (admin privileges)
+
 ## Configuration
 
 The service uses `application.yml` for configuration with environment variable overrides. Key settings include:
 
 - **Blockchain**: RPC URL, contract addresses, gas settings
+- **Authentication**: User service integration for admin validation
 - **CORS**: Allowed origins for cross-origin requests
 - **Logging**: Configurable log levels for different components
 
 ## Security Features
 
-- Input validation and sanitization
-- Transaction signature verification
-- Rate limiting considerations
-- Secure private key handling via environment variables
-- CORS protection
+- **Input validation and sanitization**
+- **Transaction signature verification** 
+- **Admin authentication** - Only admin users can resolve disputes
+- **Role-based access control** - Different endpoints for different user types
+- **Secure private key handling** via environment variables
+- **CORS protection**
+- **Rate limiting considerations**
 
 ## Error Handling
 
@@ -164,23 +247,39 @@ The service includes comprehensive error handling:
 ### Project Structure
 
 ```
-src/main/kotlin/com/conduit/chainservice/
-├── ChainServiceApplication.kt           # Main application class
-├── config/                             # Configuration classes
-│   ├── Web3Config.kt                   # Web3j and blockchain config
-│   └── WebConfig.kt                    # CORS configuration
-├── controller/                         # REST controllers
-│   ├── ChainController.kt              # Main API endpoints
-│   └── HealthController.kt             # Health check endpoints
-├── exception/                          # Error handling
-│   └── GlobalExceptionHandler.kt       # Global exception handler
-├── model/                              # Data models
-│   ├── ApiModels.kt                    # Request/response models
-│   └── ContractModels.kt               # Domain models
-└── service/                            # Business logic
-    ├── ContractQueryService.kt         # Contract state queries
-    ├── EventParsingService.kt          # Blockchain event parsing
-    └── TransactionRelayService.kt      # Transaction relaying
+src/main/kotlin/
+├── com/utility/chainservice/                   # Generic utility (future separate repo)
+│   ├── BlockchainRelayService.kt              # Core transaction relay logic
+│   ├── AuthenticationProvider.kt              # Authentication interface
+│   ├── HttpAuthenticationProvider.kt          # HTTP-based auth implementation
+│   └── models/                                # Utility models
+└── com/conduit/chainservice/                  # Project-specific (escrow)
+    ├── ChainServiceApplication.kt             # Main application class
+    ├── auth/                                  # Authentication & security
+    │   ├── AuthenticationFilter.kt
+    │   ├── SecurityConfig.kt
+    │   └── UserServiceClient.kt
+    ├── config/                                # Configuration classes
+    │   ├── Web3Config.kt                      # Web3j and blockchain config
+    │   ├── OpenApiConfig.kt                   # Swagger/OpenAPI setup
+    │   └── UtilityServiceConfiguration.kt     # Bridge to generic utility
+    ├── controller/                            # REST controllers
+    │   ├── AdminController.kt                 # Admin-only endpoints
+    │   └── HealthController.kt                # Health check endpoints
+    ├── escrow/                                # Escrow plugin
+    │   ├── EscrowServicePlugin.kt             # Plugin implementation
+    │   ├── EscrowTransactionService.kt        # Escrow business logic
+    │   ├── EscrowController.kt                # Escrow API endpoints
+    │   └── models/                            # Escrow-specific models
+    │       ├── EscrowModels.kt                # Request/response models
+    │       └── ContractModels.kt              # Domain models
+    ├── exception/                             # Error handling
+    │   └── GlobalExceptionHandler.kt          # Global exception handler
+    └── service/                               # Business logic services
+        ├── ContractQueryService.kt            # Contract state queries
+        ├── EventParsingService.kt             # Blockchain event processing
+        ├── TransactionRelayService.kt         # Legacy service (delegates to new)
+        └── ContractServiceClient.kt           # External service integration
 ```
 
 ### Testing

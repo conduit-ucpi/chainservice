@@ -63,8 +63,13 @@ data class ResolveDisputeRequest(
     @field:NotBlank(message = "Contract address is required")
     val contractAddress: String,
     
-    @field:NotBlank(message = "Recipient address is required")
-    val recipientAddress: String
+    // For backward compatibility - if recipientAddress is provided, all funds go to this address
+    val recipientAddress: String? = null,
+    
+    // For percentage-based resolution
+    val buyerPercentage: Double? = null,
+    val sellerPercentage: Double? = null,
+    val resolutionNote: String? = null
 )
 
 data class ApproveUSDCRequest(
@@ -121,4 +126,20 @@ data class ErrorResponse(
     val error: String,
     val message: String,
     val timestamp: String
+)
+
+data class AdminResolveContractRequest(
+    @field:NotNull(message = "Buyer percentage is required")
+    val buyerPercentage: Double,
+    
+    @field:NotNull(message = "Seller percentage is required")
+    val sellerPercentage: Double,
+    
+    val resolutionNote: String? = null
+)
+
+data class AdminResolveContractResponse(
+    val success: Boolean,
+    val transactionHash: String?,
+    val error: String? = null
 )

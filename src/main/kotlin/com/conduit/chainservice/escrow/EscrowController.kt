@@ -346,10 +346,16 @@ class EscrowController(
         @Valid @RequestBody
         @io.swagger.v3.oas.annotations.parameters.RequestBody(
             content = [Content(
-                examples = [ExampleObject(
-                    name = "Resolve Dispute Example",
-                    value = """{"contractAddress": "0x1234...abcd", "recipientAddress": "0x5678...efgh"}"""
-                )]
+                examples = [
+                    ExampleObject(
+                        name = "Percentage-based Resolution",
+                        value = """{"contractAddress": "0x1234...abcd", "buyerPercentage": 60.0, "sellerPercentage": 40.0, "resolutionNote": "Admin resolution note"}"""
+                    ),
+                    ExampleObject(
+                        name = "Legacy Single Recipient (deprecated)",
+                        value = """{"contractAddress": "0x1234...abcd", "recipientAddress": "0x5678...efgh"}"""
+                    )
+                ]
             )]
         )
         request: ResolveDisputeRequest
@@ -358,7 +364,45 @@ class EscrowController(
             logger.info("Resolve dispute request received for contract: ${request.contractAddress}")
             
             val result = runBlocking {
-                escrowTransactionService.resolveDispute(request.contractAddress, request.recipientAddress)
+                // Check if percentage-based resolution is requested
+                if (request.buyerPercentage != null && request.sellerPercentage != null) {
+                    // Validate percentages
+                    val buyerPct = request.buyerPercentage!!
+                    val sellerPct = request.sellerPercentage!!
+                    
+                    if (buyerPct < 0 || sellerPct < 0) {
+                        return@runBlocking com.utility.chainservice.models.TransactionResult(
+                            success = false,
+                            transactionHash = null,
+                            error = "Percentages cannot be negative"
+                        )
+                    }
+                    
+                    if (Math.abs(buyerPct + sellerPct - 100.0) > 0.01) {
+                        return@runBlocking com.utility.chainservice.models.TransactionResult(
+                            success = false,
+                            transactionHash = null,
+                            error = "Percentages must sum to 100"
+                        )
+                    }
+                    
+                    logger.info("Using percentage-based resolution: buyer=${buyerPct}%, seller=${sellerPct}%")
+                    if (request.resolutionNote != null) {
+                        logger.info("Resolution note: ${request.resolutionNote}")
+                    }
+                    
+                    escrowTransactionService.resolveDisputeWithPercentages(request.contractAddress, buyerPct, sellerPct)
+                } else if (request.recipientAddress != null) {
+                    // Legacy single recipient resolution
+                    logger.warn("Using deprecated single recipient resolution")
+                    escrowTransactionService.resolveDispute(request.contractAddress, request.recipientAddress!!)
+                } else {
+                    com.utility.chainservice.models.TransactionResult(
+                        success = false,
+                        transactionHash = null,
+                        error = "Either provide buyerPercentage+sellerPercentage or recipientAddress (deprecated)"
+                    )
+                }
             }
 
             val response = ResolveDisputeResponse(
