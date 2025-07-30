@@ -1,6 +1,7 @@
 package com.conduit.chainservice.controller
 
-import com.conduit.chainservice.config.EscrowBlockchainProperties
+import com.conduit.chainservice.config.EscrowProperties
+import com.utility.chainservice.BlockchainProperties
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.media.Content
 import io.swagger.v3.oas.annotations.media.Schema
@@ -26,7 +27,8 @@ import java.time.Instant
 class HealthController(
     private val web3j: Web3j,
     private val relayerCredentials: Credentials,
-    private val blockchainProperties: EscrowBlockchainProperties
+    private val blockchainProperties: BlockchainProperties,
+    private val escrowProperties: EscrowProperties
 ) {
 
     private val logger = LoggerFactory.getLogger(HealthController::class.java)
@@ -101,8 +103,8 @@ class HealthController(
                 ),
                 "blockchain" to mapOf(
                     "network" to blockchainProperties.rpcUrl,
-                    "usdcContract" to blockchainProperties.usdcContractAddress,
-                    "factoryContract" to blockchainProperties.contractFactoryAddress
+                    "usdcContract" to escrowProperties.usdcContractAddress,
+                    "factoryContract" to escrowProperties.contractFactoryAddress
                 ),
                 "build" to mapOf(
                     "timestamp" to Instant.now().toString()

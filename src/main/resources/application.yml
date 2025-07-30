@@ -19,11 +19,13 @@ blockchain:
     wallet-address: ${RELAYER_WALLET_ADDRESS}
   gas:
     limit-create-contract: 500000
-    limit-deposit: 250000
-    limit-dispute: 300000
-    limit-claim: 200000
+    limit-deposit: 74161
+    limit-dispute: 9633
+    limit-claim: 51702
     limit-resolve: 200000
-    price-multiplier: 1.2
+    limit-approve-usdc: 60000
+    price-multiplier: 1.7
+    minimum-gas-price-wei: ${MIN_GAS_WEI:6}
 
 auth:
   user-service-url: ${USER_SERVICE_URL}

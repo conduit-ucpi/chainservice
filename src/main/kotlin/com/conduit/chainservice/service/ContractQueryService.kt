@@ -1,6 +1,6 @@
 package com.conduit.chainservice.service
 
-import com.conduit.chainservice.config.EscrowBlockchainProperties
+import com.conduit.chainservice.config.EscrowProperties
 import com.conduit.chainservice.escrow.models.ContractInfo
 import com.conduit.chainservice.escrow.models.ContractStatus
 import org.slf4j.LoggerFactory
@@ -22,7 +22,7 @@ import java.time.Instant
 @Service
 class ContractQueryService(
     private val web3j: Web3j,
-    private val blockchainProperties: EscrowBlockchainProperties,
+    private val escrowProperties: EscrowProperties,
     private val eventParsingService: EventParsingService
 ) {
 

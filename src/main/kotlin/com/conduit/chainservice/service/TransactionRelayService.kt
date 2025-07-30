@@ -1,6 +1,6 @@
 package com.conduit.chainservice.service
 
-import com.conduit.chainservice.config.EscrowBlockchainProperties
+import com.conduit.chainservice.config.EscrowProperties
 import com.conduit.chainservice.model.ContractCreationResult
 import com.conduit.chainservice.model.OperationGasCost
 import com.conduit.chainservice.model.TransactionResult
@@ -19,7 +19,7 @@ class TransactionRelayService(
     private val web3j: Web3j,
     private val relayerCredentials: Credentials,
     private val gasProvider: ContractGasProvider,
-    private val blockchainProperties: EscrowBlockchainProperties,
+    private val escrowProperties: EscrowProperties,
     private val chainId: Long
 ) {
 

@@ -3,39 +3,51 @@ package com.conduit.chainservice.config
 import com.conduit.chainservice.auth.AuthProperties
 import com.utility.chainservice.AuthenticationProvider
 import com.utility.chainservice.HttpAuthenticationProvider
+import com.utility.chainservice.BlockchainProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 
 @Configuration
 class UtilityServiceConfiguration(
-    private val escrowBlockchainProperties: EscrowBlockchainProperties,
+    private val blockchainProperties: BlockchainProperties,
+    private val escrowProperties: EscrowProperties,
     private val authProperties: AuthProperties
 ) {
 
     @Bean
-    fun rpcUrl(): String = escrowBlockchainProperties.rpcUrl
+    fun rpcUrl(): String = blockchainProperties.rpcUrl
 
     @Bean
-    fun relayerPrivateKey(): String = escrowBlockchainProperties.relayer.privateKey
+    fun relayerPrivateKey(): String = blockchainProperties.relayer.privateKey
 
     @Bean
-    fun fallbackChainId(): Long = escrowBlockchainProperties.chainId
+    fun fallbackChainId(): Long = blockchainProperties.chainId
 
     @Bean
-    fun gasPriceMultiplier(): Double = escrowBlockchainProperties.gas.priceMultiplier
+    fun gasPriceMultiplier(): Double = blockchainProperties.gas.priceMultiplier
 
     @Bean
-    fun minimumGasPriceWei(): Long = escrowBlockchainProperties.gas.minimumGasPriceWei
+    fun minimumGasPriceWei(): Long = blockchainProperties.gas.minimumGasPriceWei
 
     @Bean
     fun gasLimitsConfig(): Map<String, Long> = mapOf(
-        "createContract" to escrowBlockchainProperties.gas.limitCreateContract,
-        "depositFunds" to escrowBlockchainProperties.gas.limitDeposit,
-        "raiseDispute" to escrowBlockchainProperties.gas.limitDispute,
-        "claimFunds" to escrowBlockchainProperties.gas.limitClaim,
-        "resolveDispute" to escrowBlockchainProperties.gas.limitResolve,
-        "approveUSDC" to escrowBlockchainProperties.gas.limitApproveUSDC
+        "createContract" to escrowProperties.gas.limitCreateContract,
+        "depositFunds" to escrowProperties.gas.limitDeposit,
+        "raiseDispute" to escrowProperties.gas.limitDispute,
+        "claimFunds" to escrowProperties.gas.limitClaim,
+        "resolveDispute" to escrowProperties.gas.limitResolve,
+        "approveUSDC" to escrowProperties.gas.limitApproveUSDC
     )
+
+    // Additional escrow-specific properties
+    @Bean
+    fun usdcContractAddress(): String = escrowProperties.usdcContractAddress
+
+    @Bean
+    fun contractFactoryAddress(): String = escrowProperties.contractFactoryAddress
+
+    @Bean
+    fun creatorFee(): java.math.BigInteger = escrowProperties.creatorFee
 
     // authenticationProvider bean is provided by blockchain-relay-utility
 }

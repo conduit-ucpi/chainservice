@@ -1,6 +1,6 @@
 package com.conduit.chainservice.service
 
-import com.conduit.chainservice.config.EscrowBlockchainProperties
+import com.conduit.chainservice.config.EscrowProperties
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -31,7 +31,7 @@ class EventParsingServiceTest {
     private lateinit var web3j: Web3j
 
     @Mock
-    private lateinit var blockchainProperties: EscrowBlockchainProperties
+    private lateinit var escrowProperties: EscrowProperties
 
     @Mock
     private lateinit var ethBlockNumberRequest: Request<*, EthBlockNumber>
@@ -57,12 +57,12 @@ class EventParsingServiceTest {
     fun setUp() {
         MockitoAnnotations.openMocks(this)
         
-        whenever(blockchainProperties.contractFactoryAddress).thenReturn(factoryAddress)
+        whenever(escrowProperties.contractFactoryAddress).thenReturn(factoryAddress)
         whenever(web3j.ethBlockNumber()).thenReturn(ethBlockNumberRequest)
         whenever(ethBlockNumberRequest.send()).thenReturn(ethBlockNumber)
         whenever(ethBlockNumber.blockNumber).thenReturn(currentBlockNumber)
         
-        eventParsingService = EventParsingService(web3j, blockchainProperties)
+        eventParsingService = EventParsingService(web3j, escrowProperties)
     }
 
     @Test

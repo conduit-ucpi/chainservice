@@ -1,6 +1,6 @@
 package com.conduit.chainservice.service
 
-import com.conduit.chainservice.config.EscrowBlockchainProperties
+import com.conduit.chainservice.config.EscrowProperties
 import com.conduit.chainservice.model.ContractEvent
 import com.conduit.chainservice.model.ContractEventHistory
 import com.conduit.chainservice.model.EventType
@@ -24,7 +24,7 @@ import java.time.Instant
 @Service
 class EventParsingService(
     private val web3j: Web3j,
-    private val blockchainProperties: EscrowBlockchainProperties
+    private val escrowProperties: EscrowProperties
 ) {
 
     private val logger = LoggerFactory.getLogger(EventParsingService::class.java)
@@ -100,7 +100,7 @@ class EventParsingService(
     suspend fun findContractsByParticipant(walletAddress: String): List<String> {
         return try {
             logger.info("Finding contracts for participant: $walletAddress")
-            logger.debug("Factory contract address: ${blockchainProperties.contractFactoryAddress}")
+            logger.debug("Factory contract address: ${escrowProperties.contractFactoryAddress}")
 
             val contractAddresses = mutableSetOf<String>()
             
@@ -127,7 +127,7 @@ class EventParsingService(
                     val chunkFilter = EthFilter(
                         org.web3j.protocol.core.DefaultBlockParameter.valueOf(chunkStart),
                         org.web3j.protocol.core.DefaultBlockParameter.valueOf(chunkEnd),
-                        blockchainProperties.contractFactoryAddress
+                        escrowProperties.contractFactoryAddress
                     )
                     
                     val chunkLogs = web3j.ethGetLogs(chunkFilter).send().logs ?: emptyList()
@@ -161,7 +161,7 @@ class EventParsingService(
                     if (block != null) {
                         val factoryTxs = block.transactions.filter { tx ->
                             val transaction = tx as org.web3j.protocol.core.methods.response.Transaction
-                            transaction.to?.equals(blockchainProperties.contractFactoryAddress, ignoreCase = true) == true
+                            transaction.to?.equals(escrowProperties.contractFactoryAddress, ignoreCase = true) == true
                         }
                         
                         if (factoryTxs.isNotEmpty()) {
@@ -219,7 +219,7 @@ class EventParsingService(
                         val filter = EthFilter(
                             org.web3j.protocol.core.DefaultBlockParameter.valueOf(chunkStart),
                             org.web3j.protocol.core.DefaultBlockParameter.valueOf(chunkEnd),
-                            blockchainProperties.contractFactoryAddress
+                            escrowProperties.contractFactoryAddress
                         )
                         
                         // Set up topics for filtering
@@ -324,7 +324,7 @@ class EventParsingService(
                     val chunkFilter = EthFilter(
                         org.web3j.protocol.core.DefaultBlockParameter.valueOf(chunkStart),
                         org.web3j.protocol.core.DefaultBlockParameter.valueOf(chunkEnd),
-                        blockchainProperties.contractFactoryAddress
+                        escrowProperties.contractFactoryAddress
                     )
                     
                     // Add the ContractCreated event signature

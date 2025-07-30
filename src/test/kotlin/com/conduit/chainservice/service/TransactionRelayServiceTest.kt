@@ -1,6 +1,6 @@
 package com.conduit.chainservice.service
 
-import com.conduit.chainservice.config.EscrowBlockchainProperties
+import com.conduit.chainservice.config.EscrowProperties
 import com.conduit.chainservice.escrow.EscrowTransactionService
 import com.utility.chainservice.BlockchainRelayService
 import org.junit.jupiter.api.BeforeEach
@@ -32,7 +32,7 @@ class TransactionRelayServiceTest {
     private lateinit var gasProvider: ContractGasProvider
 
     @Mock
-    private lateinit var blockchainProperties: EscrowBlockchainProperties
+    private lateinit var escrowProperties: EscrowProperties
 
     private lateinit var transactionRelayService: TransactionRelayService
 
@@ -44,7 +44,7 @@ class TransactionRelayServiceTest {
         MockitoAnnotations.openMocks(this)
         whenever(relayerCredentials.address).thenReturn(relayerAddress)
         transactionRelayService = TransactionRelayService(
-            blockchainRelayService, escrowTransactionService, web3j, relayerCredentials, gasProvider, blockchainProperties, chainId
+            blockchainRelayService, escrowTransactionService, web3j, relayerCredentials, gasProvider, escrowProperties, chainId
         )
     }
 

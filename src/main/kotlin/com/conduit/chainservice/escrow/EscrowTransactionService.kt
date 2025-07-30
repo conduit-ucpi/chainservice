@@ -1,6 +1,7 @@
 package com.conduit.chainservice.escrow
 
-import com.conduit.chainservice.config.EscrowBlockchainProperties
+import com.conduit.chainservice.config.EscrowProperties
+import com.utility.chainservice.BlockchainProperties
 import com.conduit.chainservice.escrow.models.ContractCreationResult
 import com.utility.chainservice.BlockchainRelayService
 import com.utility.chainservice.models.TransactionResult
@@ -26,7 +27,7 @@ class EscrowTransactionService(
     private val web3j: Web3j,
     private val relayerCredentials: Credentials,
     private val gasProvider: ContractGasProvider,
-    private val blockchainProperties: EscrowBlockchainProperties,
+    private val escrowProperties: EscrowProperties,
     private val chainId: Long
 ) {
 
@@ -46,7 +47,7 @@ class EscrowTransactionService(
             val creatorFee = if (amount == BigInteger.valueOf(1000)) { // 0.001 USDC = 1000 units (6 decimals)
                 BigInteger.ZERO
             } else {
-                blockchainProperties.creatorFee
+                escrowProperties.creatorFee
             }
 
             // Validate creator fee
@@ -88,7 +89,7 @@ class EscrowTransactionService(
                 nonce,
                 gasPrice,
                 gasLimit,
-                blockchainProperties.contractFactoryAddress,
+                escrowProperties.contractFactoryAddress,
                 BigInteger.ZERO,
                 functionData
             )
