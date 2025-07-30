@@ -15,10 +15,14 @@ java {
 }
 
 repositories {
+    maven { url = uri("https://jitpack.io") }
     mavenCentral()
 }
 
 dependencies {
+    // Blockchain Relay Utility from Jitpack
+    implementation("com.github.charliepank:blockchain-relay-utility:v0.0.1")
+    
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.boot:spring-boot-starter-security")

@@ -32,18 +32,34 @@ java -jar build/libs/chainservice-1.0.0.jar
 
 ## Architecture Overview
 
-This is a Kotlin/Spring Boot microservice that acts as a blockchain transaction relayer for an escrow system. The service pays gas fees for user-signed transactions and provides contract query functionality on the Avalanche network.
+This is a Kotlin/Spring Boot microservice that provides a **generic blockchain transaction relay utility** with a **pluggable escrow service**. The service pays gas fees for user-signed transactions and provides contract query functionality on the Avalanche network.
 
-### Core Components
+### New Architecture (Post-Refactoring)
+
+**Generic Utility (`com.utility.chainservice`)**:
+- `BlockchainRelayService` - Core blockchain transaction relaying and gas management
+- `AuthenticationProvider` - Generic interface for user authentication
+- `HttpAuthenticationProvider` - HTTP-based authentication implementation
+- `RelayController` - Generic utility endpoints (`/api/relay/*`)
+- Plugin system supporting different business logic implementations
+
+**Escrow Plugin (`com.conduit.chainservice.escrow`)**:
+- `EscrowServicePlugin` - Implements plugin interface for escrow functionality
+- `EscrowTransactionService` - Escrow-specific business logic using generic services
+- `EscrowController` - Escrow API endpoints (`/api/chain/*`)
+- All existing escrow functionality preserved through plugin architecture
 
 **Transaction Flow:**
 - Users sign transactions client-side with their private keys
 - This service receives the signed transaction, validates it, and relays it to the blockchain
+- The generic utility handles gas transfer and transaction forwarding
+- The escrow plugin provides business-specific logic (contract creation, disputes, etc.)
 - The service's relayer wallet pays the gas fees
-- Supports escrow contract creation, dispute raising/resolution, and fund claiming
 
 **Key Services:**
-- `TransactionRelayService` - Core blockchain interaction and transaction relaying
+- `BlockchainRelayService` - Generic blockchain interaction and transaction relaying
+- `EscrowTransactionService` - Escrow-specific operations using generic services
+- `TransactionRelayService` - Legacy service that delegates to new architecture
 - `ContractQueryService` - Reads contract state and history from blockchain
 - `EventParsingService` - Parses blockchain events for contract status updates
 
@@ -51,32 +67,56 @@ This is a Kotlin/Spring Boot microservice that acts as a blockchain transaction 
 - Environment-based configuration through `application.yml`
 - Blockchain properties (RPC URL, contract addresses, gas settings)
 - Authentication integration with external user service
+- Plugin auto-discovery and initialization
 
 ### Package Structure
 
 ```
-src/main/kotlin/com/conduit/chainservice/
-├── ChainServiceApplication.kt           # Main Spring Boot application
-├── auth/                                # Authentication & security
-│   ├── AuthProperties.kt
-│   ├── AuthenticationFilter.kt
-│   ├── SecurityConfig.kt
-│   └── UserServiceClient.kt
-├── config/                              # Configuration classes
-│   ├── OpenApiConfig.kt                 # Swagger/OpenAPI setup
-│   └── Web3Config.kt                    # Web3j & blockchain configuration
-├── controller/                          # REST API endpoints
-│   ├── ChainController.kt               # Main blockchain operations API
-│   └── HealthController.kt              # Health checks and monitoring
-├── exception/                           # Error handling
-│   └── GlobalExceptionHandler.kt
-├── model/                               # Data models
-│   ├── ApiModels.kt                     # Request/response DTOs
-│   └── ContractModels.kt                # Domain models
-└── service/                             # Business logic
-    ├── ContractQueryService.kt          # Contract state queries
-    ├── EventParsingService.kt           # Blockchain event processing
-    └── TransactionRelayService.kt       # Core transaction relaying
+src/main/kotlin/
+├── com/utility/chainservice/                   # Generic utility (future separate repo)
+│   ├── BlockchainRelayService.kt              # Core transaction relay logic
+│   ├── AuthenticationProvider.kt              # Authentication interface
+│   ├── HttpAuthenticationProvider.kt          # HTTP-based auth implementation
+│   ├── BlockchainConfiguration.kt             # Web3j and blockchain setup
+│   ├── RelayController.kt                     # Generic utility endpoints
+│   ├── models/
+│   │   ├── TransactionResult.kt               # Common result models
+│   │   ├── AuthenticationModels.kt            # Auth request/response models
+│   │   └── RelayModels.kt                     # Generic relay models
+│   └── plugin/
+│       ├── BlockchainServicePlugin.kt         # Plugin interface
+│       └── PluginConfiguration.kt             # Plugin config system
+└── com/conduit/chainservice/                  # Project-specific (escrow)
+    ├── ChainServiceApplication.kt             # Main application (updated)
+    ├── escrow/                                # Escrow plugin
+    │   ├── EscrowServicePlugin.kt             # Plugin implementation
+    │   ├── EscrowTransactionService.kt        # Escrow business logic
+    │   ├── EscrowController.kt                # Escrow API endpoints
+    │   └── models/
+    │       ├── EscrowModels.kt                # Escrow-specific models
+    │       └── ContractModels.kt              # Contract data models
+    ├── auth/                                  # Authentication & security
+    │   ├── AuthProperties.kt
+    │   ├── AuthenticationFilter.kt
+    │   ├── SecurityConfig.kt
+    │   └── UserServiceClient.kt
+    ├── config/                                # Configuration classes
+    │   ├── OpenApiConfig.kt                   # Swagger/OpenAPI setup
+    │   ├── Web3Config.kt                      # Web3j & blockchain configuration
+    │   └── UtilityServiceConfiguration.kt     # Bridge to generic utility
+    ├── controller/                            # Legacy compatibility
+    │   ├── ChainController.kt                 # Legacy endpoints (still functional)
+    │   └── HealthController.kt                # Health checks and monitoring
+    ├── exception/                             # Error handling
+    │   └── GlobalExceptionHandler.kt
+    ├── model/                                 # Legacy models
+    │   ├── ApiModels.kt                       # Request/response DTOs
+    │   └── ContractModels.kt                  # Domain models
+    └── service/                               # Business logic services
+        ├── ContractQueryService.kt            # Contract state queries
+        ├── EventParsingService.kt             # Blockchain event processing
+        ├── TransactionRelayService.kt         # Legacy service (delegates to new)
+        └── ContractServiceClient.kt           # External service integration
 ```
 
 ## Required Environment Variables
@@ -110,9 +150,18 @@ The application requires these environment variables to start:
 - Swagger UI available at `/swagger-ui.html`
 - OpenAPI spec at `/api-docs`
 - Health endpoints at `/actuator/health` and `/actuator/info`
+- Generic utility endpoints at `/api/relay/*`
+- Escrow plugin endpoints at `/api/chain/*` (unchanged from original)
+
+**Plugin System:**
+- Automatic plugin discovery and initialization
+- Clean separation between generic blockchain functionality and business logic
+- Easy to add new plugins for different use cases (NFT, DEX, etc.)
+- Each plugin defines its own API endpoints and business rules
 
 **Blockchain Integration:**
 - Uses Web3j library for Ethereum-compatible blockchain interaction
-- Supports contract creation, fund operations, and dispute management
+- Generic gas management and transaction relaying
+- Escrow plugin supports contract creation, fund operations, and dispute management
 - Event parsing for contract status tracking
 - Transaction receipt polling with configurable timeouts

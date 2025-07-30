@@ -1,6 +1,8 @@
 package com.conduit.chainservice.controller
 
 import com.conduit.chainservice.model.*
+import com.conduit.chainservice.escrow.models.ContractInfo
+import com.conduit.chainservice.escrow.models.ContractStatus
 import com.conduit.chainservice.service.ContractQueryService
 import com.conduit.chainservice.service.ContractServiceClient
 import com.conduit.chainservice.service.TransactionRelayService

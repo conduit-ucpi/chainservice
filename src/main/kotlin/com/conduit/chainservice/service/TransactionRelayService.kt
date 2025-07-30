@@ -6,26 +6,16 @@ import com.conduit.chainservice.model.OperationGasCost
 import com.conduit.chainservice.model.TransactionResult
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
-import org.web3j.abi.FunctionEncoder
-import org.web3j.abi.datatypes.Address
-import org.web3j.abi.datatypes.Function
-import org.web3j.abi.datatypes.Utf8String
-import org.web3j.abi.datatypes.generated.Uint256
 import org.web3j.crypto.Credentials
-import org.web3j.crypto.RawTransaction
-import org.web3j.crypto.TransactionDecoder
-import org.web3j.crypto.Keys
 import org.web3j.protocol.Web3j
-import org.web3j.protocol.core.DefaultBlockParameterName
 import org.web3j.protocol.core.methods.response.TransactionReceipt
 import org.web3j.tx.gas.ContractGasProvider
-import org.web3j.utils.Numeric
-import java.math.BigDecimal
 import java.math.BigInteger
-import java.math.RoundingMode
 
 @Service
 class TransactionRelayService(
+    private val blockchainRelayService: com.utility.chainservice.BlockchainRelayService,
+    private val escrowTransactionService: com.conduit.chainservice.escrow.EscrowTransactionService,
     private val web3j: Web3j,
     private val relayerCredentials: Credentials,
     private val gasProvider: ContractGasProvider,
@@ -36,72 +26,14 @@ class TransactionRelayService(
     private val logger = LoggerFactory.getLogger(TransactionRelayService::class.java)
 
     suspend fun relayTransaction(signedTransactionHex: String): TransactionResult {
-        return try {
-            logger.info("Relaying transaction: ${signedTransactionHex.substring(0, 20)}...")
-
-            val decodedTx = TransactionDecoder.decode(signedTransactionHex)
-            
-            val nonce = web3j.ethGetTransactionCount(
-                relayerCredentials.address,
-                DefaultBlockParameterName.PENDING
-            ).send().transactionCount
-
-            val gasPrice = gasProvider.gasPrice
-            val gasLimit = gasProvider.gasLimit
-
-            val rawTransaction = RawTransaction.createTransaction(
-                nonce,
-                gasPrice,
-                gasLimit,
-                decodedTx.to,
-                decodedTx.value,
-                decodedTx.data
-            )
-
-            val signedTransaction = org.web3j.crypto.TransactionEncoder.signMessage(
-                rawTransaction,
-                chainId,
-                relayerCredentials
-            )
-
-            val transactionHash = web3j.ethSendRawTransaction(
-                Numeric.toHexString(signedTransaction)
-            ).send()
-
-            if (transactionHash.hasError()) {
-                logger.error("Transaction relay failed: ${transactionHash.error.message}")
-                return TransactionResult(
-                    success = false,
-                    transactionHash = null,
-                    error = transactionHash.error.message
-                )
-            }
-
-            val txHash = transactionHash.transactionHash
-            logger.info("Transaction relayed successfully: $txHash")
-
-            val receipt = waitForTransactionReceipt(txHash)
-            if (receipt?.isStatusOK == true) {
-                TransactionResult(
-                    success = true,
-                    transactionHash = txHash
-                )
-            } else {
-                TransactionResult(
-                    success = false,
-                    transactionHash = txHash,
-                    error = "Transaction failed on blockchain"
-                )
-            }
-
-        } catch (e: Exception) {
-            logger.error("Error relaying transaction", e)
-            TransactionResult(
-                success = false,
-                transactionHash = null,
-                error = e.message ?: "Unknown error occurred"
-            )
-        }
+        // Delegate to generic blockchain relay service
+        val genericResult = blockchainRelayService.relayTransaction(signedTransactionHex)
+        // Convert to legacy TransactionResult format
+        return TransactionResult(
+            success = genericResult.success,
+            transactionHash = genericResult.transactionHash,
+            error = genericResult.error
+        )
     }
 
     suspend fun createContract(
@@ -111,495 +43,61 @@ class TransactionRelayService(
         expiryTimestamp: Long,
         description: String
     ): ContractCreationResult {
-        return try {
-            logger.info("Creating escrow contract for buyer: $buyer, seller: $seller, amount: $amount")
-
-            // Determine creator fee with special case logic
-            val creatorFee = if (amount == BigInteger.valueOf(1000)) { // 0.001 USDC = 1000 units (6 decimals)
-                BigInteger.ZERO
-            } else {
-                blockchainProperties.creatorFee
-            }
-
-            // Validate creator fee
-            if (creatorFee >= amount) {
-                logger.error("Creator fee ($creatorFee) must be less than contract amount ($amount)")
-                return ContractCreationResult(
-                    success = false,
-                    transactionHash = null,
-                    contractAddress = null,
-                    error = "Creator fee must be less than contract amount"
-                )
-            }
-
-            val nonce = web3j.ethGetTransactionCount(
-                relayerCredentials.address,
-                DefaultBlockParameterName.PENDING
-            ).send().transactionCount
-
-            val gasPrice = gasProvider.getGasPrice("createContract")
-            val gasLimit = gasProvider.getGasLimit("createContract")
-
-            // Build function call data for createEscrowContract with creator fee
-            val function = Function(
-                "createEscrowContract",
-                listOf(
-                    Address(buyer),
-                    Address(seller), 
-                    Uint256(amount),
-                    Uint256(BigInteger.valueOf(expiryTimestamp)),
-                    Utf8String(description),
-                    Uint256(creatorFee)
-                ),
-                emptyList()
-            )
-
-            val functionData = FunctionEncoder.encode(function)
-
-            val rawTransaction = RawTransaction.createTransaction(
-                nonce,
-                gasPrice,
-                gasLimit,
-                blockchainProperties.contractFactoryAddress,
-                BigInteger.ZERO,
-                functionData
-            )
-
-            val signedTransaction = org.web3j.crypto.TransactionEncoder.signMessage(
-                rawTransaction,
-                chainId,
-                relayerCredentials
-            )
-
-            val transactionHash = web3j.ethSendRawTransaction(
-                Numeric.toHexString(signedTransaction)
-            ).send()
-
-            if (transactionHash.hasError()) {
-                logger.error("Contract creation failed: ${transactionHash.error.message}")
-                return ContractCreationResult(
-                    success = false,
-                    transactionHash = null,
-                    contractAddress = null,
-                    error = transactionHash.error.message
-                )
-            }
-
-            val txHash = transactionHash.transactionHash
-            logger.info("Contract creation transaction sent: $txHash")
-
-            val receipt = waitForTransactionReceipt(txHash)
-            if (receipt?.isStatusOK == true) {
-                logger.info("Transaction receipt received successfully, status: ${receipt.status}")
-                logger.debug("Receipt logs count: ${receipt.logs.size}")
-                
-                // Parse ContractCreated event to get the contract address
-                val contractAddress = parseContractAddressFromReceipt(receipt)
-                
-                if (contractAddress != null) {
-                    logger.info("Escrow contract created successfully at address: $contractAddress")
-                    ContractCreationResult(
-                        success = true,
-                        transactionHash = txHash,
-                        contractAddress = contractAddress
-                    )
-                } else {
-                    logger.error("Could not extract contract address from transaction receipt")
-                    logger.debug("Receipt logs: ${receipt.logs.joinToString { "Topic[0]: ${it.topics.getOrNull(0)}, Data: ${it.data}" }}")
-                    ContractCreationResult(
-                        success = false,
-                        transactionHash = txHash,
-                        contractAddress = null,
-                        error = "Contract address not found in transaction receipt"
-                    )
-                }
-            } else {
-                logger.error("Transaction receipt indicates failure or not found. Status: ${receipt?.status}, Receipt: ${receipt != null}")
-                ContractCreationResult(
-                    success = false,
-                    transactionHash = txHash,
-                    contractAddress = null,
-                    error = "Contract creation transaction failed"
-                )
-            }
-
-        } catch (e: Exception) {
-            logger.error("Error creating escrow contract", e)
-            ContractCreationResult(
-                success = false,
-                transactionHash = null,
-                contractAddress = null,
-                error = e.message ?: "Unknown error occurred"
-            )
-        }
+        // Delegate to escrow transaction service
+        val escrowResult = escrowTransactionService.createContract(buyer, seller, amount, expiryTimestamp, description)
+        // Convert to legacy ContractCreationResult format
+        return ContractCreationResult(
+            success = escrowResult.success,
+            transactionHash = escrowResult.transactionHash,
+            contractAddress = escrowResult.contractAddress,
+            error = escrowResult.error
+        )
     }
 
     suspend fun resolveDispute(contractAddress: String, recipient: String): TransactionResult {
-        return try {
-            logger.info("Resolving dispute for contract: $contractAddress, recipient: $recipient")
-
-            val nonce = web3j.ethGetTransactionCount(
-                relayerCredentials.address,
-                DefaultBlockParameterName.PENDING
-            ).send().transactionCount
-
-            val gasPrice = gasProvider.getGasPrice("resolveDispute")
-            val gasLimit = gasProvider.getGasLimit("resolveDispute")
-
-            val function = Function(
-                "resolveDispute",
-                listOf(Address(recipient)),
-                emptyList()
-            )
-
-            val functionData = FunctionEncoder.encode(function)
-
-            val rawTransaction = RawTransaction.createTransaction(
-                nonce,
-                gasPrice,
-                gasLimit,
-                contractAddress,
-                BigInteger.ZERO,
-                functionData
-            )
-
-            val signedTransaction = org.web3j.crypto.TransactionEncoder.signMessage(
-                rawTransaction,
-                chainId,
-                relayerCredentials
-            )
-
-            val transactionHash = web3j.ethSendRawTransaction(
-                Numeric.toHexString(signedTransaction)
-            ).send()
-
-            if (transactionHash.hasError()) {
-                logger.error("Dispute resolution failed: ${transactionHash.error.message}")
-                return TransactionResult(
-                    success = false,
-                    transactionHash = null,
-                    error = transactionHash.error.message
-                )
-            }
-
-            val txHash = transactionHash.transactionHash
-            logger.info("Dispute resolution transaction sent: $txHash")
-
-            val receipt = waitForTransactionReceipt(txHash)
-            if (receipt?.isStatusOK == true) {
-                logger.info("Dispute resolved successfully")
-                TransactionResult(
-                    success = true,
-                    transactionHash = txHash
-                )
-            } else {
-                TransactionResult(
-                    success = false,
-                    transactionHash = txHash,
-                    error = "Dispute resolution transaction failed"
-                )
-            }
-
-        } catch (e: Exception) {
-            logger.error("Error resolving dispute", e)
-            TransactionResult(
-                success = false,
-                transactionHash = null,
-                error = e.message ?: "Unknown error occurred"
-            )
-        }
+        // Delegate to escrow transaction service
+        val genericResult = escrowTransactionService.resolveDispute(contractAddress, recipient)
+        // Convert to legacy TransactionResult format
+        return TransactionResult(
+            success = genericResult.success,
+            transactionHash = genericResult.transactionHash,
+            error = genericResult.error
+        )
     }
 
-    private suspend fun waitForTransactionReceipt(transactionHash: String): TransactionReceipt? {
-        return try {
-            var attempts = 0
-            val maxAttempts = 30
-
-            while (attempts < maxAttempts) {
-                val receiptResponse = web3j.ethGetTransactionReceipt(transactionHash).send()
-                val receipt = receiptResponse.result
-
-                if (receipt != null) {
-                    return receipt
-                }
-
-                Thread.sleep(2000)
-                attempts++
-            }
-
-            logger.warn("Transaction receipt not found after $maxAttempts attempts for tx: $transactionHash")
-            null
-        } catch (e: Exception) {
-            logger.error("Error waiting for transaction receipt", e)
-            null
-        }
+    suspend fun waitForTransactionReceipt(transactionHash: String): TransactionReceipt? {
+        // Delegate to generic blockchain relay service
+        return blockchainRelayService.waitForTransactionReceipt(transactionHash)
     }
 
     suspend fun raiseDispute(contractAddress: String): TransactionResult {
-        return try {
-            logger.info("Raising dispute for contract: $contractAddress")
-
-            val nonce = web3j.ethGetTransactionCount(
-                relayerCredentials.address,
-                DefaultBlockParameterName.PENDING
-            ).send().transactionCount
-
-            val gasPrice = gasProvider.getGasPrice("raiseDispute")
-            val gasLimit = gasProvider.getGasLimit("raiseDispute")
-
-            val function = Function(
-                "raiseDispute",
-                emptyList(),
-                emptyList()
-            )
-
-            val functionData = FunctionEncoder.encode(function)
-
-            val rawTransaction = RawTransaction.createTransaction(
-                nonce,
-                gasPrice,
-                gasLimit,
-                contractAddress,
-                BigInteger.ZERO,
-                functionData
-            )
-
-            val signedTransaction = org.web3j.crypto.TransactionEncoder.signMessage(
-                rawTransaction,
-                chainId,
-                relayerCredentials
-            )
-
-            val transactionHash = web3j.ethSendRawTransaction(
-                Numeric.toHexString(signedTransaction)
-            ).send()
-
-            if (transactionHash.hasError()) {
-                logger.error("Dispute raising failed: ${transactionHash.error.message}")
-                return TransactionResult(
-                    success = false,
-                    transactionHash = null,
-                    error = transactionHash.error.message
-                )
-            }
-
-            val txHash = transactionHash.transactionHash
-            logger.info("Dispute raising transaction sent: $txHash")
-
-            val receipt = waitForTransactionReceipt(txHash)
-            if (receipt?.isStatusOK == true) {
-                logger.info("Dispute raised successfully")
-                TransactionResult(
-                    success = true,
-                    transactionHash = txHash
-                )
-            } else {
-                TransactionResult(
-                    success = false,
-                    transactionHash = txHash,
-                    error = "Dispute raising transaction failed"
-                )
-            }
-
-        } catch (e: Exception) {
-            logger.error("Error raising dispute", e)
-            TransactionResult(
-                success = false,
-                transactionHash = null,
-                error = e.message ?: "Unknown error occurred"
-            )
-        }
+        // This method is deprecated - users should use raiseDisputeWithGasTransfer
+        logger.warn("Deprecated method raiseDispute called - use raiseDisputeWithGasTransfer instead")
+        return TransactionResult(
+            success = false,
+            transactionHash = null,
+            error = "This method is deprecated - use raiseDisputeWithGasTransfer instead"
+        )
     }
 
     suspend fun claimFunds(contractAddress: String): TransactionResult {
-        return try {
-            logger.info("Claiming funds for contract: $contractAddress")
-
-            val nonce = web3j.ethGetTransactionCount(
-                relayerCredentials.address,
-                DefaultBlockParameterName.PENDING
-            ).send().transactionCount
-
-            val gasPrice = gasProvider.getGasPrice("claimFunds")
-            val gasLimit = gasProvider.getGasLimit("claimFunds")
-
-            val function = Function(
-                "claimFunds",
-                emptyList(),
-                emptyList()
-            )
-
-            val functionData = FunctionEncoder.encode(function)
-
-            val rawTransaction = RawTransaction.createTransaction(
-                nonce,
-                gasPrice,
-                gasLimit,
-                contractAddress,
-                BigInteger.ZERO,
-                functionData
-            )
-
-            val signedTransaction = org.web3j.crypto.TransactionEncoder.signMessage(
-                rawTransaction,
-                chainId,
-                relayerCredentials
-            )
-
-            val transactionHash = web3j.ethSendRawTransaction(
-                Numeric.toHexString(signedTransaction)
-            ).send()
-
-            if (transactionHash.hasError()) {
-                logger.error("Funds claiming failed: ${transactionHash.error.message}")
-                return TransactionResult(
-                    success = false,
-                    transactionHash = null,
-                    error = transactionHash.error.message
-                )
-            }
-
-            val txHash = transactionHash.transactionHash
-            logger.info("Funds claiming transaction sent: $txHash")
-
-            val receipt = waitForTransactionReceipt(txHash)
-            if (receipt?.isStatusOK == true) {
-                logger.info("Funds claimed successfully")
-                TransactionResult(
-                    success = true,
-                    transactionHash = txHash
-                )
-            } else {
-                TransactionResult(
-                    success = false,
-                    transactionHash = txHash,
-                    error = "Funds claiming transaction failed"
-                )
-            }
-
-        } catch (e: Exception) {
-            logger.error("Error claiming funds", e)
-            TransactionResult(
-                success = false,
-                transactionHash = null,
-                error = e.message ?: "Unknown error occurred"
-            )
-        }
+        // This method is deprecated - users should use claimFundsWithGasTransfer
+        logger.warn("Deprecated method claimFunds called - use claimFundsWithGasTransfer instead")
+        return TransactionResult(
+            success = false,
+            transactionHash = null,
+            error = "This method is deprecated - use claimFundsWithGasTransfer instead"
+        )
     }
 
     suspend fun depositFunds(contractAddress: String): TransactionResult {
-        return try {
-            logger.info("Depositing funds for contract: $contractAddress")
-
-            val nonce = web3j.ethGetTransactionCount(
-                relayerCredentials.address,
-                DefaultBlockParameterName.PENDING
-            ).send().transactionCount
-
-            val gasPrice = gasProvider.getGasPrice("depositFunds")
-            val gasLimit = gasProvider.getGasLimit("depositFunds")
-
-            val function = Function(
-                "depositFunds",
-                emptyList(),
-                emptyList()
-            )
-
-            val functionData = FunctionEncoder.encode(function)
-
-            val rawTransaction = RawTransaction.createTransaction(
-                nonce,
-                gasPrice,
-                gasLimit,
-                contractAddress,
-                BigInteger.ZERO,
-                functionData
-            )
-
-            val signedTransaction = org.web3j.crypto.TransactionEncoder.signMessage(
-                rawTransaction,
-                chainId,
-                relayerCredentials
-            )
-
-            val transactionHash = web3j.ethSendRawTransaction(
-                Numeric.toHexString(signedTransaction)
-            ).send()
-
-            if (transactionHash.hasError()) {
-                logger.error("Funds deposit failed: ${transactionHash.error.message}")
-                return TransactionResult(
-                    success = false,
-                    transactionHash = null,
-                    error = transactionHash.error.message
-                )
-            }
-
-            val txHash = transactionHash.transactionHash
-            logger.info("Funds deposit transaction sent: $txHash")
-
-            val receipt = waitForTransactionReceipt(txHash)
-            if (receipt?.isStatusOK == true) {
-                logger.info("Funds deposited successfully")
-                TransactionResult(
-                    success = true,
-                    transactionHash = txHash
-                )
-            } else {
-                TransactionResult(
-                    success = false,
-                    transactionHash = txHash,
-                    error = "Funds deposit transaction failed"
-                )
-            }
-
-        } catch (e: Exception) {
-            logger.error("Error depositing funds", e)
-            TransactionResult(
-                success = false,
-                transactionHash = null,
-                error = e.message ?: "Unknown error occurred"
-            )
-        }
-    }
-
-    private fun parseContractAddressFromReceipt(receipt: TransactionReceipt): String? {
-        return try {
-            logger.debug("Parsing contract address from receipt with ${receipt.logs.size} logs")
-            
-            // Look for ContractCreated event signature: ContractCreated(address,address,address,uint256,uint256)
-            val contractCreatedSignature = "0x" + org.web3j.crypto.Hash.sha3String("ContractCreated(address,address,address,uint256,uint256)").substring(2)
-            logger.debug("Looking for ContractCreated event signature: $contractCreatedSignature")
-            
-            for (log in receipt.logs) {
-                logger.debug("Log: topics=${log.topics.size}, data=${log.data}")
-                
-                if (log.topics.isNotEmpty()) {
-                    val eventSignature = log.topics[0]
-                    logger.debug("Event signature: $eventSignature")
-                    
-                    // Check if this is a ContractCreated event
-                    if (eventSignature.equals(contractCreatedSignature, ignoreCase = true)) {
-                        // For ContractCreated(address indexed contractAddress, address indexed buyer, address indexed seller, uint256 amount, uint256 expiryTimestamp)
-                        // The contract address is the first indexed parameter (topic[1])
-                        if (log.topics.size >= 2) {
-                            val contractAddressTopic = log.topics[1]
-                            if (contractAddressTopic.length == 66) { // 0x + 64 hex chars
-                                val address = "0x" + contractAddressTopic.substring(26) // Last 20 bytes = address
-                                logger.info("Extracted contract address from ContractCreated event: $address")
-                                return address
-                            }
-                        }
-                    }
-                }
-            }
-            
-            logger.warn("ContractCreated event not found in transaction receipt logs")
-            null
-        } catch (e: Exception) {
-            logger.error("Error parsing contract address from receipt", e)
-            null
-        }
+        // This method is deprecated - users should use depositFundsWithGasTransfer
+        logger.warn("Deprecated method depositFunds called - use depositFundsWithGasTransfer instead")
+        return TransactionResult(
+            success = false,
+            transactionHash = null,
+            error = "This method is deprecated - use depositFundsWithGasTransfer instead"
+        )
     }
 
     fun getOperationGasCosts(): List<OperationGasCost> {
@@ -612,204 +110,53 @@ class TransactionRelayService(
             "resolveDispute" to "resolveDispute"
         )
 
-        return operations.map { (operation, gasFunction) ->
-            val gasLimit = gasProvider.getGasLimit(gasFunction).toLong()
-            val gasPrice = gasProvider.getGasPrice(gasFunction)
-            val totalCostWei = gasPrice.multiply(BigInteger.valueOf(gasLimit))
-            val totalCostAvax = weiToAvax(totalCostWei)
-
+        // Delegate to generic blockchain relay service and convert to legacy format
+        val genericCosts = blockchainRelayService.getOperationGasCosts(operations)
+        return genericCosts.map { genericCost ->
             OperationGasCost(
-                operation = operation,
-                gasLimit = gasLimit,
-                gasPriceWei = gasPrice,
-                totalCostWei = totalCostWei,
-                totalCostAvax = totalCostAvax
+                operation = genericCost.operation,
+                gasLimit = genericCost.gasLimit,
+                gasPriceWei = genericCost.gasPriceWei,
+                totalCostWei = genericCost.totalCostWei,
+                totalCostAvax = genericCost.totalCostAvax
             )
         }
     }
 
-    private fun weiToAvax(wei: BigInteger): String {
-        val weiDecimal = BigDecimal(wei)
-        val avaxDecimal = weiDecimal.divide(BigDecimal("1000000000000000000"), 18, RoundingMode.HALF_UP)
-        return avaxDecimal.stripTrailingZeros().toPlainString()
-    }
-
-
-    private suspend fun processTransactionWithGasTransfer(
-        userWalletAddress: String, 
-        signedTransactionHex: String, 
-        fallbackGasOperation: String
-    ): TransactionResult {
-        return try {
-            logger.info("Processing transaction with gas transfer for user: $userWalletAddress")
-
-            // Extract exact transaction cost from user's signed transaction
-            val decodedTx = TransactionDecoder.decode(signedTransactionHex)
-            val userGasLimit = decodedTx.gasLimit
-            val transactionValue = decodedTx.value ?: BigInteger.ZERO
-            
-            // Calculate exact gas cost based on transaction type
-            val gasCost = try {
-                // Legacy transaction: gasPrice * gasLimit
-                decodedTx.gasPrice.multiply(userGasLimit)
-            } catch (e: UnsupportedOperationException) {
-                // EIP-1559 transaction: need to access the underlying transaction
-                val transaction = decodedTx.transaction
-                if (transaction is org.web3j.crypto.transaction.type.Transaction1559) {
-                    transaction.maxFeePerGas.multiply(userGasLimit)
-                } else {
-                    // Fallback: use our gas provider estimate
-                    logger.warn("Could not determine gas cost from transaction, using fallback estimate")
-                    val fallbackGasPrice = gasProvider.getGasPrice(fallbackGasOperation)
-                    fallbackGasPrice.multiply(userGasLimit)
-                }
-            }
-            
-            // Total amount needed = gas cost + transaction value
-            val totalAmountNeeded = gasCost.add(transactionValue)
-            
-            logger.info("Transaction requires: gasLimit=$userGasLimit, gasCost=$gasCost wei, transactionValue=$transactionValue wei, totalNeeded=$totalAmountNeeded wei")
-
-            // Check user's current AVAX balance
-            val currentBalance = web3j.ethGetBalance(userWalletAddress, DefaultBlockParameterName.LATEST).send().balance
-            
-            // Only transfer if user doesn't have enough for the entire transaction
-            if (currentBalance < totalAmountNeeded) {
-                val amountNeeded = totalAmountNeeded.subtract(currentBalance)
-                logger.info("User has $currentBalance wei, needs $totalAmountNeeded wei, transferring $amountNeeded wei")
-                
-                val gasTransferResult = transferGasToUser(userWalletAddress, amountNeeded)
-                if (!gasTransferResult.success) {
-                    logger.error("Failed to transfer gas to user: ${gasTransferResult.error}")
-                    return TransactionResult(
-                        success = false,
-                        transactionHash = null,
-                        error = "Failed to transfer gas to user: ${gasTransferResult.error}"
-                    )
-                }
-            } else {
-                logger.info("User already has sufficient balance ($currentBalance wei >= $totalAmountNeeded wei), skipping transfer")
-            }
-
-            // Forward the original signed transaction unchanged
-            val transactionHash = web3j.ethSendRawTransaction(signedTransactionHex).send()
-
-            if (transactionHash.hasError()) {
-                logger.error("Transaction forwarding failed: ${transactionHash.error.message}")
-                return TransactionResult(
-                    success = false,
-                    transactionHash = null,
-                    error = transactionHash.error.message
-                )
-            }
-
-            val txHash = transactionHash.transactionHash
-            logger.info("Transaction forwarded successfully: $txHash")
-
-            val receipt = waitForTransactionReceipt(txHash)
-            if (receipt?.isStatusOK == true) {
-                TransactionResult(
-                    success = true,
-                    transactionHash = txHash
-                )
-            } else {
-                TransactionResult(
-                    success = false,
-                    transactionHash = txHash,
-                    error = "Transaction failed on blockchain"
-                )
-            }
-
-        } catch (e: Exception) {
-            logger.error("Error processing transaction with gas transfer", e)
-            TransactionResult(
-                success = false,
-                transactionHash = null,
-                error = e.message ?: "Unknown error occurred"
-            )
-        }
-    }
-
-    private suspend fun transferGasToUser(userAddress: String, gasAmount: BigInteger): TransactionResult {
-        return try {
-            logger.info("Transferring $gasAmount wei to user: $userAddress")
-            
-            val nonce = web3j.ethGetTransactionCount(
-                relayerCredentials.address,
-                DefaultBlockParameterName.PENDING
-            ).send().transactionCount
-            
-            val gasPrice = gasProvider.gasPrice
-            val gasLimit = BigInteger.valueOf(21000) // Standard gas limit for ETH transfer
-
-            val rawTransaction = RawTransaction.createEtherTransaction(
-                nonce,
-                gasPrice,
-                gasLimit,
-                userAddress,
-                gasAmount
-            )
-
-            val signedTransaction = org.web3j.crypto.TransactionEncoder.signMessage(
-                rawTransaction,
-                chainId,
-                relayerCredentials
-            )
-
-            val transactionHash = web3j.ethSendRawTransaction(
-                Numeric.toHexString(signedTransaction)
-            ).send()
-
-            if (transactionHash.hasError()) {
-                logger.error("Gas transfer failed: ${transactionHash.error.message}")
-                return TransactionResult(
-                    success = false,
-                    transactionHash = null,
-                    error = transactionHash.error.message
-                )
-            }
-
-            val txHash = transactionHash.transactionHash
-            logger.info("Gas transfer transaction sent: $txHash")
-
-            val receipt = waitForTransactionReceipt(txHash)
-            if (receipt?.isStatusOK == true) {
-                logger.info("Gas transferred successfully to user")
-                TransactionResult(
-                    success = true,
-                    transactionHash = txHash
-                )
-            } else {
-                TransactionResult(
-                    success = false,
-                    transactionHash = txHash,
-                    error = "Gas transfer transaction failed"
-                )
-            }
-
-        } catch (e: Exception) {
-            logger.error("Error transferring gas to user", e)
-            TransactionResult(
-                success = false,
-                transactionHash = null,
-                error = e.message ?: "Unknown error occurred"
-            )
-        }
-    }
-
+    // Gas transfer methods - delegate to escrow transaction service
     suspend fun depositFundsWithGasTransfer(userWalletAddress: String, signedTransactionHex: String): TransactionResult {
-        return processTransactionWithGasTransfer(userWalletAddress, signedTransactionHex, "depositFunds")
+        val genericResult = escrowTransactionService.depositFundsWithGasTransfer(userWalletAddress, signedTransactionHex)
+        return TransactionResult(
+            success = genericResult.success,
+            transactionHash = genericResult.transactionHash,
+            error = genericResult.error
+        )
     }
 
     suspend fun approveUSDCWithGasTransfer(userWalletAddress: String, signedTransactionHex: String): TransactionResult {
-        return processTransactionWithGasTransfer(userWalletAddress, signedTransactionHex, "approveUSDC")
+        val genericResult = escrowTransactionService.approveUSDCWithGasTransfer(userWalletAddress, signedTransactionHex)
+        return TransactionResult(
+            success = genericResult.success,
+            transactionHash = genericResult.transactionHash,
+            error = genericResult.error
+        )
     }
 
     suspend fun claimFundsWithGasTransfer(userWalletAddress: String, signedTransactionHex: String): TransactionResult {
-        return processTransactionWithGasTransfer(userWalletAddress, signedTransactionHex, "claimFunds")
+        val genericResult = escrowTransactionService.claimFundsWithGasTransfer(userWalletAddress, signedTransactionHex)
+        return TransactionResult(
+            success = genericResult.success,
+            transactionHash = genericResult.transactionHash,
+            error = genericResult.error
+        )
     }
 
     suspend fun raiseDisputeWithGasTransfer(userWalletAddress: String, signedTransactionHex: String): TransactionResult {
-        return processTransactionWithGasTransfer(userWalletAddress, signedTransactionHex, "raiseDispute")
+        val genericResult = escrowTransactionService.raiseDisputeWithGasTransfer(userWalletAddress, signedTransactionHex)
+        return TransactionResult(
+            success = genericResult.success,
+            transactionHash = genericResult.transactionHash,
+            error = genericResult.error
+        )
     }
 }

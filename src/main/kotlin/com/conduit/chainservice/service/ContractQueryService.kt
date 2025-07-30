@@ -1,8 +1,8 @@
 package com.conduit.chainservice.service
 
 import com.conduit.chainservice.config.BlockchainProperties
-import com.conduit.chainservice.model.ContractInfo
-import com.conduit.chainservice.model.ContractStatus
+import com.conduit.chainservice.escrow.models.ContractInfo
+import com.conduit.chainservice.escrow.models.ContractStatus
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.web3j.abi.EventEncoder

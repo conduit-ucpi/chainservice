@@ -1,11 +1,9 @@
-package com.conduit.chainservice.controller
+package com.conduit.chainservice.escrow
 
-import com.conduit.chainservice.model.*
-import com.conduit.chainservice.escrow.models.ContractInfo
-import com.conduit.chainservice.escrow.models.GetContractsResponse
+import com.conduit.chainservice.escrow.models.*
 import com.conduit.chainservice.service.ContractQueryService
 import com.conduit.chainservice.service.ContractServiceClient
-import com.conduit.chainservice.service.TransactionRelayService
+import com.utility.chainservice.models.OperationGasCost
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.media.Content
@@ -28,14 +26,15 @@ import java.time.Instant
 @RestController
 @RequestMapping("/api/chain")
 @Validated
-@Tag(name = "Chain Service", description = "Blockchain transaction relay and contract management API")
-class ChainController(
-    private val transactionRelayService: TransactionRelayService,
+@Tag(name = "Escrow Service", description = "Blockchain escrow contract management and transaction relay API")
+class EscrowController(
+    private val escrowTransactionService: EscrowTransactionService,
     private val contractQueryService: ContractQueryService,
-    private val contractServiceClient: ContractServiceClient
+    private val contractServiceClient: ContractServiceClient,
+    private val escrowServicePlugin: EscrowServicePlugin
 ) {
 
-    private val logger = LoggerFactory.getLogger(ChainController::class.java)
+    private val logger = LoggerFactory.getLogger(EscrowController::class.java)
     
     @Value("\${blockchain.chain-id}")
     private lateinit var chainId: String
@@ -78,7 +77,7 @@ class ChainController(
             logger.info("Create contract request received")
             
             val result = runBlocking {
-                transactionRelayService.createContract(
+                escrowTransactionService.createContract(
                     request.buyer,
                     request.seller,
                     request.amount,
@@ -147,7 +146,7 @@ class ChainController(
             logger.info("Raise dispute request received for contract: ${request.contractAddress}")
             
             val result = runBlocking {
-                transactionRelayService.raiseDisputeWithGasTransfer(request.userWalletAddress, request.signedTransaction)
+                escrowTransactionService.raiseDisputeWithGasTransfer(request.userWalletAddress, request.signedTransaction)
             }
 
             val response = RaiseDisputeResponse(
@@ -208,7 +207,7 @@ class ChainController(
             logger.info("Claim funds request received for contract: ${request.contractAddress}")
             
             val result = runBlocking {
-                transactionRelayService.claimFundsWithGasTransfer(request.userWalletAddress, request.signedTransaction)
+                escrowTransactionService.claimFundsWithGasTransfer(request.userWalletAddress, request.signedTransaction)
             }
 
             val response = ClaimFundsResponse(
@@ -276,7 +275,7 @@ class ChainController(
             logger.info("Deposit funds request received for contract: ${request.contractAddress}")
             
             val result = runBlocking {
-                transactionRelayService.depositFundsWithGasTransfer(request.userWalletAddress, request.signedTransaction)
+                escrowTransactionService.depositFundsWithGasTransfer(request.userWalletAddress, request.signedTransaction)
             }
 
             val response = DepositFundsResponse(
@@ -359,7 +358,7 @@ class ChainController(
             logger.info("Resolve dispute request received for contract: ${request.contractAddress}")
             
             val result = runBlocking {
-                transactionRelayService.resolveDispute(request.contractAddress, request.recipientAddress)
+                escrowTransactionService.resolveDispute(request.contractAddress, request.recipientAddress)
             }
 
             val response = ResolveDisputeResponse(
@@ -549,7 +548,9 @@ class ChainController(
         return try {
             logger.info("Gas costs request received")
             
-            val operationCosts = transactionRelayService.getOperationGasCosts()
+            val operationCosts = escrowServicePlugin.getRelayService().getOperationGasCosts(
+                escrowServicePlugin.getGasOperations()
+            )
             val response = GasCostsResponse(
                 operations = operationCosts,
                 timestamp = Instant.now().toString()
@@ -604,7 +605,7 @@ class ChainController(
             logger.info("Approve USDC request received for user: ${request.userWalletAddress}")
             
             val result = runBlocking {
-                transactionRelayService.approveUSDCWithGasTransfer(request.userWalletAddress, request.signedTransaction)
+                escrowTransactionService.approveUSDCWithGasTransfer(request.userWalletAddress, request.signedTransaction)
             }
 
             val response = ApproveUSDCResponse(
@@ -631,4 +632,9 @@ class ChainController(
             ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response)
         }
     }
+
+    data class GasCostsResponse(
+        val operations: List<OperationGasCost>,
+        val timestamp: String
+    )
 }

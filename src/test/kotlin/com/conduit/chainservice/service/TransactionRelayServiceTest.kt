@@ -1,6 +1,8 @@
 package com.conduit.chainservice.service
 
 import com.conduit.chainservice.config.BlockchainProperties
+import com.conduit.chainservice.escrow.EscrowTransactionService
+import com.utility.chainservice.BlockchainRelayService
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Assertions.*
@@ -13,6 +15,12 @@ import org.web3j.tx.gas.ContractGasProvider
 import java.math.BigInteger
 
 class TransactionRelayServiceTest {
+
+    @Mock
+    private lateinit var blockchainRelayService: BlockchainRelayService
+
+    @Mock
+    private lateinit var escrowTransactionService: EscrowTransactionService
 
     @Mock
     private lateinit var web3j: Web3j
@@ -36,7 +44,7 @@ class TransactionRelayServiceTest {
         MockitoAnnotations.openMocks(this)
         whenever(relayerCredentials.address).thenReturn(relayerAddress)
         transactionRelayService = TransactionRelayService(
-            web3j, relayerCredentials, gasProvider, blockchainProperties, chainId
+            blockchainRelayService, escrowTransactionService, web3j, relayerCredentials, gasProvider, blockchainProperties, chainId
         )
     }
 
@@ -49,9 +57,16 @@ class TransactionRelayServiceTest {
 
     @Test
     fun `getOperationGasCosts includes all required operations`() {
-        // Given
-        whenever(gasProvider.getGasLimit(any())).thenReturn(BigInteger.valueOf(100000))
-        whenever(gasProvider.getGasPrice(any())).thenReturn(BigInteger.valueOf(20000000000))
+        // Given - mock the blockchain relay service response
+        val mockGasCosts = listOf(
+            com.utility.chainservice.models.OperationGasCost("claimFunds", 100000, BigInteger.valueOf(20000000000), BigInteger.valueOf(2000000000000000), "0.002"),
+            com.utility.chainservice.models.OperationGasCost("depositFunds", 100000, BigInteger.valueOf(20000000000), BigInteger.valueOf(2000000000000000), "0.002"),
+            com.utility.chainservice.models.OperationGasCost("approveUSDC", 100000, BigInteger.valueOf(20000000000), BigInteger.valueOf(2000000000000000), "0.002"),
+            com.utility.chainservice.models.OperationGasCost("createContract", 100000, BigInteger.valueOf(20000000000), BigInteger.valueOf(2000000000000000), "0.002"),
+            com.utility.chainservice.models.OperationGasCost("raiseDispute", 100000, BigInteger.valueOf(20000000000), BigInteger.valueOf(2000000000000000), "0.002"),
+            com.utility.chainservice.models.OperationGasCost("resolveDispute", 100000, BigInteger.valueOf(20000000000), BigInteger.valueOf(2000000000000000), "0.002")
+        )
+        whenever(blockchainRelayService.getOperationGasCosts(any())).thenReturn(mockGasCosts)
         
         // When
         val gasCosts = transactionRelayService.getOperationGasCosts()
