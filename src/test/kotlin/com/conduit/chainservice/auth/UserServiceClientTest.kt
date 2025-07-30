@@ -1,6 +1,7 @@
 package com.conduit.chainservice.auth
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.utility.chainservice.AuthProperties
 import okhttp3.mockwebserver.MockWebServer
 import okhttp3.mockwebserver.MockResponse
 import org.junit.jupiter.api.AfterEach

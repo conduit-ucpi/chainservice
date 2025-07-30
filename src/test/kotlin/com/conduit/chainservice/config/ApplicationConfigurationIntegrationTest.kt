@@ -1,6 +1,6 @@
 package com.conduit.chainservice.config
 
-import com.conduit.chainservice.auth.AuthProperties
+import com.utility.chainservice.AuthProperties
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Assertions.*
 import org.springframework.boot.context.properties.EnableConfigurationProperties
@@ -24,11 +24,11 @@ class ApplicationConfigurationIntegrationTest {
     fun `should load configuration properties successfully with required environment variables`() {
         contextRunner
             .withPropertyValues(
-                "blockchain.usdcContractAddress=0x1234567890123456789012345678901234567890",
-                "blockchain.contractFactoryAddress=0x1234567890123456789012345678901234567890",
-                "blockchain.creatorFee=1000000",
-                "blockchain.gas.limitCreateContract=500000",
-                "blockchain.gas.limitDeposit=74161",
+                "escrow.usdcContractAddress=0x1234567890123456789012345678901234567890",
+                "escrow.contractFactoryAddress=0x1234567890123456789012345678901234567890",
+                "escrow.creatorFee=1000000",
+                "escrow.gas.limitCreateContract=500000",
+                "escrow.gas.limitDeposit=74161",
                 "auth.userServiceUrl=http://localhost:8080",
                 "auth.enabled=true"
             )
@@ -55,11 +55,11 @@ class ApplicationConfigurationIntegrationTest {
     fun `should work with kebab-case property names from YAML`() {
         contextRunner
             .withPropertyValues(
-                "blockchain.usdc-contract-address=0x1234567890123456789012345678901234567890",
-                "blockchain.contract-factory-address=0x1234567890123456789012345678901234567890",
-                "blockchain.creator-fee=1000000",
-                "blockchain.gas.limit-create-contract=500000",
-                "blockchain.gas.limit-deposit=74161",
+                "escrow.usdc-contract-address=0x1234567890123456789012345678901234567890",
+                "escrow.contract-factory-address=0x1234567890123456789012345678901234567890",
+                "escrow.creator-fee=1000000",
+                "escrow.gas.limit-create-contract=500000",
+                "escrow.gas.limit-deposit=74161",
                 "auth.user-service-url=http://localhost:8080",
                 "auth.enabled=true"
             )

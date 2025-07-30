@@ -3,7 +3,7 @@ package com.conduit.chainservice.config
 import org.springframework.boot.context.properties.ConfigurationProperties
 import java.math.BigInteger
 
-@ConfigurationProperties(prefix = "blockchain")
+@ConfigurationProperties(prefix = "escrow")
 data class EscrowProperties(
     var usdcContractAddress: String = "",
     var contractFactoryAddress: String = "",

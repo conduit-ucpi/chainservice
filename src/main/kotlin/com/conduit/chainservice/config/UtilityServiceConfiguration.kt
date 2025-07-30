@@ -1,6 +1,5 @@
 package com.conduit.chainservice.config
 
-import com.conduit.chainservice.auth.AuthProperties
 import com.utility.chainservice.AuthenticationProvider
 import com.utility.chainservice.HttpAuthenticationProvider
 import com.utility.chainservice.BlockchainProperties
@@ -10,8 +9,7 @@ import org.springframework.context.annotation.Configuration
 @Configuration
 class UtilityServiceConfiguration(
     private val blockchainProperties: BlockchainProperties,
-    private val escrowProperties: EscrowProperties,
-    private val authProperties: AuthProperties
+    private val escrowProperties: EscrowProperties
 ) {
 
     @Bean
@@ -48,6 +46,4 @@ class UtilityServiceConfiguration(
 
     @Bean
     fun creatorFee(): java.math.BigInteger = escrowProperties.creatorFee
-
-    // authenticationProvider bean is provided by blockchain-relay-utility
 }
