@@ -47,31 +47,6 @@ class ContractQueryServiceTest {
         whenever(eventParsingService.findContractsByParticipant(walletAddress))
             .thenReturn(listOf(contract1, contract2))
         
-        // Mock contract info retrieval - user is buyer in contract1, seller in contract2
-        val contractInfo1 = ContractInfo(
-            contractAddress = contract1,
-            buyer = walletAddress,
-            seller = otherWallet,
-            amount = BigInteger.valueOf(1000000),
-            expiryTimestamp = System.currentTimeMillis() / 1000 + 3600,
-            description = "Test contract 1",
-            status = ContractStatus.ACTIVE,
-            funded = true,
-            createdAt = Instant.now()
-        )
-        
-        val contractInfo2 = ContractInfo(
-            contractAddress = contract2,
-            buyer = otherWallet,
-            seller = walletAddress,
-            amount = BigInteger.valueOf(2000000),
-            expiryTimestamp = System.currentTimeMillis() / 1000 + 7200,
-            description = "Test contract 2",
-            status = ContractStatus.ACTIVE,
-            funded = true,
-            createdAt = Instant.now()
-        )
-        
         // Remove private method mocking - test will use real implementation
 
         val result = contractQueryService.getContractsForWallet(walletAddress)
@@ -89,43 +64,6 @@ class ContractQueryServiceTest {
         // Mock that admin gets all contracts
         whenever(eventParsingService.findAllContracts())
             .thenReturn(listOf(contract1, contract2, contract3))
-        
-        // Mock contract info retrieval for all contracts
-        val contractInfo1 = ContractInfo(
-            contractAddress = contract1,
-            buyer = walletAddress,
-            seller = otherWallet,
-            amount = BigInteger.valueOf(1000000),
-            expiryTimestamp = System.currentTimeMillis() / 1000 + 3600,
-            description = "Test contract 1",
-            status = ContractStatus.ACTIVE,
-            funded = true,
-            createdAt = Instant.now()
-        )
-        
-        val contractInfo2 = ContractInfo(
-            contractAddress = contract2,
-            buyer = otherWallet,
-            seller = adminWallet,
-            amount = BigInteger.valueOf(2000000),
-            expiryTimestamp = System.currentTimeMillis() / 1000 + 7200,
-            description = "Test contract 2",
-            status = ContractStatus.ACTIVE,
-            funded = true,
-            createdAt = Instant.now()
-        )
-        
-        val contractInfo3 = ContractInfo(
-            contractAddress = contract3,
-            buyer = "0xddd4444444444444444444444444444444444444",
-            seller = "0xeee5555555555555555555555555555555555555",
-            amount = BigInteger.valueOf(3000000),
-            expiryTimestamp = System.currentTimeMillis() / 1000 + 10800,
-            description = "Test contract 3",
-            status = ContractStatus.CREATED,
-            funded = true,
-            createdAt = Instant.now()
-        )
         
         // Remove private method mocking - test will use real implementation
 
@@ -145,18 +83,6 @@ class ContractQueryServiceTest {
         // Mock that user with userType "regular" still gets filtered results
         whenever(eventParsingService.findContractsByParticipant(walletAddress))
             .thenReturn(listOf(contract1))
-        
-        val contractInfo1 = ContractInfo(
-            contractAddress = contract1,
-            buyer = walletAddress,
-            seller = otherWallet,
-            amount = BigInteger.valueOf(1000000),
-            expiryTimestamp = System.currentTimeMillis() / 1000 + 3600,
-            description = "Test contract 1",
-            status = ContractStatus.ACTIVE,
-            funded = true,
-            createdAt = Instant.now()
-        )
         
         // Remove private method mocking - test will use real implementation
 

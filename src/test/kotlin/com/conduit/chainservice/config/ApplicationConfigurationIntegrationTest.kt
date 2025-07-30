@@ -1,7 +1,6 @@
 package com.conduit.chainservice.config
 
-import com.utility.chainservice.AuthProperties
-import com.utility.chainservice.BlockchainProperties
+import com.conduit.chainservice.auth.AuthProperties
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Assertions.*
 import org.springframework.boot.context.properties.EnableConfigurationProperties
@@ -15,7 +14,7 @@ import org.springframework.boot.test.context.runner.ApplicationContextRunner
 class ApplicationConfigurationIntegrationTest {
 
     @TestConfiguration
-    @EnableConfigurationProperties(BlockchainProperties::class, AuthProperties::class)
+    @EnableConfigurationProperties(EscrowProperties::class, AuthProperties::class)
     class TestConfig
 
     private val contextRunner = ApplicationContextRunner()
@@ -25,28 +24,27 @@ class ApplicationConfigurationIntegrationTest {
     fun `should load configuration properties successfully with required environment variables`() {
         contextRunner
             .withPropertyValues(
-                "blockchain.rpcUrl=https://api.avax-test.network/ext/bc/C/rpc",
-                "blockchain.chainId=43113",
-                "blockchain.relayer.privateKey=0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef12",
-                "blockchain.relayer.walletAddress=0x1234567890123456789012345678901234567890",
-                "blockchain.gas.priceMultiplier=1.7",
-                "blockchain.gas.minimumGasPriceWei=6",
+                "blockchain.usdcContractAddress=0x1234567890123456789012345678901234567890",
+                "blockchain.contractFactoryAddress=0x1234567890123456789012345678901234567890",
+                "blockchain.creatorFee=1000000",
+                "blockchain.gas.limitCreateContract=500000",
+                "blockchain.gas.limitDeposit=74161",
                 "auth.userServiceUrl=http://localhost:8080",
                 "auth.enabled=true"
             )
             .run { context ->
-                assertTrue(context.containsBean("blockchainProperties"))
-                assertTrue(context.containsBean("authProperties"))
+                // Check if we can get the beans by type
+                assertNotNull(context.getBean(EscrowProperties::class.java))
+                assertNotNull(context.getBean(AuthProperties::class.java))
                 
-                val blockchainProps = context.getBean(BlockchainProperties::class.java)
+                val escrowProps = context.getBean(EscrowProperties::class.java)
                 val authProps = context.getBean(AuthProperties::class.java)
                 
-                assertEquals("https://api.avax-test.network/ext/bc/C/rpc", blockchainProps.rpcUrl)
-                assertEquals(43113L, blockchainProps.chainId)
-                assertEquals("0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef12", blockchainProps.relayer.privateKey)
-                assertEquals("0x1234567890123456789012345678901234567890", blockchainProps.relayer.walletAddress)
-                assertEquals(1.7, blockchainProps.gas.priceMultiplier)
-                assertEquals(6L, blockchainProps.gas.minimumGasPriceWei)
+                assertEquals("0x1234567890123456789012345678901234567890", escrowProps.usdcContractAddress)
+                assertEquals("0x1234567890123456789012345678901234567890", escrowProps.contractFactoryAddress)
+                assertEquals(java.math.BigInteger.valueOf(1000000), escrowProps.creatorFee)
+                assertEquals(500000L, escrowProps.gas.limitCreateContract)
+                assertEquals(74161L, escrowProps.gas.limitDeposit)
                 
                 assertEquals("http://localhost:8080", authProps.userServiceUrl)
                 assertTrue(authProps.enabled)
@@ -57,22 +55,21 @@ class ApplicationConfigurationIntegrationTest {
     fun `should work with kebab-case property names from YAML`() {
         contextRunner
             .withPropertyValues(
-                "blockchain.rpc-url=https://api.avax-test.network/ext/bc/C/rpc",
-                "blockchain.chain-id=43113",
-                "blockchain.relayer.private-key=0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef12",
-                "blockchain.relayer.wallet-address=0x1234567890123456789012345678901234567890",
-                "blockchain.gas.price-multiplier=1.7",
-                "blockchain.gas.minimum-gas-price-wei=6",
+                "blockchain.usdc-contract-address=0x1234567890123456789012345678901234567890",
+                "blockchain.contract-factory-address=0x1234567890123456789012345678901234567890",
+                "blockchain.creator-fee=1000000",
+                "blockchain.gas.limit-create-contract=500000",
+                "blockchain.gas.limit-deposit=74161",
                 "auth.user-service-url=http://localhost:8080",
                 "auth.enabled=true"
             )
             .run { context ->
-                val blockchainProps = context.getBean(BlockchainProperties::class.java)
+                val escrowProps = context.getBean(EscrowProperties::class.java)
                 val authProps = context.getBean(AuthProperties::class.java)
                 
                 // Spring Boot should handle kebab-case to camelCase conversion
-                assertEquals("https://api.avax-test.network/ext/bc/C/rpc", blockchainProps.rpcUrl)
-                assertEquals(43113L, blockchainProps.chainId)
+                assertEquals("0x1234567890123456789012345678901234567890", escrowProps.usdcContractAddress)
+                assertEquals("0x1234567890123456789012345678901234567890", escrowProps.contractFactoryAddress)
                 assertEquals("http://localhost:8080", authProps.userServiceUrl)
             }
     }
@@ -81,16 +78,16 @@ class ApplicationConfigurationIntegrationTest {
     fun `should use default values when optional properties are not provided`() {
         contextRunner
             .withPropertyValues(
-                "blockchain.rpcUrl=https://api.avax-test.network/ext/bc/C/rpc"
+                "auth.userServiceUrl=http://localhost:8080"
                 // Omitting optional properties to test defaults
             )
             .run { context ->
-                val blockchainProps = context.getBean(BlockchainProperties::class.java)
+                val escrowProps = context.getBean(EscrowProperties::class.java)
                 val authProps = context.getBean(AuthProperties::class.java)
                 
-                assertEquals(43113L, blockchainProps.chainId) // Default value
-                assertEquals(1.2, blockchainProps.gas.priceMultiplier) // Default value
-                assertEquals(6L, blockchainProps.gas.minimumGasPriceWei) // Default value
+                assertEquals(java.math.BigInteger.ZERO, escrowProps.creatorFee) // Default value
+                assertEquals(500000L, escrowProps.gas.limitCreateContract) // Default value
+                assertEquals(74161L, escrowProps.gas.limitDeposit) // Default value
                 assertTrue(authProps.enabled) // Default value
             }
     }
