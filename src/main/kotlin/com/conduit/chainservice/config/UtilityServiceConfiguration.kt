@@ -19,13 +19,7 @@ class UtilityServiceConfiguration(
     fun relayerPrivateKey(): String = blockchainProperties.relayer.privateKey
 
     @Bean
-    fun fallbackChainId(): Long = blockchainProperties.chainId
-
-    @Bean
     fun gasPriceMultiplier(): Double = blockchainProperties.gas.priceMultiplier
-
-    @Bean
-    fun minimumGasPriceWei(): Long = blockchainProperties.gas.minimumGasPriceWei
 
     @Bean
     fun gasLimitsConfig(): Map<String, Long> = mapOf(
