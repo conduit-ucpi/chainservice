@@ -38,6 +38,10 @@ contract-service:
   url: ${CONTRACT_SERVICE_URL:http://localhost:8080}
   enabled: ${CONTRACT_SERVICE_ENABLED:true}
 
+email-service:
+  url: ${EMAIL_SERVICE_URL:http://localhost:8979}
+  enabled: ${EMAIL_SERVICE_ENABLED:true}
+
 management:
   endpoints:
     web:

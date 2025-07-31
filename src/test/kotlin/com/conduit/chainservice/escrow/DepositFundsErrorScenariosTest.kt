@@ -3,6 +3,7 @@ package com.conduit.chainservice.escrow
 import com.conduit.chainservice.escrow.models.DepositFundsRequest
 import com.conduit.chainservice.service.ContractServiceClient
 import com.conduit.chainservice.service.ContractQueryService
+import com.conduit.chainservice.service.EmailServiceClient
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.utility.chainservice.models.TransactionResult
 import kotlinx.coroutines.runBlocking
@@ -42,6 +43,9 @@ class DepositFundsErrorScenariosTest {
     @Mock
     private lateinit var escrowServicePlugin: EscrowServicePlugin
 
+    @Mock
+    private lateinit var emailServiceClient: EmailServiceClient
+
     private lateinit var escrowController: EscrowController
 
     @BeforeEach
@@ -51,7 +55,8 @@ class DepositFundsErrorScenariosTest {
             escrowTransactionService,
             contractQueryService,
             contractServiceClient,
-            escrowServicePlugin
+            escrowServicePlugin,
+            emailServiceClient
         )
         
         // Use reflection to set chainId

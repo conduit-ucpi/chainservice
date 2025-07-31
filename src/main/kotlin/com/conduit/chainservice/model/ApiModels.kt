@@ -44,7 +44,15 @@ data class RaiseDisputeRequest(
     
     @field:NotBlank(message = "Signed transaction is required")
     @field:Pattern(regexp = "^0x[a-fA-F0-9]+$", message = "Invalid signed transaction format")
-    val signedTransaction: String
+    val signedTransaction: String,
+    
+    val buyerEmail: String? = null,
+    val sellerEmail: String? = null,
+    val contractDescription: String? = null,
+    val amount: String? = null,
+    val currency: String? = null,
+    val payoutDateTime: String? = null,
+    val productName: String? = null
 )
 
 data class RaiseDisputeResponse(
@@ -86,7 +94,14 @@ data class DepositFundsRequest(
     @field:Pattern(regexp = "^0x[a-fA-F0-9]+$", message = "Invalid signed transaction format")
     val signedTransaction: String,
     
-    val contractId: String? = null
+    val contractId: String? = null,
+    
+    val buyerEmail: String? = null,
+    val sellerEmail: String? = null,
+    val contractDescription: String? = null,
+    val amount: String? = null,
+    val payoutDateTime: String? = null,
+    val contractLink: String? = null
 )
 
 data class DepositFundsResponse(
@@ -102,7 +117,18 @@ data class ResolveDisputeRequest(
     
     @field:NotBlank(message = "Recipient address is required")
     @field:Pattern(regexp = "^0x[a-fA-F0-9]{40}$", message = "Invalid recipient address format")
-    val recipientAddress: String
+    val recipientAddress: String,
+    
+    val buyerEmail: String? = null,
+    val sellerEmail: String? = null,
+    val contractDescription: String? = null,
+    val amount: String? = null,
+    val currency: String? = null,
+    val payoutDateTime: String? = null,
+    val sellerPercentage: String? = null,
+    val buyerPercentage: String? = null,
+    val sellerActualAmount: String? = null,
+    val buyerActualAmount: String? = null
 )
 
 data class ResolveDisputeResponse(

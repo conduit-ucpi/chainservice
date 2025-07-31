@@ -32,7 +32,15 @@ data class RaiseDisputeRequest(
     val userWalletAddress: String,
     
     @field:NotBlank(message = "Signed transaction is required")
-    val signedTransaction: String
+    val signedTransaction: String,
+    
+    val buyerEmail: String? = null,
+    val sellerEmail: String? = null,
+    val contractDescription: String? = null,
+    val amount: String? = null,
+    val currency: String? = null,
+    val payoutDateTime: String? = null,
+    val productName: String? = null
 )
 
 data class ClaimFundsRequest(
@@ -56,7 +64,14 @@ data class DepositFundsRequest(
     @field:NotBlank(message = "Signed transaction is required")
     val signedTransaction: String,
     
-    val contractId: String? = null
+    val contractId: String? = null,
+    
+    val buyerEmail: String? = null,
+    val sellerEmail: String? = null,
+    val contractDescription: String? = null,
+    val amount: String? = null,
+    val payoutDateTime: String? = null,
+    val contractLink: String? = null
 )
 
 data class ResolveDisputeRequest(
@@ -69,7 +84,16 @@ data class ResolveDisputeRequest(
     // For percentage-based resolution
     val buyerPercentage: Double? = null,
     val sellerPercentage: Double? = null,
-    val resolutionNote: String? = null
+    val resolutionNote: String? = null,
+    
+    val buyerEmail: String? = null,
+    val sellerEmail: String? = null,
+    val contractDescription: String? = null,
+    val amount: String? = null,
+    val currency: String? = null,
+    val payoutDateTime: String? = null,
+    val sellerActualAmount: String? = null,
+    val buyerActualAmount: String? = null
 )
 
 data class ApproveUSDCRequest(

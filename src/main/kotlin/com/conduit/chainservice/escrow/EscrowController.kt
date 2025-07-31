@@ -3,6 +3,7 @@ package com.conduit.chainservice.escrow
 import com.conduit.chainservice.escrow.models.*
 import com.conduit.chainservice.service.ContractQueryService
 import com.conduit.chainservice.service.ContractServiceClient
+import com.conduit.chainservice.service.EmailServiceClient
 import com.utility.chainservice.models.OperationGasCost
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
@@ -31,7 +32,8 @@ class EscrowController(
     private val escrowTransactionService: EscrowTransactionService,
     private val contractQueryService: ContractQueryService,
     private val contractServiceClient: ContractServiceClient,
-    private val escrowServicePlugin: EscrowServicePlugin
+    private val escrowServicePlugin: EscrowServicePlugin,
+    private val emailServiceClient: EmailServiceClient
 ) {
 
     private val logger = LoggerFactory.getLogger(EscrowController::class.java)
@@ -157,6 +159,45 @@ class EscrowController(
 
             if (result.success) {
                 logger.info("Dispute raised successfully: ${result.transactionHash}")
+                
+                // Send dispute raised email notifications if email addresses are provided
+                if (!request.buyerEmail.isNullOrBlank() && !request.sellerEmail.isNullOrBlank()) {
+                    try {
+                        // Send notification to both parties about the dispute
+                        runBlocking {
+                            // Notify buyer
+                            emailServiceClient.sendDisputeRaised(
+                                recipientEmail = request.buyerEmail!!,
+                                buyerEmail = request.buyerEmail!!,
+                                sellerEmail = request.sellerEmail!!,
+                                amount = request.amount ?: "N/A",
+                                currency = request.currency ?: "USDC",
+                                contractDescription = request.contractDescription ?: "Escrow contract",
+                                payoutDateTime = request.payoutDateTime ?: "N/A",
+                                productName = request.productName ?: "Product/Service"
+                            ).block()
+                            
+                            // Notify seller
+                            emailServiceClient.sendDisputeRaised(
+                                recipientEmail = request.sellerEmail!!,
+                                buyerEmail = request.buyerEmail!!,
+                                sellerEmail = request.sellerEmail!!,
+                                amount = request.amount ?: "N/A",
+                                currency = request.currency ?: "USDC",
+                                contractDescription = request.contractDescription ?: "Escrow contract",
+                                payoutDateTime = request.payoutDateTime ?: "N/A",
+                                productName = request.productName ?: "Product/Service"
+                            ).block()
+                        }
+                        logger.info("Dispute raised notification emails sent successfully to both parties")
+                    } catch (e: Exception) {
+                        // Log the error but don't fail the dispute response since the blockchain transaction succeeded
+                        logger.error("Failed to send dispute raised notification emails", e)
+                    }
+                } else {
+                    logger.info("Buyer or seller email not provided, skipping dispute raised notification")
+                }
+                
                 ResponseEntity.ok(response)
             } else {
                 logger.error("Dispute raising failed: ${result.error}")
@@ -360,6 +401,28 @@ class EscrowController(
                     logger.info("No contractId provided in deposit request, skipping contract service update")
                 }
                 
+                // Send payment notification email if seller email is provided
+                if (!request.sellerEmail.isNullOrBlank() && !request.buyerEmail.isNullOrBlank()) {
+                    try {
+                        runBlocking {
+                            emailServiceClient.sendPaymentNotification(
+                                sellerEmail = request.sellerEmail!!,
+                                buyerEmail = request.buyerEmail!!,
+                                contractDescription = request.contractDescription ?: "Escrow contract",
+                                amount = request.amount ?: "N/A",
+                                payoutDateTime = request.payoutDateTime ?: "N/A",
+                                contractLink = request.contractLink ?: ""
+                            ).block()
+                        }
+                        logger.info("Payment notification email sent successfully to seller: ${request.sellerEmail}")
+                    } catch (e: Exception) {
+                        // Log the error but don't fail the deposit response since the blockchain transaction succeeded
+                        logger.error("Failed to send payment notification email to seller: ${request.sellerEmail}", e)
+                    }
+                } else {
+                    logger.info("Seller or buyer email not provided, skipping payment notification")
+                }
+                
                 ResponseEntity.ok(response)
             } else {
                 logger.error("Funds deposit failed: ${result.error}")
@@ -465,6 +528,55 @@ class EscrowController(
 
             if (result.success) {
                 logger.info("Dispute resolved successfully: ${result.transactionHash}")
+                
+                // Send dispute resolved email notifications if email addresses are provided
+                if (!request.buyerEmail.isNullOrBlank() && !request.sellerEmail.isNullOrBlank()) {
+                    try {
+                        // Calculate actual amounts based on percentages (if provided)
+                        val totalAmount = request.amount ?: "N/A"
+                        val sellerPercentage = request.sellerPercentage?.toString() ?: (if (request.buyerPercentage != null) (100.0 - request.buyerPercentage!!).toString() else "N/A")
+                        val buyerPercentage = request.buyerPercentage?.toString() ?: (if (request.sellerPercentage != null) (100.0 - request.sellerPercentage!!).toString() else "N/A")
+                        
+                        runBlocking {
+                            // Notify buyer
+                            emailServiceClient.sendDisputeResolved(
+                                recipientEmail = request.buyerEmail!!,
+                                amount = totalAmount,
+                                currency = request.currency ?: "USDC",
+                                buyerEmail = request.buyerEmail!!,
+                                sellerEmail = request.sellerEmail!!,
+                                contractDescription = request.contractDescription ?: "Escrow contract",
+                                payoutDateTime = request.payoutDateTime ?: "N/A",
+                                sellerPercentage = sellerPercentage,
+                                sellerActualAmount = request.sellerActualAmount ?: "N/A",
+                                buyerPercentage = buyerPercentage,
+                                buyerActualAmount = request.buyerActualAmount ?: "N/A"
+                            ).block()
+                            
+                            // Notify seller
+                            emailServiceClient.sendDisputeResolved(
+                                recipientEmail = request.sellerEmail!!,
+                                amount = totalAmount,
+                                currency = request.currency ?: "USDC",
+                                buyerEmail = request.buyerEmail!!,
+                                sellerEmail = request.sellerEmail!!,
+                                contractDescription = request.contractDescription ?: "Escrow contract",
+                                payoutDateTime = request.payoutDateTime ?: "N/A",
+                                sellerPercentage = sellerPercentage,
+                                sellerActualAmount = request.sellerActualAmount ?: "N/A",
+                                buyerPercentage = buyerPercentage,
+                                buyerActualAmount = request.buyerActualAmount ?: "N/A"
+                            ).block()
+                        }
+                        logger.info("Dispute resolved notification emails sent successfully to both parties")
+                    } catch (e: Exception) {
+                        // Log the error but don't fail the dispute resolution response since the blockchain transaction succeeded
+                        logger.error("Failed to send dispute resolved notification emails", e)
+                    }
+                } else {
+                    logger.info("Buyer or seller email not provided, skipping dispute resolved notification")
+                }
+                
                 ResponseEntity.ok(response)
             } else {
                 logger.error("Dispute resolution failed: ${result.error}")

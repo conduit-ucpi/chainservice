@@ -4,6 +4,7 @@ import com.conduit.chainservice.escrow.models.DepositFundsRequest
 import com.conduit.chainservice.escrow.models.DepositFundsResponse
 import com.conduit.chainservice.service.ContractServiceClient
 import com.conduit.chainservice.service.ContractQueryService
+import com.conduit.chainservice.service.EmailServiceClient
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.utility.chainservice.models.TransactionResult
 import jakarta.servlet.http.HttpServletRequest
@@ -41,6 +42,9 @@ class EscrowControllerDepositFundsTest {
     @Mock
     private lateinit var escrowServicePlugin: EscrowServicePlugin
 
+    @Mock
+    private lateinit var emailServiceClient: EmailServiceClient
+
     private lateinit var escrowController: EscrowController
 
     @BeforeEach
@@ -50,7 +54,8 @@ class EscrowControllerDepositFundsTest {
             escrowTransactionService, 
             contractQueryService,
             contractServiceClient,
-            escrowServicePlugin
+            escrowServicePlugin,
+            emailServiceClient
         )
         
         // Use reflection to set chainId since it's a @Value property
