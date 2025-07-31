@@ -274,6 +274,58 @@ class EscrowController(
         return try {
             logger.info("Deposit funds request received for contract: ${request.contractAddress}")
             
+            // If contractId is provided, get contract from contract service and validate status
+            if (request.contractId != null) {
+                try {
+                    val contractData = runBlocking {
+                        contractServiceClient.getContract(request.contractId, httpServletRequest).block()
+                    }
+                    
+                    if (contractData == null) {
+                        logger.error("Contract not found with ID: ${request.contractId}")
+                        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
+                            DepositFundsResponse(
+                                success = false,
+                                transactionHash = null,
+                                error = "Contract not found with ID: ${request.contractId}"
+                            )
+                        )
+                    }
+                    
+                    val status = contractData["status"] as? String
+                    if (status != "OK") {
+                        logger.error("Contract ${request.contractId} has invalid status: $status. Expected: OK")
+                        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
+                            DepositFundsResponse(
+                                success = false,
+                                transactionHash = null,
+                                error = "Contract status is '$status', expected 'OK'"
+                            )
+                        )
+                    }
+                    
+                    // Update status to IN-PROCESS before proceeding
+                    runBlocking {
+                        contractServiceClient.updateContractStatus(
+                            request.contractId,
+                            "IN-PROCESS",
+                            httpServletRequest
+                        ).block()
+                    }
+                    logger.info("Updated contract ${request.contractId} status to IN-PROCESS")
+                    
+                } catch (e: Exception) {
+                    logger.error("Failed to validate or update contract status for ID: ${request.contractId}", e)
+                    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
+                        DepositFundsResponse(
+                            success = false,
+                            transactionHash = null,
+                            error = "Failed to validate contract: ${e.message}"
+                        )
+                    )
+                }
+            }
+            
             val result = runBlocking {
                 escrowTransactionService.depositFundsWithGasTransfer(request.userWalletAddress, request.signedTransaction)
             }
