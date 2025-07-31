@@ -50,12 +50,12 @@ class ContractServiceClient(
             ))
         }
 
-        // Include status update to "OK" since deployment was successful
+        // Include state update to "OK" since deployment was successful
         val updateRequestWithStatus = mapOf(
             "chainAddress" to chainAddress,
             "chainId" to chainId,
             "buyerAddress" to buyerAddress,
-            "status" to "OK"
+            "state" to "OK"
         )
 
         logger.info("Updating contract $contractId with deployment details: chainAddress=$chainAddress, chainId=$chainId")
@@ -154,9 +154,9 @@ class ContractServiceClient(
             return Mono.just(mapOf("status" to "skipped"))
         }
 
-        val statusUpdate = mapOf("status" to status)
+        val statusUpdate = mapOf("state" to status)
 
-        logger.info("Updating contract $contractId status to $status")
+        logger.info("Updating contract $contractId state to $status")
 
         return webClient.patch()
             .uri("/api/contracts/$contractId")
@@ -179,7 +179,7 @@ class ContractServiceClient(
             .retrieve()
             .bodyToMono(object : org.springframework.core.ParameterizedTypeReference<Map<String, Any>>() {})
             .doOnSuccess { response ->
-                logger.info("Successfully updated contract $contractId status to $status")
+                logger.info("Successfully updated contract $contractId state to $status")
             }
             .onErrorResume { error ->
                 when (error) {

@@ -165,3 +165,6 @@ The application requires these environment variables to start:
 - Escrow plugin supports contract creation, fund operations, and dispute management
 - Event parsing for contract status tracking
 - Transaction receipt polling with configurable timeouts
+
+**Testing**
+- Uses Mockito for tsting, with standalone setup

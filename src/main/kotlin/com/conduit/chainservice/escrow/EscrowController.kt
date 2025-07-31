@@ -292,14 +292,14 @@ class EscrowController(
                         )
                     }
                     
-                    val status = contractData["status"] as? String
+                    val status = contractData["state"] as? String
                     if (status != "OK") {
-                        logger.error("Contract ${request.contractId} has invalid status: $status. Expected: OK")
+                        logger.error("Contract ${request.contractId} has invalid state: $status. Expected: OK")
                         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
                             DepositFundsResponse(
                                 success = false,
                                 transactionHash = null,
-                                error = "Contract status is '$status', expected 'OK'"
+                                error = "Contract state is '$status', expected 'OK'"
                             )
                         )
                     }
@@ -312,10 +312,10 @@ class EscrowController(
                             httpServletRequest
                         ).block()
                     }
-                    logger.info("Updated contract ${request.contractId} status to IN-PROCESS")
+                    logger.info("Updated contract ${request.contractId} state to IN-PROCESS")
                     
                 } catch (e: Exception) {
-                    logger.error("Failed to validate or update contract status for ID: ${request.contractId}", e)
+                    logger.error("Failed to validate or update contract state for ID: ${request.contractId}", e)
                     return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
                         DepositFundsResponse(
                             success = false,
