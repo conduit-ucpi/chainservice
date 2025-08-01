@@ -73,7 +73,8 @@ class EscrowController(
                 )]
             )]
         )
-        request: CreateContractRequest
+        request: CreateContractRequest,
+        httpRequest: HttpServletRequest
     ): ResponseEntity<CreateContractResponse> {
         return try {
             logger.info("Create contract request received")
@@ -142,7 +143,8 @@ class EscrowController(
                 )]
             )]
         )
-        request: RaiseDisputeRequest
+        request: RaiseDisputeRequest,
+        httpRequest: HttpServletRequest
     ): ResponseEntity<RaiseDisputeResponse> {
         return try {
             logger.info("Raise dispute request received for contract: ${request.contractAddress}")
@@ -174,7 +176,8 @@ class EscrowController(
                                 currency = request.currency ?: "USDC",
                                 contractDescription = request.contractDescription ?: "Escrow contract",
                                 payoutDateTime = request.payoutDateTime ?: "N/A",
-                                productName = request.productName ?: "Product/Service"
+                                productName = request.productName ?: "Product/Service",
+                                httpRequest = httpRequest
                             ).block()
                             
                             // Notify seller
@@ -186,7 +189,8 @@ class EscrowController(
                                 currency = request.currency ?: "USDC",
                                 contractDescription = request.contractDescription ?: "Escrow contract",
                                 payoutDateTime = request.payoutDateTime ?: "N/A",
-                                productName = request.productName ?: "Product/Service"
+                                productName = request.productName ?: "Product/Service",
+                                httpRequest = httpRequest
                             ).block()
                         }
                         logger.info("Dispute raised notification emails sent successfully to both parties")
@@ -411,7 +415,8 @@ class EscrowController(
                                 contractDescription = request.contractDescription ?: "Escrow contract",
                                 amount = request.amount ?: "N/A",
                                 payoutDateTime = request.payoutDateTime ?: "N/A",
-                                contractLink = request.contractLink ?: ""
+                                contractLink = request.contractLink ?: "",
+                                httpRequest = httpServletRequest
                             ).block()
                         }
                         logger.info("Payment notification email sent successfully to seller: ${request.sellerEmail}")
@@ -473,7 +478,8 @@ class EscrowController(
                 ]
             )]
         )
-        request: ResolveDisputeRequest
+        request: ResolveDisputeRequest,
+        httpRequest: HttpServletRequest
     ): ResponseEntity<ResolveDisputeResponse> {
         return try {
             logger.info("Resolve dispute request received for contract: ${request.contractAddress}")
@@ -550,7 +556,8 @@ class EscrowController(
                                 sellerPercentage = sellerPercentage,
                                 sellerActualAmount = request.sellerActualAmount ?: "N/A",
                                 buyerPercentage = buyerPercentage,
-                                buyerActualAmount = request.buyerActualAmount ?: "N/A"
+                                buyerActualAmount = request.buyerActualAmount ?: "N/A",
+                                httpRequest = httpRequest
                             ).block()
                             
                             // Notify seller
@@ -565,7 +572,8 @@ class EscrowController(
                                 sellerPercentage = sellerPercentage,
                                 sellerActualAmount = request.sellerActualAmount ?: "N/A",
                                 buyerPercentage = buyerPercentage,
-                                buyerActualAmount = request.buyerActualAmount ?: "N/A"
+                                buyerActualAmount = request.buyerActualAmount ?: "N/A",
+                                httpRequest = httpRequest
                             ).block()
                         }
                         logger.info("Dispute resolved notification emails sent successfully to both parties")

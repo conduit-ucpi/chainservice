@@ -1,6 +1,7 @@
 package com.conduit.chainservice.service
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import jakarta.servlet.http.HttpServletRequest
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpHeaders
@@ -76,7 +77,8 @@ class EmailServiceClient(
         contractDescription: String,
         amount: String,
         payoutDateTime: String,
-        contractLink: String
+        contractLink: String,
+        httpRequest: HttpServletRequest
     ): Mono<SendEmailResponse> {
         if (!enabled) {
             logger.info("Email service integration disabled, skipping payment notification")
@@ -87,7 +89,7 @@ class EmailServiceClient(
             ))
         }
 
-        val request = PaymentNotificationRequest(
+        val emailRequest = PaymentNotificationRequest(
             to = sellerEmail,
             buyerEmail = buyerEmail,
             link = contractLink,
@@ -100,7 +102,22 @@ class EmailServiceClient(
 
         return webClient.post()
             .uri("/api/email/payment-notification")
-            .bodyValue(request)
+            .headers { headers ->
+                // Forward authentication headers
+                httpRequest.getHeader(HttpHeaders.AUTHORIZATION)?.let {
+                    headers.set(HttpHeaders.AUTHORIZATION, it)
+                }
+                
+                // Forward cookies including AUTH-TOKEN and session
+                httpRequest.getHeader(HttpHeaders.COOKIE)?.let {
+                    headers.set(HttpHeaders.COOKIE, it)
+                }
+                
+                // Add any custom headers that might be needed
+                headers.set("X-Forwarded-For", httpRequest.remoteAddr)
+                headers.set("X-Original-URI", httpRequest.requestURI)
+            }
+            .bodyValue(emailRequest)
             .retrieve()
             .bodyToMono(SendEmailResponse::class.java)
             .doOnSuccess { response ->
@@ -136,7 +153,8 @@ class EmailServiceClient(
         currency: String,
         contractDescription: String,
         payoutDateTime: String,
-        productName: String
+        productName: String,
+        httpRequest: HttpServletRequest
     ): Mono<SendEmailResponse> {
         if (!enabled) {
             logger.info("Email service integration disabled, skipping dispute raised notification")
@@ -147,7 +165,7 @@ class EmailServiceClient(
             ))
         }
 
-        val request = DisputeRaisedRequest(
+        val emailRequest = DisputeRaisedRequest(
             to = recipientEmail,
             buyerEmail = buyerEmail,
             amount = amount,
@@ -162,7 +180,22 @@ class EmailServiceClient(
 
         return webClient.post()
             .uri("/api/email/dispute-raised")
-            .bodyValue(request)
+            .headers { headers ->
+                // Forward authentication headers
+                httpRequest.getHeader(HttpHeaders.AUTHORIZATION)?.let {
+                    headers.set(HttpHeaders.AUTHORIZATION, it)
+                }
+                
+                // Forward cookies including AUTH-TOKEN and session
+                httpRequest.getHeader(HttpHeaders.COOKIE)?.let {
+                    headers.set(HttpHeaders.COOKIE, it)
+                }
+                
+                // Add any custom headers that might be needed
+                headers.set("X-Forwarded-For", httpRequest.remoteAddr)
+                headers.set("X-Original-URI", httpRequest.requestURI)
+            }
+            .bodyValue(emailRequest)
             .retrieve()
             .bodyToMono(SendEmailResponse::class.java)
             .doOnSuccess { response ->
@@ -201,7 +234,8 @@ class EmailServiceClient(
         sellerPercentage: String,
         sellerActualAmount: String,
         buyerPercentage: String,
-        buyerActualAmount: String
+        buyerActualAmount: String,
+        httpRequest: HttpServletRequest
     ): Mono<SendEmailResponse> {
         if (!enabled) {
             logger.info("Email service integration disabled, skipping dispute resolved notification")
@@ -212,7 +246,7 @@ class EmailServiceClient(
             ))
         }
 
-        val request = DisputeResolvedRequest(
+        val emailRequest = DisputeResolvedRequest(
             to = recipientEmail,
             amount = amount,
             currency = currency,
@@ -230,7 +264,22 @@ class EmailServiceClient(
 
         return webClient.post()
             .uri("/api/email/dispute-resolved")
-            .bodyValue(request)
+            .headers { headers ->
+                // Forward authentication headers
+                httpRequest.getHeader(HttpHeaders.AUTHORIZATION)?.let {
+                    headers.set(HttpHeaders.AUTHORIZATION, it)
+                }
+                
+                // Forward cookies including AUTH-TOKEN and session
+                httpRequest.getHeader(HttpHeaders.COOKIE)?.let {
+                    headers.set(HttpHeaders.COOKIE, it)
+                }
+                
+                // Add any custom headers that might be needed
+                headers.set("X-Forwarded-For", httpRequest.remoteAddr)
+                headers.set("X-Original-URI", httpRequest.requestURI)
+            }
+            .bodyValue(emailRequest)
             .retrieve()
             .bodyToMono(SendEmailResponse::class.java)
             .doOnSuccess { response ->
