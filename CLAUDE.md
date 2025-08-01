@@ -166,5 +166,15 @@ The application requires these environment variables to start:
 - Event parsing for contract status tracking
 - Transaction receipt polling with configurable timeouts
 
-**Testing**
-- Uses Mockito for tsting, with standalone setup
+**Testing Requirements:**
+- Uses Mockito for testing, with standalone setup
+- All new features must include unit tests
+- Integration tests required for blockchain operations
+- Test coverage should be maintained above 80%
+
+**Git Commit Requirements:**
+- **All git commit messages must be useful and descriptive**
+- Explain what was changed and why, not just what files were touched
+- Use present tense and imperative mood ("Add validation" not "Added validation")
+- Include context about the business impact when relevant
+- Avoid generic messages like "fix", "update", or "changes"
