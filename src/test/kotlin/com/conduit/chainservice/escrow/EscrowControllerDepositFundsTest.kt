@@ -74,7 +74,13 @@ class EscrowControllerDepositFundsTest {
             contractAddress = "0x1234567890abcdef1234567890abcdef12345678",
             userWalletAddress = "0x9876543210fedcba9876543210fedcba98765432",
             signedTransaction = "0xf86c8082520894...",
-            contractId = contractId
+            contractId = contractId,
+            buyerEmail = "buyer@test.com",
+            sellerEmail = "seller@test.com",
+            contractDescription = "Test contract description",
+            amount = "100.0",
+            payoutDateTime = "2024-12-31T23:59:59Z",
+            contractLink = "https://test.com/contract"
         )
 
         // Mock contract service returning state field (not status)
@@ -146,7 +152,13 @@ class EscrowControllerDepositFundsTest {
             contractAddress = "0x1234567890abcdef1234567890abcdef12345678",
             userWalletAddress = "0x9876543210fedcba9876543210fedcba98765432",
             signedTransaction = "0xf86c8082520894...",
-            contractId = contractId
+            contractId = contractId,
+            buyerEmail = "buyer@test.com",
+            sellerEmail = "seller@test.com",
+            contractDescription = "Test contract description",
+            amount = "100.0",
+            payoutDateTime = "2024-12-31T23:59:59Z",
+            contractLink = "https://test.com/contract"
         )
 
         // Mock contract service returning non-OK state
@@ -187,7 +199,13 @@ class EscrowControllerDepositFundsTest {
             contractAddress = "0x1234567890abcdef1234567890abcdef12345678",
             userWalletAddress = "0x9876543210fedcba9876543210fedcba98765432",
             signedTransaction = "0xf86c8082520894...",
-            contractId = contractId
+            contractId = contractId,
+            buyerEmail = "buyer@test.com",
+            sellerEmail = "seller@test.com",
+            contractDescription = "Test contract description",
+            amount = "100.0",
+            payoutDateTime = "2024-12-31T23:59:59Z",
+            contractLink = "https://test.com/contract"
         )
 
         // Mock contract service returning contract without state field
@@ -225,7 +243,13 @@ class EscrowControllerDepositFundsTest {
             contractAddress = "0x1234567890abcdef1234567890abcdef12345678",
             userWalletAddress = "0x9876543210fedcba9876543210fedcba98765432",
             signedTransaction = "0xf86c8082520894...",
-            contractId = contractId
+            contractId = contractId,
+            buyerEmail = "buyer@test.com",
+            sellerEmail = "seller@test.com",
+            contractDescription = "Test contract description",
+            amount = "100.0",
+            payoutDateTime = "2024-12-31T23:59:59Z",
+            contractLink = "https://test.com/contract"
         )
 
         whenever(contractServiceClient.getContract(eq(contractId), any()))
@@ -253,7 +277,13 @@ class EscrowControllerDepositFundsTest {
             contractAddress = "0x1234567890abcdef1234567890abcdef12345678",
             userWalletAddress = "0x9876543210fedcba9876543210fedcba98765432",
             signedTransaction = "0xf86c8082520894...",
-            contractId = null  // No contract ID provided
+            contractId = null,  // No contract ID provided
+            buyerEmail = "buyer@test.com",
+            sellerEmail = "seller@test.com",
+            contractDescription = "Test contract description",
+            amount = "100.0",
+            payoutDateTime = "2024-12-31T23:59:59Z",
+            contractLink = "https://test.com/contract"
         )
 
         runBlocking {
@@ -298,7 +328,13 @@ class EscrowControllerDepositFundsTest {
             contractAddress = "0x1234567890abcdef1234567890abcdef12345678",
             userWalletAddress = "0x9876543210fedcba9876543210fedcba98765432",
             signedTransaction = "0xf86c8082520894...",
-            contractId = contractId
+            contractId = contractId,
+            buyerEmail = "buyer@test.com",
+            sellerEmail = "seller@test.com",
+            contractDescription = "Test contract description",
+            amount = "100.0",
+            payoutDateTime = "2024-12-31T23:59:59Z",
+            contractLink = "https://test.com/contract"
         )
 
         val contractData = mapOf(

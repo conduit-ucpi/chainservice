@@ -104,7 +104,13 @@ class DepositFundsErrorScenariosTest {
             contractAddress = "invalid-address",  // Invalid format
             userWalletAddress = "0x9876543210fedcba9876543210fedcba98765432",
             signedTransaction = "0xf86c8082520894...",
-            contractId = null
+            contractId = null,
+            buyerEmail = "buyer@test.com",
+            sellerEmail = "seller@test.com",
+            contractDescription = "Test contract description",
+            amount = "100.0",
+            payoutDateTime = "2024-12-31T23:59:59Z",
+            contractLink = "https://test.com/contract"
         )
 
         // Mock the service to throw an exception due to invalid address
@@ -132,7 +138,13 @@ class DepositFundsErrorScenariosTest {
             contractAddress = "0x1234567890abcdef1234567890abcdef12345678",
             userWalletAddress = "0x9876543210fedcba9876543210fedcba98765432",
             signedTransaction = "0xf86c8082520894...",
-            contractId = contractId
+            contractId = contractId,
+            buyerEmail = "buyer@test.com",
+            sellerEmail = "seller@test.com",
+            contractDescription = "Test contract description",
+            amount = "100.0",
+            payoutDateTime = "2024-12-31T23:59:59Z",
+            contractLink = "https://test.com/contract"
         )
 
         whenever(contractServiceClient.getContract(eq(contractId), any()))
@@ -166,7 +178,13 @@ class DepositFundsErrorScenariosTest {
             contractAddress = "0x1234567890abcdef1234567890abcdef12345678",
             userWalletAddress = "0x9876543210fedcba9876543210fedcba98765432",
             signedTransaction = "0xf86c8082520894...",
-            contractId = contractId
+            contractId = contractId,
+            buyerEmail = "buyer@test.com",
+            sellerEmail = "seller@test.com",
+            contractDescription = "Test contract description",
+            amount = "100.0",
+            payoutDateTime = "2024-12-31T23:59:59Z",
+            contractLink = "https://test.com/contract"
         )
 
         val contractData = mapOf(
@@ -201,7 +219,13 @@ class DepositFundsErrorScenariosTest {
             contractAddress = "0x1234567890abcdef1234567890abcdef12345678",
             userWalletAddress = "0x9876543210fedcba9876543210fedcba98765432",
             signedTransaction = "0xf86c8082520894...",
-            contractId = contractId
+            contractId = contractId,
+            buyerEmail = "buyer@test.com",
+            sellerEmail = "seller@test.com",
+            contractDescription = "Test contract description",
+            amount = "100.0",
+            payoutDateTime = "2024-12-31T23:59:59Z",
+            contractLink = "https://test.com/contract"
         )
 
         val contractData = mapOf(
@@ -233,7 +257,13 @@ class DepositFundsErrorScenariosTest {
             contractAddress = "0x1234567890abcdef1234567890abcdef12345678",
             userWalletAddress = "0x9876543210fedcba9876543210fedcba98765432",
             signedTransaction = "0xf86c8082520894...",
-            contractId = contractId
+            contractId = contractId,
+            buyerEmail = "buyer@test.com",
+            sellerEmail = "seller@test.com",
+            contractDescription = "Test contract description",
+            amount = "100.0",
+            payoutDateTime = "2024-12-31T23:59:59Z",
+            contractLink = "https://test.com/contract"
         )
 
         val contractData = mapOf(
@@ -265,7 +295,13 @@ class DepositFundsErrorScenariosTest {
             contractAddress = "0x1234567890abcdef1234567890abcdef12345678",
             userWalletAddress = "0x9876543210fedcba9876543210fedcba98765432",
             signedTransaction = "0xf86c8082520894...",
-            contractId = contractId
+            contractId = contractId,
+            buyerEmail = "buyer@test.com",
+            sellerEmail = "seller@test.com",
+            contractDescription = "Test contract description",
+            amount = "100.0",
+            payoutDateTime = "2024-12-31T23:59:59Z",
+            contractLink = "https://test.com/contract"
         )
 
         // Contract data with unexpected structure
@@ -296,7 +332,13 @@ class DepositFundsErrorScenariosTest {
             contractAddress = "0x1234567890abcdef1234567890abcdef12345678",
             userWalletAddress = "0x9876543210fedcba9876543210fedcba98765432",
             signedTransaction = "0xf86c8082520894...",
-            contractId = null  // Skip contract validation
+            contractId = null,  // Skip contract validation
+            buyerEmail = "buyer@test.com",
+            sellerEmail = "seller@test.com",
+            contractDescription = "Test contract description",
+            amount = "100.0",
+            payoutDateTime = "2024-12-31T23:59:59Z",
+            contractLink = "https://test.com/contract"
         )
 
         // Blockchain service throws unexpected exception
@@ -324,7 +366,13 @@ class DepositFundsErrorScenariosTest {
             contractAddress = "0x1234567890abcdef1234567890abcdef12345678",
             userWalletAddress = "0x9876543210fedcba9876543210fedcba98765432",
             signedTransaction = "0xf86c8082520894...",
-            contractId = contractId
+            contractId = contractId,
+            buyerEmail = "buyer@test.com",
+            sellerEmail = "seller@test.com",
+            contractDescription = "Test contract description",
+            amount = "100.0",
+            payoutDateTime = "2024-12-31T23:59:59Z",
+            contractLink = "https://test.com/contract"
         )
 
         whenever(contractServiceClient.getContract(eq(contractId), any()))
@@ -350,7 +398,13 @@ class DepositFundsErrorScenariosTest {
             contractAddress = "0x1234567890abcdef1234567890abcdef12345678",
             userWalletAddress = "0x9876543210fedcba9876543210fedcba98765432",
             signedTransaction = "0x" + "f".repeat(1000),  // Very long transaction
-            contractId = null
+            contractId = null,
+            buyerEmail = "buyer@test.com",
+            sellerEmail = "seller@test.com",
+            contractDescription = "Test contract description",
+            amount = "100.0",
+            payoutDateTime = "2024-12-31T23:59:59Z",
+            contractLink = "https://test.com/contract"
         )
 
         runBlocking {

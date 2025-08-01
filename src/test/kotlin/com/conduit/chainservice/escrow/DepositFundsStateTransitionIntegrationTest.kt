@@ -72,7 +72,13 @@ class DepositFundsStateTransitionIntegrationTest {
             contractAddress = "0x1234567890abcdef1234567890abcdef12345678",
             userWalletAddress = "0x9876543210fedcba9876543210fedcba98765432",
             signedTransaction = "0xf86c8082520894...",
-            contractId = contractId
+            contractId = contractId,
+            buyerEmail = "buyer@test.com",
+            sellerEmail = "seller@test.com",
+            contractDescription = "Test contract description",
+            amount = "100.0",
+            payoutDateTime = "2024-12-31T23:59:59Z",
+            contractLink = "https://test.com/contract"
         )
 
         // Step 1: Initial state is OK
@@ -158,7 +164,13 @@ class DepositFundsStateTransitionIntegrationTest {
             contractAddress = "0x1234567890abcdef1234567890abcdef12345678",
             userWalletAddress = "0x9876543210fedcba9876543210fedcba98765432",
             signedTransaction = "0xf86c8082520894...",
-            contractId = contractId
+            contractId = contractId,
+            buyerEmail = "buyer@test.com",
+            sellerEmail = "seller@test.com",
+            contractDescription = "Test contract description",
+            amount = "100.0",
+            payoutDateTime = "2024-12-31T23:59:59Z",
+            contractLink = "https://test.com/contract"
         )
 
         // Step 1: Initial state is OK
@@ -230,7 +242,13 @@ class DepositFundsStateTransitionIntegrationTest {
             contractAddress = "0x1234567890abcdef1234567890abcdef12345678",
             userWalletAddress = "0x9876543210fedcba9876543210fedcba98765432",
             signedTransaction = "0xf86c8082520894...",
-            contractId = contractId
+            contractId = contractId,
+            buyerEmail = "buyer@test.com",
+            sellerEmail = "seller@test.com",
+            contractDescription = "Test contract description",
+            amount = "100.0",
+            payoutDateTime = "2024-12-31T23:59:59Z",
+            contractLink = "https://test.com/contract"
         )
 
         // Step 1: Initial state is OK
@@ -278,7 +296,13 @@ class DepositFundsStateTransitionIntegrationTest {
             contractAddress = "0x1234567890abcdef1234567890abcdef12345678",
             userWalletAddress = "0x9876543210fedcba9876543210fedcba98765432",
             signedTransaction = "0xf86c8082520894...",
-            contractId = contractId
+            contractId = contractId,
+            buyerEmail = "buyer@test.com",
+            sellerEmail = "seller@test.com",
+            contractDescription = "Test contract description",
+            amount = "100.0",
+            payoutDateTime = "2024-12-31T23:59:59Z",
+            contractLink = "https://test.com/contract"
         )
 
         val initialContractData = mapOf(
