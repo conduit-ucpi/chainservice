@@ -42,6 +42,9 @@ email-service:
   url: ${EMAIL_SERVICE_URL:http://localhost:8979}
   enabled: ${EMAIL_SERVICE_ENABLED:true}
 
+app:
+  service-link: ${SERVICE_LINK:http://localhost:3000}
+
 management:
   endpoints:
     web:

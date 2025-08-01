@@ -82,5 +82,6 @@ jobs:
               -e CREATOR_FEE_USDC_X_1M=${{ vars.CREATOR_FEE_USDC_X_1M }} \
               -e MIN_GAS_WEI=${{ vars.MIN_GAS_WEI }} \
               -e EMAIL_SERVICE_URL=${{ vars.EMAIL_SERVICE_URL }} \
+              -e SERVICE_LINK=${{ vars.SERVICE_LINK }} \
               ghcr.io/${{ env.REPO_LOWER }}:${{ env.GIT_SHA }}
           '

@@ -37,6 +37,9 @@ class EscrowController(
 ) {
 
     private val logger = LoggerFactory.getLogger(EscrowController::class.java)
+
+    @Value("\${app.service-link}")
+    private lateinit var serviceLink: String
     
     @Value("\${blockchain.chain-id}")
     private lateinit var chainId: String
@@ -415,7 +418,7 @@ class EscrowController(
                                 contractDescription = request.contractDescription ?: "Escrow contract",
                                 amount = request.amount ?: "N/A",
                                 payoutDateTime = request.payoutDateTime ?: "N/A",
-                                contractLink = request.contractLink ?: "",
+                                contractLink = "$serviceLink/contract/${request.contractAddress}",
                                 httpRequest = httpServletRequest
                             ).block()
                         }
