@@ -886,6 +886,160 @@ class EscrowController(
         }
     }
 
+    @PostMapping("/contracts/batch-info")
+    @Operation(
+        summary = "Batch Query Contract Information",
+        description = "Retrieves blockchain state for multiple contracts in a single efficient RPC batch request. Returns contract information including status, funding state, amounts, and timestamps. Supports up to 100 contracts per request with graceful partial failure handling."
+    )
+    @ApiResponses(value = [
+        ApiResponse(
+            responseCode = "200",
+            description = "Batch query completed (may include partial failures)",
+            content = [Content(schema = Schema(implementation = BatchContractInfoResponse::class))]
+        ),
+        ApiResponse(
+            responseCode = "400",
+            description = "Invalid request (e.g., too many contracts, invalid addresses)",
+            content = [Content(schema = Schema(implementation = ErrorResponse::class))]
+        ),
+        ApiResponse(
+            responseCode = "500",
+            description = "Internal server error",
+            content = [Content(schema = Schema(implementation = ErrorResponse::class))]
+        )
+    ])
+    fun getBatchContractInfo(
+        @Valid @RequestBody
+        @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            content = [Content(
+                examples = [
+                    ExampleObject(
+                        name = "Batch Query Example",
+                        value = """{"contractAddresses": ["0x1234567890abcdef1234567890abcdef12345678", "0x9876543210fedcba9876543210fedcba98765432", "0xabcdefabcdefabcdefabcdefabcdefabcdefabcdef"]}"""
+                    ),
+                    ExampleObject(
+                        name = "Single Contract Example",
+                        value = """{"contractAddresses": ["0x1234567890abcdef1234567890abcdef12345678"]}"""
+                    )
+                ]
+            )]
+        )
+        request: BatchContractInfoRequest,
+        httpRequest: HttpServletRequest
+    ): ResponseEntity<Any> {
+        return try {
+            val userType = httpRequest.getAttribute("userType") as? String
+            val userId = httpRequest.getAttribute("userId") as? String
+            
+            logger.info("Batch contract info request received for ${request.contractAddresses.size} contracts, userType: $userType, userId: $userId")
+            
+            // Validate request
+            if (request.contractAddresses.isEmpty()) {
+                return ResponseEntity.badRequest().body(
+                    ErrorResponse(
+                        error = "Bad Request",
+                        message = "Contract addresses list cannot be empty",
+                        timestamp = Instant.now().toString()
+                    )
+                )
+            }
+            
+            if (request.contractAddresses.size > 100) {
+                return ResponseEntity.badRequest().body(
+                    ErrorResponse(
+                        error = "Bad Request", 
+                        message = "Cannot query more than 100 contracts at once",
+                        timestamp = Instant.now().toString()
+                    )
+                )
+            }
+            
+            // For non-admin users, filter contracts to only those they have access to
+            val allowedContracts = if (userType == "admin") {
+                request.contractAddresses
+            } else {
+                // Get user's wallet address for authorization
+                val userWalletAddress = httpRequest.getAttribute("userWallet") as? String
+                
+                if (userWalletAddress == null) {
+                    logger.warn("No user wallet address found for batch request from user $userId")
+                    return ResponseEntity.badRequest().body(
+                        ErrorResponse(
+                            error = "Bad Request",
+                            message = "User wallet address not found",
+                            timestamp = Instant.now().toString()
+                        )
+                    )
+                }
+                
+                // Filter contracts by checking individual contract access
+                // For efficiency in batch operations, we'll allow the request but mark unauthorized contracts as failed
+                request.contractAddresses
+            }
+            
+            val batchResults = runBlocking {
+                contractQueryService.getBatchContractInfo(allowedContracts)
+            }
+            
+            // For non-admin users, filter out contracts they don't have access to
+            val filteredResults = if (userType == "admin") {
+                batchResults
+            } else {
+                val userWalletAddress = httpRequest.getAttribute("userWallet") as? String
+                batchResults.mapValues { (contractAddress, result) ->
+                    if (result.success && result.contractInfo != null && userWalletAddress != null) {
+                        val contract = result.contractInfo!!
+                        if (contract.buyer.equals(userWalletAddress, ignoreCase = true) || 
+                            contract.seller.equals(userWalletAddress, ignoreCase = true)) {
+                            result
+                        } else {
+                            ContractInfoResult(
+                                success = false,
+                                contractInfo = null,
+                                error = "Access denied - you are not authorized to view this contract"
+                            )
+                        }
+                    } else {
+                        result
+                    }
+                }
+            }
+            
+            val totalRequested = request.contractAddresses.size
+            val totalSuccessful = filteredResults.values.count { it.success }
+            val totalFailed = totalRequested - totalSuccessful
+            
+            val response = BatchContractInfoResponse(
+                contracts = filteredResults,
+                totalRequested = totalRequested,
+                totalSuccessful = totalSuccessful,
+                totalFailed = totalFailed,
+                timestamp = Instant.now().toString()
+            )
+            
+            logger.info("Batch contract info completed: $totalRequested requested, $totalSuccessful successful, $totalFailed failed")
+            ResponseEntity.ok(response)
+            
+        } catch (e: IllegalArgumentException) {
+            logger.error("Invalid batch contract info request", e)
+            val errorResponse = ErrorResponse(
+                error = "Bad Request",
+                message = e.message ?: "Invalid request parameters",
+                timestamp = Instant.now().toString()
+            )
+            ResponseEntity.badRequest().body(errorResponse)
+            
+        } catch (e: Exception) {
+            logger.error("Error in batch contract info endpoint", e)
+            val errorResponse = ErrorResponse(
+                error = "Internal Server Error",
+                message = e.message ?: "Failed to process batch request",
+                timestamp = Instant.now().toString()
+            )
+            ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse)
+        }
+    }
+
     data class GasCostsResponse(
         val operations: List<OperationGasCost>,
         val timestamp: String

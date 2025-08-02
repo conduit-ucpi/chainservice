@@ -175,3 +175,31 @@ data class AdminResolveContractResponse(
     val transactionHash: String?,
     val error: String? = null
 )
+
+// Batch query models
+data class BatchContractInfoRequest(
+    @field:NotNull(message = "Contract addresses list is required")
+    val contractAddresses: List<String>
+) {
+    init {
+        require(contractAddresses.isNotEmpty()) { "Contract addresses list cannot be empty" }
+        require(contractAddresses.size <= 100) { "Cannot query more than 100 contracts at once" }
+        contractAddresses.forEach { address ->
+            require(address.matches(Regex("^0x[a-fA-F0-9]{40}$"))) { "Invalid contract address format: $address" }
+        }
+    }
+}
+
+data class BatchContractInfoResponse(
+    val contracts: Map<String, ContractInfoResult>,
+    val totalRequested: Int,
+    val totalSuccessful: Int,
+    val totalFailed: Int,
+    val timestamp: String
+)
+
+data class ContractInfoResult(
+    val success: Boolean,
+    val contractInfo: ContractInfo? = null,
+    val error: String? = null
+)

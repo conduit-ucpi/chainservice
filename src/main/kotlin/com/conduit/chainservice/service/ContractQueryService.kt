@@ -3,6 +3,7 @@ package com.conduit.chainservice.service
 import com.conduit.chainservice.config.EscrowProperties
 import com.conduit.chainservice.escrow.models.ContractInfo
 import com.conduit.chainservice.escrow.models.ContractStatus
+import com.conduit.chainservice.escrow.models.ContractInfoResult
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.web3j.abi.EventEncoder
@@ -19,6 +20,9 @@ import org.web3j.protocol.exceptions.ClientConnectionException
 import org.web3j.utils.Convert
 import java.math.BigInteger
 import java.time.Instant
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.awaitAll
 
 @Service
 class ContractQueryService(
@@ -375,5 +379,67 @@ class ContractQueryService(
                 "claimed" to false
             )
         }
+    }
+
+    /**
+     * Batch query multiple contracts efficiently using parallel individual calls
+     * Note: Web3j BatchRequest has limited support, so we use parallel coroutines instead
+     */
+    suspend fun getBatchContractInfo(contractAddresses: List<String>): Map<String, ContractInfoResult> = coroutineScope {
+        logger.info("Starting batch query for ${contractAddresses.size} contracts")
+        
+        if (contractAddresses.isEmpty()) {
+            return@coroutineScope emptyMap<String, ContractInfoResult>()
+        }
+        
+        // Use parallel coroutines to query contracts efficiently
+        val deferredResults = contractAddresses.map { contractAddress ->
+            async {
+                try {
+                    val contractInfo = getContractInfo(contractAddress)
+                    if (contractInfo != null) {
+                        contractAddress to ContractInfoResult(
+                            success = true,
+                            contractInfo = contractInfo,
+                            error = null
+                        )
+                    } else {
+                        contractAddress to ContractInfoResult(
+                            success = false,
+                            contractInfo = null,
+                            error = "Contract not found or invalid"
+                        )
+                    }
+                } catch (e: Exception) {
+                    val isRateLimited = handleRateLimitingError(e, contractAddress, "batch getContractInfo")
+                    
+                    val errorMessage = if (isRateLimited) {
+                        "Rate limited by RPC provider"
+                    } else {
+                        e.message ?: "Failed to query contract"
+                    }
+                    
+                    if (!isRateLimited) {
+                        logger.error("Failed to query contract $contractAddress in batch", e)
+                    }
+                    
+                    contractAddress to ContractInfoResult(
+                        success = false,
+                        contractInfo = null,
+                        error = errorMessage
+                    )
+                }
+            }
+        }
+        
+        // Await all results
+        val results = deferredResults.awaitAll().toMap()
+        
+        val successCount = results.values.count { it.success }
+        val failureCount = results.size - successCount
+        
+        logger.info("Batch query completed: ${results.size} total, $successCount successful, $failureCount failed")
+        
+        return@coroutineScope results
     }
 }
