@@ -170,7 +170,29 @@ data class AdminResolveContractRequest(
     @field:NotNull(message = "Seller percentage is required")
     val sellerPercentage: Double,
     
-    val resolutionNote: String? = null
+    val resolutionNote: String? = null,
+    
+    // Email fields for notifications - required for admin resolving disputes
+    @field:NotBlank(message = "Buyer email is required")
+    val buyerEmail: String,
+    
+    @field:NotBlank(message = "Seller email is required")
+    val sellerEmail: String,
+    
+    @field:NotBlank(message = "Contract description is required")
+    val contractDescription: String,
+    
+    @field:NotBlank(message = "Amount is required")
+    val amount: String,
+    
+    @field:NotBlank(message = "Currency is required")
+    val currency: String,
+    
+    @field:NotBlank(message = "Payout date time is required")
+    val payoutDateTime: String,
+    
+    val sellerActualAmount: String? = null,
+    val buyerActualAmount: String? = null
 )
 
 data class AdminResolveContractResponse(

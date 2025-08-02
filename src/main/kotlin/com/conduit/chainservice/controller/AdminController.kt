@@ -1,8 +1,9 @@
 package com.conduit.chainservice.controller
 
-import com.conduit.chainservice.escrow.EscrowTransactionService
+import com.conduit.chainservice.escrow.EscrowController
 import com.conduit.chainservice.escrow.models.AdminResolveContractRequest
 import com.conduit.chainservice.escrow.models.AdminResolveContractResponse
+import com.conduit.chainservice.escrow.models.ResolveDisputeRequest
 import com.conduit.chainservice.service.ContractQueryService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
@@ -26,7 +27,7 @@ import org.springframework.web.bind.annotation.*
 @Validated
 @Tag(name = "Admin Operations", description = "Admin-only escrow contract operations")
 class AdminController(
-    private val escrowTransactionService: EscrowTransactionService,
+    private val escrowController: EscrowController,
     private val contractQueryService: ContractQueryService
 ) {
 
@@ -73,7 +74,7 @@ class AdminController(
             content = [Content(
                 examples = [ExampleObject(
                     name = "Resolve Contract Example",
-                    value = """{"buyerPercentage": 60.0, "sellerPercentage": 40.0, "resolutionNote": "Admin resolution: buyer provided evidence of delivery issues"}"""
+                    value = """{"buyerPercentage": 60.0, "sellerPercentage": 40.0, "resolutionNote": "Admin resolution: buyer provided evidence of delivery issues", "buyerEmail": "buyer@example.com", "sellerEmail": "seller@example.com", "amount": "1000000", "currency": "USDC", "contractDescription": "Web development services", "payoutDateTime": "1722598500", "buyerActualAmount": "600000", "sellerActualAmount": "400000"}"""
                 )]
             )]
         )
@@ -96,7 +97,7 @@ class AdminController(
                 )
             }
 
-            // Validate percentages
+            // Validate percentages early to provide consistent error messages
             val buyerPct = request.buyerPercentage
             val sellerPct = request.sellerPercentage
             
@@ -137,28 +138,38 @@ class AdminController(
                 )
             }
             
-            logger.info("Resolving dispute for contract: $contractAddress with buyer=${buyerPct}%, seller=${sellerPct}%")
-            if (request.resolutionNote != null) {
-                logger.info("Resolution note: ${request.resolutionNote}")
-            }
-            
-            val result = runBlocking {
-                escrowTransactionService.resolveDisputeWithPercentages(contractAddress, buyerPct, sellerPct)
-            }
-
-            val response = AdminResolveContractResponse(
-                success = result.success,
-                transactionHash = result.transactionHash,
-                error = result.error
+            // Convert AdminResolveContractRequest to ResolveDisputeRequest to reuse existing logic
+            val resolveDisputeRequest = ResolveDisputeRequest(
+                contractAddress = contractAddress,
+                recipientAddress = null, // Use percentage-based resolution
+                buyerPercentage = request.buyerPercentage,
+                sellerPercentage = request.sellerPercentage,
+                resolutionNote = request.resolutionNote,
+                buyerEmail = request.buyerEmail,
+                sellerEmail = request.sellerEmail,
+                contractDescription = request.contractDescription,
+                amount = request.amount,
+                currency = request.currency,
+                payoutDateTime = request.payoutDateTime,
+                sellerActualAmount = request.sellerActualAmount,
+                buyerActualAmount = request.buyerActualAmount
             )
-
-            if (result.success) {
-                logger.info("Contract dispute resolved successfully: ${result.transactionHash}")
-                ResponseEntity.ok(response)
-            } else {
-                logger.error("Contract dispute resolution failed: ${result.error}")
-                ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response)
-            }
+            
+            logger.info("Delegating to escrow controller for dispute resolution")
+            
+            // Delegate to the existing escrow controller resolve dispute logic
+            val chainResponse = escrowController.resolveDispute(resolveDisputeRequest, httpServletRequest)
+            
+            // Convert the response back to AdminResolveContractResponse
+            val chainResponseBody = chainResponse.body
+            val adminResponse = AdminResolveContractResponse(
+                success = chainResponseBody?.success ?: false,
+                transactionHash = chainResponseBody?.transactionHash,
+                error = chainResponseBody?.error
+            )
+            
+            // Preserve the HTTP status from the chain response
+            ResponseEntity.status(chainResponse.statusCode).body(adminResponse)
 
         } catch (e: Exception) {
             logger.error("Error in admin resolve contract endpoint", e)
