@@ -41,12 +41,12 @@ class ConditionalEmailFieldsValidator : ConstraintValidator<ConditionalEmailFiel
         val buyerEmail = clazz.getDeclaredField("buyerEmail").apply { isAccessible = true }.get(request) as? String
         val sellerEmail = clazz.getDeclaredField("sellerEmail").apply { isAccessible = true }.get(request) as? String
         
-        // If no email addresses provided, validation passes
+        // If no email addresses provided, validation passes (no email notifications will be sent)
         if (buyerEmail.isNullOrBlank() || sellerEmail.isNullOrBlank()) {
             return true
         }
         
-        // If email addresses are provided, check required fields
+        // If BOTH email addresses are provided, ALL required fields become mandatory
         val amount = clazz.getDeclaredField("amount").apply { isAccessible = true }.get(request) as? String
         val payoutDateTime = clazz.getDeclaredField("payoutDateTime").apply { isAccessible = true }.get(request) as? String
         val contractDescription = clazz.getDeclaredField("contractDescription").apply { isAccessible = true }.get(request) as? String
@@ -54,20 +54,34 @@ class ConditionalEmailFieldsValidator : ConstraintValidator<ConditionalEmailFiel
         
         val violations = mutableListOf<String>()
         
-        if (amount.isNullOrBlank()) violations.add("amount")
-        if (payoutDateTime.isNullOrBlank()) violations.add("payoutDateTime")
-        if (contractDescription.isNullOrBlank()) violations.add("contractDescription")
-        if (productName.isNullOrBlank()) violations.add("productName")
+        // Check for null, blank, or "N/A" values
+        if (isInvalidField(amount)) violations.add("amount (cannot be null, empty, or 'N/A')")
+        if (isInvalidField(payoutDateTime)) violations.add("payoutDateTime (cannot be null, empty, or 'N/A')")
+        if (isInvalidField(contractDescription)) violations.add("contractDescription (cannot be null, empty, or 'N/A')")
+        if (isInvalidField(productName)) violations.add("productName (cannot be null, empty, or 'N/A')")
         
         if (violations.isNotEmpty()) {
             context.disableDefaultConstraintViolation()
             context.buildConstraintViolationWithTemplate(
-                "When email addresses are provided, the following fields are required for email notifications: ${violations.joinToString(", ")}"
+                "When both buyer and seller email addresses are provided, all email notification fields are required. Invalid fields: ${violations.joinToString(", ")}"
             ).addConstraintViolation()
             return false
         }
         
         return true
+    }
+    
+    /**
+     * Checks if a field value is invalid for email notifications.
+     * Invalid means: null, blank, whitespace-only, or common problematic values
+     */
+    private fun isInvalidField(value: String?): Boolean {
+        if (value.isNullOrBlank()) return true
+        
+        val trimmedValue = value.trim()
+        val problematicValues = setOf("N/A", "null", "undefined", "")
+        
+        return problematicValues.any { it.equals(trimmedValue, ignoreCase = true) }
     }
     
     private fun validateResolveDisputeRequest(request: Any, context: ConstraintValidatorContext): Boolean {
@@ -114,7 +128,20 @@ class ConditionalEmailFieldsValidator : ConstraintValidator<ConditionalEmailFiel
 object EmailFieldValidator {
     
     /**
-     * Checks if all required fields for dispute raised email are present.
+     * Checks if a field value is valid for email notifications.
+     * Valid means: not null, not blank, and not any common problematic values
+     */
+    private fun isValidEmailField(value: String?): Boolean {
+        if (value.isNullOrBlank()) return false
+        
+        val trimmedValue = value.trim()
+        val problematicValues = setOf("N/A", "null", "undefined", "")
+        
+        return !problematicValues.any { it.equals(trimmedValue, ignoreCase = true) }
+    }
+    
+    /**
+     * Checks if all required fields for dispute raised email are present and valid.
      */
     fun canSendDisputeRaisedEmail(
         buyerEmail: String?,
@@ -124,16 +151,16 @@ object EmailFieldValidator {
         contractDescription: String?,
         productName: String?
     ): Boolean {
-        return !buyerEmail.isNullOrBlank() &&
-               !sellerEmail.isNullOrBlank() &&
-               !amount.isNullOrBlank() &&
-               !payoutDateTime.isNullOrBlank() &&
-               !contractDescription.isNullOrBlank() &&
-               !productName.isNullOrBlank()
+        return isValidEmailField(buyerEmail) &&
+               isValidEmailField(sellerEmail) &&
+               isValidEmailField(amount) &&
+               isValidEmailField(payoutDateTime) &&
+               isValidEmailField(contractDescription) &&
+               isValidEmailField(productName)
     }
     
     /**
-     * Checks if all required fields for dispute resolved email are present.
+     * Checks if all required fields for dispute resolved email are present and valid.
      */
     fun canSendDisputeResolvedEmail(
         buyerEmail: String?,
@@ -144,17 +171,17 @@ object EmailFieldValidator {
         sellerActualAmount: String?,
         buyerActualAmount: String?
     ): Boolean {
-        return !buyerEmail.isNullOrBlank() &&
-               !sellerEmail.isNullOrBlank() &&
-               !amount.isNullOrBlank() &&
-               !payoutDateTime.isNullOrBlank() &&
-               !contractDescription.isNullOrBlank() &&
-               !sellerActualAmount.isNullOrBlank() &&
-               !buyerActualAmount.isNullOrBlank()
+        return isValidEmailField(buyerEmail) &&
+               isValidEmailField(sellerEmail) &&
+               isValidEmailField(amount) &&
+               isValidEmailField(payoutDateTime) &&
+               isValidEmailField(contractDescription) &&
+               isValidEmailField(sellerActualAmount) &&
+               isValidEmailField(buyerActualAmount)
     }
     
     /**
-     * Checks if all required fields for payment notification email are present.
+     * Checks if all required fields for payment notification email are present and valid.
      */
     fun canSendPaymentNotificationEmail(
         buyerEmail: String?,
@@ -163,10 +190,10 @@ object EmailFieldValidator {
         amount: String?,
         payoutDateTime: String?
     ): Boolean {
-        return !buyerEmail.isNullOrBlank() &&
-               !sellerEmail.isNullOrBlank() &&
-               !contractDescription.isNullOrBlank() &&
-               !amount.isNullOrBlank() &&
-               !payoutDateTime.isNullOrBlank()
+        return isValidEmailField(buyerEmail) &&
+               isValidEmailField(sellerEmail) &&
+               isValidEmailField(contractDescription) &&
+               isValidEmailField(amount) &&
+               isValidEmailField(payoutDateTime)
     }
 }

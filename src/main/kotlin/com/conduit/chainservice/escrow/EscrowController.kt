@@ -167,6 +167,8 @@ class EscrowController(
                 logger.info("Dispute raised successfully: ${result.transactionHash}")
                 
                 // Send dispute raised email notifications if all required fields are provided
+                logger.info("Checking if email notification can be sent. Field values: buyerEmail=${request.buyerEmail}, sellerEmail=${request.sellerEmail}, amount=${request.amount}, payoutDateTime=${request.payoutDateTime}, contractDescription=${request.contractDescription}, productName=${request.productName}, currency=${request.currency}")
+                
                 if (EmailFieldValidator.canSendDisputeRaisedEmail(
                     request.buyerEmail,
                     request.sellerEmail,
@@ -176,31 +178,42 @@ class EscrowController(
                     request.productName
                 )) {
                     try {
+                        // Validate that all fields are truly non-null before sending
+                        val validatedAmount = request.amount ?: throw IllegalStateException("Amount is null despite validation")
+                        val validatedPayoutDateTime = request.payoutDateTime ?: throw IllegalStateException("PayoutDateTime is null despite validation")
+                        val validatedContractDescription = request.contractDescription ?: throw IllegalStateException("ContractDescription is null despite validation")
+                        val validatedProductName = request.productName ?: throw IllegalStateException("ProductName is null despite validation")
+                        val validatedBuyerEmail = request.buyerEmail ?: throw IllegalStateException("BuyerEmail is null despite validation")
+                        val validatedSellerEmail = request.sellerEmail ?: throw IllegalStateException("SellerEmail is null despite validation")
+                        val validatedCurrency = request.currency ?: "USDC"
+                        
+                        logger.info("Sending dispute raised emails with validated values: amount=$validatedAmount, payoutDateTime=$validatedPayoutDateTime, description=$validatedContractDescription, product=$validatedProductName")
+                        
                         // Send notification to both parties about the dispute
                         runBlocking {
                             // Notify buyer
                             emailServiceClient.sendDisputeRaised(
-                                recipientEmail = request.buyerEmail!!,
-                                buyerEmail = request.buyerEmail!!,
-                                sellerEmail = request.sellerEmail!!,
-                                amount = request.amount!!,
-                                currency = request.currency ?: "USDC",
-                                contractDescription = request.contractDescription!!,
-                                payoutDateTime = request.payoutDateTime!!,
-                                productName = request.productName!!,
+                                recipientEmail = validatedBuyerEmail,
+                                buyerEmail = validatedBuyerEmail,
+                                sellerEmail = validatedSellerEmail,
+                                amount = validatedAmount,
+                                currency = validatedCurrency,
+                                contractDescription = validatedContractDescription,
+                                payoutDateTime = validatedPayoutDateTime,
+                                productName = validatedProductName,
                                 httpRequest = httpRequest
                             ).block()
                             
                             // Notify seller
                             emailServiceClient.sendDisputeRaised(
-                                recipientEmail = request.sellerEmail!!,
-                                buyerEmail = request.buyerEmail!!,
-                                sellerEmail = request.sellerEmail!!,
-                                amount = request.amount!!,
-                                currency = request.currency ?: "USDC",
-                                contractDescription = request.contractDescription!!,
-                                payoutDateTime = request.payoutDateTime!!,
-                                productName = request.productName!!,
+                                recipientEmail = validatedSellerEmail,
+                                buyerEmail = validatedBuyerEmail,
+                                sellerEmail = validatedSellerEmail,
+                                amount = validatedAmount,
+                                currency = validatedCurrency,
+                                contractDescription = validatedContractDescription,
+                                payoutDateTime = validatedPayoutDateTime,
+                                productName = validatedProductName,
                                 httpRequest = httpRequest
                             ).block()
                         }
@@ -210,7 +223,7 @@ class EscrowController(
                         logger.error("Failed to send dispute raised notification emails", e)
                     }
                 } else {
-                    logger.info("Email notification skipped for dispute raised - missing required fields. Required: buyerEmail, sellerEmail, amount, payoutDateTime, contractDescription, productName")
+                    logger.warn("Email notification skipped for dispute raised - invalid or missing required fields. Field validation details: buyerEmail=${request.buyerEmail?.let { "present(${it.length} chars)" } ?: "null"}, sellerEmail=${request.sellerEmail?.let { "present(${it.length} chars)" } ?: "null"}, amount=${request.amount?.let { "present($it)" } ?: "null"}, payoutDateTime=${request.payoutDateTime?.let { "present($it)" } ?: "null"}, contractDescription=${request.contractDescription?.let { "present(${it.length} chars)" } ?: "null"}, productName=${request.productName?.let { "present($it)" } ?: "null"}")
                 }
                 
                 ResponseEntity.ok(response)

@@ -15,6 +15,7 @@ import org.web3j.protocol.Web3j
 import org.web3j.protocol.core.DefaultBlockParameterName
 import org.web3j.protocol.core.methods.request.EthFilter
 import org.web3j.protocol.core.methods.response.EthCall
+import org.web3j.protocol.exceptions.ClientConnectionException
 import org.web3j.utils.Convert
 import java.math.BigInteger
 import java.time.Instant
@@ -27,6 +28,58 @@ class ContractQueryService(
 ) {
 
     private val logger = LoggerFactory.getLogger(ContractQueryService::class.java)
+
+    /**
+     * Checks if an exception is a 429 rate limiting error and logs it appropriately
+     */
+    private fun handleRateLimitingError(e: Exception, contractAddress: String? = null, operation: String = "blockchain call"): Boolean {
+        return when {
+            e is ClientConnectionException && e.message?.contains("429") == true -> {
+                val errorCode = extractErrorCode(e.message)
+                logger.error(
+                    "RPC RATE LIMITING DETECTED - Operation: $operation" +
+                    (contractAddress?.let { ", Contract: $it" } ?: "") +
+                    ", RPC Endpoint: ${getRpcEndpoint()}" +
+                    (errorCode?.let { ", Error Code: $it" } ?: "") +
+                    ", Error: ${e.message}"
+                )
+                true
+            }
+            e.message?.contains("429") == true -> {
+                val errorCode = extractErrorCode(e.message)
+                logger.error(
+                    "RPC RATE LIMITING DETECTED (via message) - Operation: $operation" +
+                    (contractAddress?.let { ", Contract: $it" } ?: "") +
+                    ", RPC Endpoint: ${getRpcEndpoint()}" +
+                    (errorCode?.let { ", Error Code: $it" } ?: "") +
+                    ", Error: ${e.message}"
+                )
+                true
+            }
+            else -> false
+        }
+    }
+
+    /**
+     * Extracts error code from exception message (e.g., "1015" from "error code: 1015")
+     */
+    private fun extractErrorCode(message: String?): String? {
+        if (message == null) return null
+        val regex = Regex("error code:\\s*(\\d+)")
+        return regex.find(message)?.groupValues?.get(1)
+    }
+
+    /**
+     * Gets the RPC endpoint URL for logging purposes
+     */
+    private fun getRpcEndpoint(): String {
+        return try {
+            // Try to get the RPC URL from environment or properties
+            System.getenv("RPC_URL") ?: "Unknown RPC Endpoint"
+        } catch (e: Exception) {
+            "Unknown RPC Endpoint"
+        }
+    }
 
     suspend fun getContractsForWallet(walletAddress: String, userType: String? = null): List<ContractInfo> {
         return try {
@@ -45,7 +98,13 @@ class ContractQueryService(
             }
 
         } catch (e: Exception) {
-            logger.error("Error querying contracts for wallet: $walletAddress", e)
+            // Check if this is a 429 rate limiting error and log accordingly
+            val isRateLimited = handleRateLimitingError(e, operation = "getContractsForWallet query for $walletAddress")
+            
+            if (!isRateLimited) {
+                // Log other types of errors normally
+                logger.error("Error querying contracts for wallet: $walletAddress", e)
+            }
             emptyList()
         }
     }
@@ -87,7 +146,13 @@ class ContractQueryService(
             )
 
         } catch (e: Exception) {
-            logger.error("Error getting contract info for: $contractAddress", e)
+            // Check if this is a 429 rate limiting error and log accordingly
+            val isRateLimited = handleRateLimitingError(e, contractAddress, "getContractInfo for $contractAddress")
+            
+            if (!isRateLimited) {
+                // Log other types of errors normally
+                logger.error("Error getting contract info for: $contractAddress", e)
+            }
             null
         }
     }
@@ -113,7 +178,13 @@ class ContractQueryService(
             }
 
         } catch (e: Exception) {
-            logger.error("Error getting contract status for: $contractAddress", e)
+            // Check if this is a 429 rate limiting error and log accordingly
+            val isRateLimited = handleRateLimitingError(e, contractAddress, "getContractStatus for $contractAddress")
+            
+            if (!isRateLimited) {
+                // Log other types of errors normally
+                logger.error("Error getting contract status for: $contractAddress", e)
+            }
             ContractStatus.EXPIRED
         }
     }
@@ -162,7 +233,13 @@ class ContractQueryService(
             }
 
         } catch (e: Exception) {
-            logger.error("Error getting contract info for: $contractAddress", e)
+            // Check if this is a 429 rate limiting error and log accordingly
+            val isRateLimited = handleRateLimitingError(e, contractAddress, "getContractInfo (private) for $contractAddress")
+            
+            if (!isRateLimited) {
+                // Log other types of errors normally
+                logger.error("Error getting contract info for: $contractAddress", e)
+            }
             null
         }
     }
@@ -185,7 +262,13 @@ class ContractQueryService(
             )
 
         } catch (e: Exception) {
-            logger.error("Error querying contract state for: $contractAddress", e)
+            // Check if this is a 429 rate limiting error and log accordingly
+            val isRateLimited = handleRateLimitingError(e, contractAddress, "queryContractState for $contractAddress")
+            
+            if (!isRateLimited) {
+                // Log other types of errors normally
+                logger.error("Error querying contract state for: $contractAddress", e)
+            }
             throw e
         }
     }
@@ -224,14 +307,22 @@ class ContractQueryService(
             parseNewContractResult(result)
 
         } catch (e: Exception) {
-            logger.error("Error calling getContractInfo on $contractAddress", e)
-            // Return default values
+            // Check if this is a 429 rate limiting error and log accordingly
+            val isRateLimited = handleRateLimitingError(e, contractAddress, "getContractInfo call")
+            
+            if (!isRateLimited) {
+                // Log other types of errors normally
+                logger.error("Error calling getContractInfo on $contractAddress", e)
+            }
+            
+            // Return default values for any error
             mapOf(
                 "buyer" to "0x0000000000000000000000000000000000000000",
                 "seller" to "0x0000000000000000000000000000000000000000", 
                 "amount" to BigInteger.ZERO,
                 "expiryTimestamp" to 0L,
                 "description" to "",
+                "funded" to false,
                 "disputed" to false,
                 "resolved" to false,
                 "claimed" to false
