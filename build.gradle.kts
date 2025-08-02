@@ -47,6 +47,10 @@ dependencies {
     // HTTP Client for user service communication
     implementation("org.springframework.boot:spring-boot-starter-webflux")
     
+    // Caffeine caching
+    implementation("com.github.ben-manes.caffeine:caffeine:3.1.8")
+    implementation("org.springframework.boot:spring-boot-starter-cache")
+    
     // Testing
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.mockito.kotlin:mockito-kotlin:5.1.0")

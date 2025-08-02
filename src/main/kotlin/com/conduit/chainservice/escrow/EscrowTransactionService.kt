@@ -3,6 +3,7 @@ package com.conduit.chainservice.escrow
 import com.conduit.chainservice.config.EscrowProperties
 import com.utility.chainservice.BlockchainProperties
 import com.conduit.chainservice.escrow.models.ContractCreationResult
+import com.conduit.chainservice.service.CacheInvalidationService
 import com.utility.chainservice.BlockchainRelayService
 import com.utility.chainservice.models.TransactionResult
 import org.slf4j.LoggerFactory
@@ -17,6 +18,9 @@ import org.web3j.crypto.RawTransaction
 import org.web3j.protocol.Web3j
 import org.web3j.protocol.core.DefaultBlockParameterName
 import org.web3j.protocol.core.methods.response.TransactionReceipt
+import org.web3j.rlp.RlpDecoder
+import org.web3j.rlp.RlpList
+import org.web3j.rlp.RlpString
 import org.web3j.tx.gas.ContractGasProvider
 import org.web3j.utils.Numeric
 import java.math.BigInteger
@@ -24,6 +28,7 @@ import java.math.BigInteger
 @Service
 class EscrowTransactionService(
     private val blockchainRelayService: BlockchainRelayService,
+    private val cacheInvalidationService: CacheInvalidationService,
     private val web3j: Web3j,
     private val relayerCredentials: Credentials,
     private val gasProvider: ContractGasProvider,
@@ -127,6 +132,10 @@ class EscrowTransactionService(
                 
                 if (contractAddress != null) {
                     logger.info("Escrow contract created successfully at address: $contractAddress")
+                    
+                    // Invalidate cache for the newly created contract
+                    cacheInvalidationService.invalidateContractCache(contractAddress, "createContract", txHash)
+                    
                     ContractCreationResult(
                         success = true,
                         transactionHash = txHash,
@@ -217,6 +226,10 @@ class EscrowTransactionService(
             val receipt = blockchainRelayService.waitForTransactionReceipt(txHash)
             if (receipt?.isStatusOK == true) {
                 logger.info("Dispute resolved successfully")
+                
+                // Invalidate cache for the contract whose dispute was resolved
+                cacheInvalidationService.invalidateContractCache(contractAddress, "resolveDispute", txHash)
+                
                 TransactionResult(
                     success = true,
                     transactionHash = txHash
@@ -317,6 +330,10 @@ class EscrowTransactionService(
             val receipt = blockchainRelayService.waitForTransactionReceipt(txHash)
             if (receipt?.isStatusOK == true) {
                 logger.info("Dispute resolved successfully with percentages")
+                
+                // Invalidate cache for the contract whose dispute was resolved
+                cacheInvalidationService.invalidateContractCache(contractAddress, "resolveDisputeWithPercentages", txHash)
+                
                 TransactionResult(
                     success = true,
                     transactionHash = txHash
@@ -339,21 +356,101 @@ class EscrowTransactionService(
         }
     }
 
-    // Delegate gas transfer operations to generic service
+    // Delegate gas transfer operations to generic service with cache invalidation
     suspend fun raiseDisputeWithGasTransfer(userWalletAddress: String, signedTransactionHex: String): TransactionResult {
-        return blockchainRelayService.processTransactionWithGasTransfer(userWalletAddress, signedTransactionHex, "raiseDispute")
+        val result = blockchainRelayService.processTransactionWithGasTransfer(userWalletAddress, signedTransactionHex, "raiseDispute")
+        
+        // Invalidate cache on successful transaction - extract contract address from signed transaction
+        if (result.success && result.transactionHash != null) {
+            val contractAddress = extractContractAddressFromSignedTransaction(signedTransactionHex)
+            if (contractAddress != null) {
+                cacheInvalidationService.invalidateContractCache(contractAddress, "raiseDispute", result.transactionHash)
+            } else {
+                logger.warn("Could not extract contract address from raiseDispute transaction for cache invalidation")
+            }
+        }
+        
+        return result
     }
 
     suspend fun claimFundsWithGasTransfer(userWalletAddress: String, signedTransactionHex: String): TransactionResult {
-        return blockchainRelayService.processTransactionWithGasTransfer(userWalletAddress, signedTransactionHex, "claimFunds")
+        val result = blockchainRelayService.processTransactionWithGasTransfer(userWalletAddress, signedTransactionHex, "claimFunds")
+        
+        // Invalidate cache on successful transaction - extract contract address from signed transaction
+        if (result.success && result.transactionHash != null) {
+            val contractAddress = extractContractAddressFromSignedTransaction(signedTransactionHex)
+            if (contractAddress != null) {
+                cacheInvalidationService.invalidateContractCache(contractAddress, "claimFunds", result.transactionHash)
+            } else {
+                logger.warn("Could not extract contract address from claimFunds transaction for cache invalidation")
+            }
+        }
+        
+        return result
     }
 
     suspend fun depositFundsWithGasTransfer(userWalletAddress: String, signedTransactionHex: String): TransactionResult {
-        return blockchainRelayService.processTransactionWithGasTransfer(userWalletAddress, signedTransactionHex, "depositFunds")
+        val result = blockchainRelayService.processTransactionWithGasTransfer(userWalletAddress, signedTransactionHex, "depositFunds")
+        
+        // Invalidate cache on successful transaction - extract contract address from signed transaction
+        if (result.success && result.transactionHash != null) {
+            val contractAddress = extractContractAddressFromSignedTransaction(signedTransactionHex)
+            if (contractAddress != null) {
+                cacheInvalidationService.invalidateContractCache(contractAddress, "depositFunds", result.transactionHash)
+            } else {
+                logger.warn("Could not extract contract address from depositFunds transaction for cache invalidation")
+            }
+        }
+        
+        return result
     }
 
     suspend fun approveUSDCWithGasTransfer(userWalletAddress: String, signedTransactionHex: String): TransactionResult {
-        return blockchainRelayService.processTransactionWithGasTransfer(userWalletAddress, signedTransactionHex, "approveUSDC")
+        val result = blockchainRelayService.processTransactionWithGasTransfer(userWalletAddress, signedTransactionHex, "approveUSDC")
+        
+        // For approveUSDC, we're approving the USDC contract to spend tokens on behalf of the escrow contract
+        // This doesn't directly change contract state, but we might want to invalidate cache for related contracts
+        // For now, we'll skip cache invalidation for approve operations as they don't change escrow contract state
+        
+        return result
+    }
+
+    /**
+     * Extracts the contract address (to field) from a signed transaction hex string.
+     * This is used to determine which contract's cache should be invalidated.
+     */
+    private fun extractContractAddressFromSignedTransaction(signedTransactionHex: String): String? {
+        return try {
+            // Remove 0x prefix if present
+            val cleanHex = if (signedTransactionHex.startsWith("0x")) {
+                signedTransactionHex.substring(2)
+            } else {
+                signedTransactionHex
+            }
+            
+            // Decode the signed transaction to extract the "to" field (contract address)
+            val transactionBytes = Numeric.hexStringToByteArray(cleanHex)
+            val transaction = RlpDecoder.decode(transactionBytes)
+            val values = transaction.values as RlpList
+            
+            // In a standard Ethereum transaction, the "to" field is at index 3
+            // Structure: [nonce, gasPrice, gasLimit, to, value, data, v, r, s]
+            if (values.values.size > 3) {
+                val toField = values.values[3] as RlpString
+                val addressBytes = toField.bytes
+                if (addressBytes.isNotEmpty()) {
+                    val address = Numeric.toHexString(addressBytes)
+                    logger.debug("Extracted contract address from signed transaction: $address")
+                    return address
+                }
+            }
+            
+            logger.debug("Could not extract contract address from signed transaction - unexpected structure")
+            null
+        } catch (e: Exception) {
+            logger.debug("Failed to extract contract address from signed transaction", e)
+            null
+        }
     }
 
     private fun parseContractAddressFromReceipt(receipt: TransactionReceipt): String? {

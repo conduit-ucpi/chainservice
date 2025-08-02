@@ -24,7 +24,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.awaitAll
 
-@Service
+@Service("originalContractQueryService")
 class ContractQueryService(
     private val web3j: Web3j,
     private val escrowProperties: EscrowProperties,

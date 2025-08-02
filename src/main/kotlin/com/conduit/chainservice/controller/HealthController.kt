@@ -1,6 +1,7 @@
 package com.conduit.chainservice.controller
 
 import com.conduit.chainservice.config.EscrowProperties
+import com.conduit.chainservice.service.CacheMetricsService
 import com.utility.chainservice.BlockchainProperties
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.media.Content
@@ -28,7 +29,8 @@ class HealthController(
     private val web3j: Web3j,
     private val relayerCredentials: Credentials,
     private val blockchainProperties: BlockchainProperties,
-    private val escrowProperties: EscrowProperties
+    private val escrowProperties: EscrowProperties,
+    private val cacheMetricsService: CacheMetricsService
 ) {
 
     private val logger = LoggerFactory.getLogger(HealthController::class.java)
@@ -117,6 +119,60 @@ class HealthController(
             logger.error("Info endpoint failed", e)
             ResponseEntity.status(500).body(
                 mapOf("error" to (e.message ?: "Unknown error"))
+            )
+        }
+    }
+
+    @GetMapping("/cache")
+    @Operation(
+        summary = "Cache Metrics",
+        description = "Returns detailed cache performance metrics including hit rates and RPC call reduction statistics."
+    )
+    @ApiResponse(
+        responseCode = "200",
+        description = "Cache metrics retrieved successfully",
+        content = [Content(schema = Schema(implementation = Map::class))]
+    )
+    fun cacheMetrics(): ResponseEntity<Map<String, Any>> {
+        return try {
+            val metrics = cacheMetricsService.getMetrics()
+            
+            val response = mapOf(
+                "cache" to mapOf(
+                    "status" to "ACTIVE",
+                    "totalRequests" to metrics.totalRequests,
+                    "cacheHits" to metrics.cacheHits,
+                    "cacheMisses" to metrics.cacheMisses,
+                    "hitRate" to "${"%.2f".format(metrics.hitRate)}%",
+                    "rpcCalls" to mapOf(
+                        "made" to metrics.rpcCallsMade,
+                        "saved" to metrics.rpcCallsSaved,
+                        "reductionRate" to "${"%.2f".format(metrics.rpcReductionRate)}%"
+                    ),
+                    "batchQueries" to metrics.batchQueries,
+                    "totalContractsRequested" to metrics.totalContractsRequested,
+                    "uptime" to metrics.uptime.toString(),
+                    "operationMetrics" to metrics.operationMetrics.mapValues { (_, opMetrics) ->
+                        mapOf(
+                            "requests" to opMetrics.requests,
+                            "hits" to opMetrics.hits,
+                            "misses" to opMetrics.misses,
+                            "hitRate" to "${"%.2f".format(opMetrics.hitRate)}%"
+                        )
+                    }
+                ),
+                "timestamp" to Instant.now().toString()
+            )
+            
+            ResponseEntity.ok(response)
+
+        } catch (e: Exception) {
+            logger.error("Cache metrics endpoint failed", e)
+            ResponseEntity.status(500).body(
+                mapOf(
+                    "error" to (e.message ?: "Unknown error"),
+                    "timestamp" to Instant.now().toString()
+                )
             )
         }
     }
