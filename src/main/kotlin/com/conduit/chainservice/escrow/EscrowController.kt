@@ -1,6 +1,7 @@
 package com.conduit.chainservice.escrow
 
 import com.conduit.chainservice.escrow.models.*
+import com.conduit.chainservice.escrow.validation.EmailFieldValidator
 import com.conduit.chainservice.service.ContractQueryService
 import com.conduit.chainservice.service.ContractServiceClient
 import com.conduit.chainservice.service.EmailServiceClient
@@ -165,8 +166,15 @@ class EscrowController(
             if (result.success) {
                 logger.info("Dispute raised successfully: ${result.transactionHash}")
                 
-                // Send dispute raised email notifications if email addresses are provided
-                if (!request.buyerEmail.isNullOrBlank() && !request.sellerEmail.isNullOrBlank()) {
+                // Send dispute raised email notifications if all required fields are provided
+                if (EmailFieldValidator.canSendDisputeRaisedEmail(
+                    request.buyerEmail,
+                    request.sellerEmail,
+                    request.amount,
+                    request.payoutDateTime,
+                    request.contractDescription,
+                    request.productName
+                )) {
                     try {
                         // Send notification to both parties about the dispute
                         runBlocking {
@@ -175,11 +183,11 @@ class EscrowController(
                                 recipientEmail = request.buyerEmail!!,
                                 buyerEmail = request.buyerEmail!!,
                                 sellerEmail = request.sellerEmail!!,
-                                amount = request.amount ?: "N/A",
+                                amount = request.amount!!,
                                 currency = request.currency ?: "USDC",
-                                contractDescription = request.contractDescription ?: "Escrow contract",
-                                payoutDateTime = request.payoutDateTime ?: "N/A",
-                                productName = request.productName ?: "Product/Service",
+                                contractDescription = request.contractDescription!!,
+                                payoutDateTime = request.payoutDateTime!!,
+                                productName = request.productName!!,
                                 httpRequest = httpRequest
                             ).block()
                             
@@ -188,11 +196,11 @@ class EscrowController(
                                 recipientEmail = request.sellerEmail!!,
                                 buyerEmail = request.buyerEmail!!,
                                 sellerEmail = request.sellerEmail!!,
-                                amount = request.amount ?: "N/A",
+                                amount = request.amount!!,
                                 currency = request.currency ?: "USDC",
-                                contractDescription = request.contractDescription ?: "Escrow contract",
-                                payoutDateTime = request.payoutDateTime ?: "N/A",
-                                productName = request.productName ?: "Product/Service",
+                                contractDescription = request.contractDescription!!,
+                                payoutDateTime = request.payoutDateTime!!,
+                                productName = request.productName!!,
                                 httpRequest = httpRequest
                             ).block()
                         }
@@ -202,7 +210,7 @@ class EscrowController(
                         logger.error("Failed to send dispute raised notification emails", e)
                     }
                 } else {
-                    logger.info("Buyer or seller email not provided, skipping dispute raised notification")
+                    logger.info("Email notification skipped for dispute raised - missing required fields. Required: buyerEmail, sellerEmail, amount, payoutDateTime, contractDescription, productName")
                 }
                 
                 ResponseEntity.ok(response)
@@ -408,14 +416,20 @@ class EscrowController(
                     logger.info("No contractId provided in deposit request, skipping contract service update")
                 }
                 
-                // Send payment notification email if seller email is provided
-                if (!request.sellerEmail.isNullOrBlank() && !request.buyerEmail.isNullOrBlank()) {
+                // Send payment notification email if all required fields are provided
+                if (EmailFieldValidator.canSendPaymentNotificationEmail(
+                    request.buyerEmail,
+                    request.sellerEmail,
+                    request.contractDescription,
+                    request.amount,
+                    request.payoutDateTime
+                )) {
                     try {
                         runBlocking {
                             emailServiceClient.sendPaymentNotification(
                                 sellerEmail = request.sellerEmail!!,
                                 buyerEmail = request.buyerEmail!!,
-                                contractDescription = request.contractDescription ?: "Escrow contract",
+                                contractDescription = request.contractDescription!!,
                                 amount = request.amount,
                                 payoutDateTime = request.payoutDateTime,
                                 contractLink = "$serviceLink/contract/${request.contractAddress}",
@@ -428,7 +442,7 @@ class EscrowController(
                         logger.error("Failed to send payment notification email to seller: ${request.sellerEmail}", e)
                     }
                 } else {
-                    logger.info("Seller or buyer email not provided, skipping payment notification")
+                    logger.info("Email notification skipped for payment - missing required fields. Required: buyerEmail, sellerEmail, contractDescription, amount, payoutDateTime")
                 }
                 
                 ResponseEntity.ok(response)
@@ -538,44 +552,51 @@ class EscrowController(
             if (result.success) {
                 logger.info("Dispute resolved successfully: ${result.transactionHash}")
                 
-                // Send dispute resolved email notifications if email addresses are provided
-                if (!request.buyerEmail.isNullOrBlank() && !request.sellerEmail.isNullOrBlank()) {
+                // Send dispute resolved email notifications if all required fields are provided
+                if (EmailFieldValidator.canSendDisputeResolvedEmail(
+                    request.buyerEmail,
+                    request.sellerEmail,
+                    request.amount,
+                    request.payoutDateTime,
+                    request.contractDescription,
+                    request.sellerActualAmount,
+                    request.buyerActualAmount
+                )) {
                     try {
-                        // Calculate actual amounts based on percentages (if provided)
-                        val totalAmount = request.amount ?: "N/A"
-                        val sellerPercentage = request.sellerPercentage?.toString() ?: (if (request.buyerPercentage != null) (100.0 - request.buyerPercentage!!).toString() else "N/A")
-                        val buyerPercentage = request.buyerPercentage?.toString() ?: (if (request.sellerPercentage != null) (100.0 - request.sellerPercentage!!).toString() else "N/A")
+                        // Calculate percentages if not provided
+                        val sellerPercentage = request.sellerPercentage?.toString() ?: (if (request.buyerPercentage != null) (100.0 - request.buyerPercentage!!).toString() else "0")
+                        val buyerPercentage = request.buyerPercentage?.toString() ?: (if (request.sellerPercentage != null) (100.0 - request.sellerPercentage!!).toString() else "0")
                         
                         runBlocking {
                             // Notify buyer
                             emailServiceClient.sendDisputeResolved(
                                 recipientEmail = request.buyerEmail!!,
-                                amount = totalAmount,
+                                amount = request.amount!!,
                                 currency = request.currency ?: "USDC",
                                 buyerEmail = request.buyerEmail!!,
                                 sellerEmail = request.sellerEmail!!,
-                                contractDescription = request.contractDescription ?: "Escrow contract",
-                                payoutDateTime = request.payoutDateTime ?: "N/A",
+                                contractDescription = request.contractDescription!!,
+                                payoutDateTime = request.payoutDateTime!!,
                                 sellerPercentage = sellerPercentage,
-                                sellerActualAmount = request.sellerActualAmount ?: "N/A",
+                                sellerActualAmount = request.sellerActualAmount!!,
                                 buyerPercentage = buyerPercentage,
-                                buyerActualAmount = request.buyerActualAmount ?: "N/A",
+                                buyerActualAmount = request.buyerActualAmount!!,
                                 httpRequest = httpRequest
                             ).block()
                             
                             // Notify seller
                             emailServiceClient.sendDisputeResolved(
                                 recipientEmail = request.sellerEmail!!,
-                                amount = totalAmount,
+                                amount = request.amount!!,
                                 currency = request.currency ?: "USDC",
                                 buyerEmail = request.buyerEmail!!,
                                 sellerEmail = request.sellerEmail!!,
-                                contractDescription = request.contractDescription ?: "Escrow contract",
-                                payoutDateTime = request.payoutDateTime ?: "N/A",
+                                contractDescription = request.contractDescription!!,
+                                payoutDateTime = request.payoutDateTime!!,
                                 sellerPercentage = sellerPercentage,
-                                sellerActualAmount = request.sellerActualAmount ?: "N/A",
+                                sellerActualAmount = request.sellerActualAmount!!,
                                 buyerPercentage = buyerPercentage,
-                                buyerActualAmount = request.buyerActualAmount ?: "N/A",
+                                buyerActualAmount = request.buyerActualAmount!!,
                                 httpRequest = httpRequest
                             ).block()
                         }
@@ -585,7 +606,7 @@ class EscrowController(
                         logger.error("Failed to send dispute resolved notification emails", e)
                     }
                 } else {
-                    logger.info("Buyer or seller email not provided, skipping dispute resolved notification")
+                    logger.info("Email notification skipped for dispute resolution - missing required fields. Required: buyerEmail, sellerEmail, amount, payoutDateTime, contractDescription, sellerActualAmount, buyerActualAmount")
                 }
                 
                 ResponseEntity.ok(response)

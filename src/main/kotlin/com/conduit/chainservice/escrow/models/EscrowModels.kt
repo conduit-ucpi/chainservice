@@ -1,5 +1,6 @@
 package com.conduit.chainservice.escrow.models
 
+import com.conduit.chainservice.escrow.validation.ConditionalEmailFields
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.NotNull
 import jakarta.validation.constraints.Positive
@@ -24,6 +25,7 @@ data class CreateContractRequest(
     val description: String
 )
 
+@ConditionalEmailFields
 data class RaiseDisputeRequest(
     @field:NotBlank(message = "Contract address is required")
     val contractAddress: String,
@@ -79,6 +81,7 @@ data class DepositFundsRequest(
     val contractLink: String? = null
 )
 
+@ConditionalEmailFields
 data class ResolveDisputeRequest(
     @field:NotBlank(message = "Contract address is required")
     val contractAddress: String,
