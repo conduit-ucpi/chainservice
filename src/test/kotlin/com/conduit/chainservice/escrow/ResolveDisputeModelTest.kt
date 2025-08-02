@@ -55,7 +55,13 @@ class ResolveDisputeModelTest {
         val request = AdminResolveContractRequest(
             buyerPercentage = 75.5,
             sellerPercentage = 24.5,
-            resolutionNote = "Admin decision: buyer provided evidence"
+            resolutionNote = "Admin decision: buyer provided evidence",
+            buyerEmail = "buyer@test.com",
+            sellerEmail = "seller@test.com",
+            contractDescription = "Test contract description",
+            amount = "100.0",
+            currency = "USDC",
+            payoutDateTime = "2024-12-31T23:59:59Z"
         )
 
         assertEquals(75.5, request.buyerPercentage)

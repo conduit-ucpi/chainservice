@@ -1,6 +1,6 @@
 package com.conduit.chainservice.controller
 
-import com.conduit.chainservice.escrow.EscrowTransactionService
+import com.conduit.chainservice.escrow.EscrowController
 import com.conduit.chainservice.escrow.models.AdminResolveContractRequest
 import com.conduit.chainservice.service.ContractQueryService
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -20,7 +20,7 @@ class AdminControllerBasicTest {
     private lateinit var mockMvc: MockMvc
     
     @Mock
-    private lateinit var escrowTransactionService: EscrowTransactionService
+    private lateinit var escrowController: EscrowController
     
     @Mock
     private lateinit var contractQueryService: ContractQueryService
@@ -31,7 +31,7 @@ class AdminControllerBasicTest {
     @BeforeEach
     fun setup() {
         MockitoAnnotations.openMocks(this)
-        adminController = AdminController(escrowTransactionService, contractQueryService)
+        adminController = AdminController(escrowController, contractQueryService)
         mockMvc = MockMvcBuilders.standaloneSetup(adminController).build()
     }
 
@@ -41,7 +41,13 @@ class AdminControllerBasicTest {
         val request = AdminResolveContractRequest(
             buyerPercentage = 60.0,
             sellerPercentage = 40.0,
-            resolutionNote = "Test resolution"
+            resolutionNote = "Test resolution",
+            buyerEmail = "buyer@test.com",
+            sellerEmail = "seller@test.com",
+            contractDescription = "Test contract",
+            amount = "1000000",
+            currency = "USDC",
+            payoutDateTime = "1722598500"
         )
 
         mockMvc.perform(
@@ -61,7 +67,13 @@ class AdminControllerBasicTest {
         val request = AdminResolveContractRequest(
             buyerPercentage = -10.0,
             sellerPercentage = 110.0,
-            resolutionNote = "Invalid resolution"
+            resolutionNote = "Invalid resolution",
+            buyerEmail = "buyer@test.com",
+            sellerEmail = "seller@test.com",
+            contractDescription = "Test contract",
+            amount = "1000000",
+            currency = "USDC",
+            payoutDateTime = "1722598500"
         )
 
         mockMvc.perform(
@@ -81,7 +93,13 @@ class AdminControllerBasicTest {
         val request = AdminResolveContractRequest(
             buyerPercentage = 50.0,
             sellerPercentage = 40.0,
-            resolutionNote = "Invalid percentages"
+            resolutionNote = "Invalid percentages",
+            buyerEmail = "buyer@test.com",
+            sellerEmail = "seller@test.com",
+            contractDescription = "Test contract",
+            amount = "1000000",
+            currency = "USDC",
+            payoutDateTime = "1722598500"
         )
 
         mockMvc.perform(
@@ -101,7 +119,13 @@ class AdminControllerBasicTest {
         val request = AdminResolveContractRequest(
             buyerPercentage = 60.0,
             sellerPercentage = 40.0,
-            resolutionNote = "Test resolution"
+            resolutionNote = "Test resolution",
+            buyerEmail = "buyer@test.com",
+            sellerEmail = "seller@test.com",
+            contractDescription = "Test contract",
+            amount = "1000000",
+            currency = "USDC",
+            payoutDateTime = "1722598500"
         )
 
         mockMvc.perform(
