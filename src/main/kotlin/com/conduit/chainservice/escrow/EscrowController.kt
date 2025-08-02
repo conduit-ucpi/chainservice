@@ -446,7 +446,7 @@ class EscrowController(
                                 amount = request.amount,
                                 currency = request.currency,
                                 payoutDateTime = request.payoutDateTime,
-                                contractLink = "$serviceLink/contract/${request.contractAddress}",
+                                contractLink = request.contractLink ?: "$serviceLink/contract/${request.contractAddress}",
                                 httpRequest = httpServletRequest
                             ).block()
                         }
