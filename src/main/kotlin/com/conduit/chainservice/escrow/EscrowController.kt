@@ -416,8 +416,8 @@ class EscrowController(
                                 sellerEmail = request.sellerEmail!!,
                                 buyerEmail = request.buyerEmail!!,
                                 contractDescription = request.contractDescription ?: "Escrow contract",
-                                amount = request.amount ?: "N/A",
-                                payoutDateTime = request.payoutDateTime ?: "N/A",
+                                amount = request.amount,
+                                payoutDateTime = request.payoutDateTime,
                                 contractLink = "$serviceLink/contract/${request.contractAddress}",
                                 httpRequest = httpServletRequest
                             ).block()

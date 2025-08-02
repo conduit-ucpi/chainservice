@@ -69,8 +69,13 @@ data class DepositFundsRequest(
     val buyerEmail: String? = null,
     val sellerEmail: String? = null,
     val contractDescription: String? = null,
-    val amount: String? = null,
-    val payoutDateTime: String? = null,
+    
+    @field:NotBlank(message = "Amount is required for payment notifications")
+    val amount: String,
+    
+    @field:NotBlank(message = "Payout date time is required for payment notifications")
+    val payoutDateTime: String,
+    
     val contractLink: String? = null
 )
 
