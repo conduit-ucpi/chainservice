@@ -75,6 +75,9 @@ data class DepositFundsRequest(
     @field:NotBlank(message = "Amount is required for payment notifications")
     val amount: String,
     
+    @field:NotBlank(message = "Currency is required")
+    val currency: String,
+    
     @field:NotBlank(message = "Payout date time is required for payment notifications")
     val payoutDateTime: String,
     

@@ -74,6 +74,7 @@ class DepositFundsStateTransitionIntegrationTest {
             signedTransaction = "0xf86c8082520894...",
             contractId = contractId,
             amount = "100.00 USDC",
+            currency = "USDC",
             payoutDateTime = "2024-12-31T23:59:59Z"
         )
 
@@ -162,6 +163,7 @@ class DepositFundsStateTransitionIntegrationTest {
             signedTransaction = "0xf86c8082520894...",
             contractId = contractId,
             amount = "100.00 USDC",
+            currency = "USDC",
             payoutDateTime = "2024-12-31T23:59:59Z"
         )
 
@@ -236,6 +238,7 @@ class DepositFundsStateTransitionIntegrationTest {
             signedTransaction = "0xf86c8082520894...",
             contractId = contractId,
             amount = "100.00 USDC",
+            currency = "USDC",
             payoutDateTime = "2024-12-31T23:59:59Z"
         )
 
@@ -286,6 +289,7 @@ class DepositFundsStateTransitionIntegrationTest {
             signedTransaction = "0xf86c8082520894...",
             contractId = contractId,
             amount = "100.00 USDC",
+            currency = "USDC",
             payoutDateTime = "2024-12-31T23:59:59Z"
         )
 

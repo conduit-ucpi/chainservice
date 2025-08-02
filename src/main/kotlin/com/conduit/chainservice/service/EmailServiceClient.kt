@@ -17,6 +17,7 @@ data class PaymentNotificationRequest(
     val link: String,
     val description: String,
     val amount: String,
+    val currency: String,
     val payoutDateTime: String
 )
 
@@ -76,6 +77,7 @@ class EmailServiceClient(
         buyerEmail: String,
         contractDescription: String,
         amount: String,
+        currency: String,
         payoutDateTime: String,
         contractLink: String,
         httpRequest: HttpServletRequest
@@ -95,6 +97,7 @@ class EmailServiceClient(
             link = contractLink,
             description = contractDescription,
             amount = amount,
+            currency = currency,
             payoutDateTime = payoutDateTime
         )
 

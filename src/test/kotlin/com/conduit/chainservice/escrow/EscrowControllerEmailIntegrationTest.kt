@@ -82,6 +82,7 @@ class EscrowControllerEmailIntegrationTest {
             buyerEmail = "buyer@example.com",
             sellerEmail = "seller@example.com",
             amount = "100.00 USDC",
+            currency = "USDC",
             payoutDateTime = "2024-12-31T23:59:59Z",
             contractDescription = "Test escrow contract",
             productName = "Test Product"
@@ -124,6 +125,7 @@ class EscrowControllerEmailIntegrationTest {
             buyerEmail = "buyer@example.com",
             sellerEmail = "seller@example.com",
             amount = "100.00 USDC",
+            currency = "USDC",
             payoutDateTime = "2024-12-31T23:59:59Z",
             contractDescription = "Test escrow contract"
             // productName is missing
@@ -190,6 +192,7 @@ class EscrowControllerEmailIntegrationTest {
             sellerEmail = "seller@example.com",
             contractDescription = "Test escrow contract",
             amount = "100.00 USDC",
+            currency = "USDC",
             payoutDateTime = "2024-12-31T23:59:59Z"
         )
 
@@ -204,7 +207,7 @@ class EscrowControllerEmailIntegrationTest {
             ))
         }
 
-        whenever(emailServiceClient.sendPaymentNotification(any(), any(), any(), any(), any(), any(), any()))
+        whenever(emailServiceClient.sendPaymentNotification(any(), any(), any(), any(), any(), any(), any(), any()))
             .thenReturn(Mono.just(SendEmailResponse(true, "msg-123", "Email sent successfully")))
 
         // Act & Assert
@@ -216,7 +219,7 @@ class EscrowControllerEmailIntegrationTest {
 
         // Verify email service was called once
         verify(emailServiceClient, times(1)).sendPaymentNotification(
-            any(), any(), any(), any(), any(), any(), any()
+            any(), any(), any(), any(), any(), any(), any(), any()
         )
     }
 
@@ -230,6 +233,7 @@ class EscrowControllerEmailIntegrationTest {
             buyerEmail = "buyer@example.com",
             sellerEmail = "seller@example.com",
             amount = "100.00 USDC",
+            currency = "USDC",
             payoutDateTime = "2024-12-31T23:59:59Z"
             // contractDescription is missing
         )
@@ -254,7 +258,7 @@ class EscrowControllerEmailIntegrationTest {
 
         // Verify email service was never called
         verify(emailServiceClient, never()).sendPaymentNotification(
-            any(), any(), any(), any(), any(), any(), any()
+            any(), any(), any(), any(), any(), any(), any(), any()
         )
     }
 
@@ -268,6 +272,7 @@ class EscrowControllerEmailIntegrationTest {
             buyerEmail = "buyer@example.com",
             sellerEmail = "seller@example.com",
             amount = "100.00 USDC",
+            currency = "USDC",
             payoutDateTime = "2024-12-31T23:59:59Z",
             contractDescription = "Test escrow contract",
             sellerActualAmount = "40.00 USDC",
@@ -312,6 +317,7 @@ class EscrowControllerEmailIntegrationTest {
             buyerEmail = "buyer@example.com",
             sellerEmail = "seller@example.com",
             amount = "100.00 USDC",
+            currency = "USDC",
             payoutDateTime = "2024-12-31T23:59:59Z",
             contractDescription = "Test escrow contract"
             // sellerActualAmount and buyerActualAmount are missing

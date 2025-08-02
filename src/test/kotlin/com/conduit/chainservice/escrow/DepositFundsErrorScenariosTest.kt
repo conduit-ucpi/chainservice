@@ -106,6 +106,7 @@ class DepositFundsErrorScenariosTest {
             signedTransaction = "0xf86c8082520894...",
             contractId = null,
             amount = "100.00 USDC",
+            currency = "USDC",
             payoutDateTime = "2024-12-31T23:59:59Z"
         )
 
@@ -136,6 +137,7 @@ class DepositFundsErrorScenariosTest {
             signedTransaction = "0xf86c8082520894...",
             contractId = contractId,
             amount = "100.00 USDC",
+            currency = "USDC",
             payoutDateTime = "2024-12-31T23:59:59Z"
         )
 
@@ -172,6 +174,7 @@ class DepositFundsErrorScenariosTest {
             signedTransaction = "0xf86c8082520894...",
             contractId = contractId,
             amount = "100.00 USDC",
+            currency = "USDC",
             payoutDateTime = "2024-12-31T23:59:59Z"
         )
 
@@ -209,6 +212,7 @@ class DepositFundsErrorScenariosTest {
             signedTransaction = "0xf86c8082520894...",
             contractId = contractId,
             amount = "100.00 USDC",
+            currency = "USDC",
             payoutDateTime = "2024-12-31T23:59:59Z"
         )
 
@@ -243,6 +247,7 @@ class DepositFundsErrorScenariosTest {
             signedTransaction = "0xf86c8082520894...",
             contractId = contractId,
             amount = "100.00 USDC",
+            currency = "USDC",
             payoutDateTime = "2024-12-31T23:59:59Z"
         )
 
@@ -277,6 +282,7 @@ class DepositFundsErrorScenariosTest {
             signedTransaction = "0xf86c8082520894...",
             contractId = contractId,
             amount = "100.00 USDC",
+            currency = "USDC",
             payoutDateTime = "2024-12-31T23:59:59Z"
         )
 
@@ -310,6 +316,7 @@ class DepositFundsErrorScenariosTest {
             signedTransaction = "0xf86c8082520894...",
             contractId = null,  // Skip contract validation
             amount = "100.00 USDC",
+            currency = "USDC",
             payoutDateTime = "2024-12-31T23:59:59Z"
         )
 
@@ -340,6 +347,7 @@ class DepositFundsErrorScenariosTest {
             signedTransaction = "0xf86c8082520894...",
             contractId = contractId,
             amount = "100.00 USDC",
+            currency = "USDC",
             payoutDateTime = "2024-12-31T23:59:59Z"
         )
 
@@ -368,6 +376,7 @@ class DepositFundsErrorScenariosTest {
             signedTransaction = "0x" + "f".repeat(1000),  // Very long transaction
             contractId = null,
             amount = "100.00 USDC",
+            currency = "USDC",
             payoutDateTime = "2024-12-31T23:59:59Z"
         )
 

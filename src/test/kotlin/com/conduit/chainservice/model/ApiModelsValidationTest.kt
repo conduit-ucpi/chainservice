@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Assertions.*
 import java.math.BigInteger
 import java.time.Instant
+import com.conduit.chainservice.escrow.models.*
 
 class ApiModelsValidationTest {
 
@@ -208,6 +209,7 @@ class ApiModelsValidationTest {
             signedTransaction = "0xf86c8082520894abcdefabcdefabcdefabcdefabcdefabcdefabcdef80801ba01234567890abcdef12",
             contractId = "507f1f77bcf86cd799439011",
             amount = "100.00 USDC",
+            currency = "USDC",
             payoutDateTime = "2024-12-31T23:59:59Z"
         )
 
@@ -226,6 +228,7 @@ class ApiModelsValidationTest {
             userWalletAddress = "0x9876543210fedcba9876543210fedcba98765432",
             signedTransaction = "0xf86c8082520894abcdefabcdefabcdefabcdefabcdefabcdefabcdef80801ba01234567890abcdef12",
             amount = "100.00 USDC",
+            currency = "USDC",
             payoutDateTime = "2024-12-31T23:59:59Z"
         )
 
