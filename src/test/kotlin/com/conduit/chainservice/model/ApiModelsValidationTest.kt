@@ -208,9 +208,13 @@ class ApiModelsValidationTest {
             userWalletAddress = "0x9876543210fedcba9876543210fedcba98765432",
             signedTransaction = "0xf86c8082520894abcdefabcdefabcdefabcdefabcdefabcdefabcdef80801ba01234567890abcdef12",
             contractId = "507f1f77bcf86cd799439011",
-            amount = "100.00 USDC",
+            buyerEmail = "buyer@test.com",
+            sellerEmail = "seller@test.com",
+            contractDescription = "Test contract description",
+            amount = "100.0",
             currency = "USDC",
-            payoutDateTime = "2024-12-31T23:59:59Z"
+            payoutDateTime = "2024-12-31T23:59:59Z",
+            contractLink = "https://test.com/contract"
         )
 
         // When
@@ -227,9 +231,14 @@ class ApiModelsValidationTest {
             contractAddress = "0x1234567890abcdef1234567890abcdef12345678",
             userWalletAddress = "0x9876543210fedcba9876543210fedcba98765432",
             signedTransaction = "0xf86c8082520894abcdefabcdefabcdefabcdefabcdefabcdefabcdef80801ba01234567890abcdef12",
-            amount = "100.00 USDC",
+            contractId = null,
+            buyerEmail = "buyer@test.com",
+            sellerEmail = "seller@test.com",
+            contractDescription = "Test contract description",
+            amount = "100.0",
             currency = "USDC",
-            payoutDateTime = "2024-12-31T23:59:59Z"
+            payoutDateTime = "2024-12-31T23:59:59Z",
+            contractLink = "https://test.com/contract"
         )
 
         // When
@@ -245,7 +254,14 @@ class ApiModelsValidationTest {
         val request = RaiseDisputeRequest(
             contractAddress = "0x1234567890abcdef1234567890abcdef12345678",
             userWalletAddress = "0x9876543210fedcba9876543210fedcba98765432",
-            signedTransaction = "0xf86c8082520894abcdefabcdefabcdefabcdefabcdefabcdefabcdef80801ba01234567890abcdef12"
+            signedTransaction = "0xf86c8082520894abcdefabcdefabcdefabcdefabcdefabcdefabcdef80801ba01234567890abcdef12",
+            buyerEmail = "buyer@test.com",
+            sellerEmail = "seller@test.com",
+            contractDescription = "Test contract description",
+            amount = "100.0",
+            currency = "USDC",
+            payoutDateTime = "2024-12-31T23:59:59Z",
+            productName = "Test Product"
         )
 
         // When
@@ -261,7 +277,14 @@ class ApiModelsValidationTest {
         val request = RaiseDisputeRequest(
             contractAddress = "invalid-address",
             userWalletAddress = "0x9876543210fedcba9876543210fedcba98765432",
-            signedTransaction = "0xf86c8082520894abcdefabcdefabcdefabcdefabcdefabcdefabcdef80801ba01234567890abcdef12"
+            signedTransaction = "0xf86c8082520894abcdefabcdefabcdefabcdefabcdefabcdefabcdef80801ba01234567890abcdef12",
+            buyerEmail = "buyer@test.com",
+            sellerEmail = "seller@test.com",
+            contractDescription = "Test contract description",
+            amount = "100.0",
+            currency = "USDC",
+            payoutDateTime = "2024-12-31T23:59:59Z",
+            productName = "Test Product"
         )
 
         // When
@@ -278,7 +301,14 @@ class ApiModelsValidationTest {
         val request = RaiseDisputeRequest(
             contractAddress = "0x1234567890abcdef1234567890abcdef12345678",
             userWalletAddress = "invalid-wallet",
-            signedTransaction = "0xf86c8082520894abcdefabcdefabcdefabcdefabcdefabcdefabcdef80801ba01234567890abcdef12"
+            signedTransaction = "0xf86c8082520894abcdefabcdefabcdefabcdefabcdefabcdefabcdef80801ba01234567890abcdef12",
+            buyerEmail = "buyer@test.com",
+            sellerEmail = "seller@test.com",
+            contractDescription = "Test contract description",
+            amount = "100.0",
+            currency = "USDC",
+            payoutDateTime = "2024-12-31T23:59:59Z",
+            productName = "Test Product"
         )
 
         // When
@@ -295,7 +325,14 @@ class ApiModelsValidationTest {
         val request = RaiseDisputeRequest(
             contractAddress = "0x1234567890abcdef1234567890abcdef12345678",
             userWalletAddress = "0x9876543210fedcba9876543210fedcba98765432",
-            signedTransaction = "invalid-transaction"
+            signedTransaction = "invalid-transaction",
+            buyerEmail = "buyer@test.com",
+            sellerEmail = "seller@test.com",
+            contractDescription = "Test contract description",
+            amount = "100.0",
+            currency = "USDC",
+            payoutDateTime = "2024-12-31T23:59:59Z",
+            productName = "Test Product"
         )
 
         // When
@@ -311,7 +348,13 @@ class ApiModelsValidationTest {
         // Given
         val request = ResolveDisputeRequest(
             contractAddress = "0x1234567890abcdef1234567890abcdef12345678",
-            recipientAddress = "0x9876543210fedcba9876543210fedcba98765432"
+            recipientAddress = "0x9876543210fedcba9876543210fedcba98765432",
+            buyerEmail = "buyer@test.com",
+            sellerEmail = "seller@test.com",
+            contractDescription = "Test contract description",
+            amount = "100.0",
+            currency = "USDC",
+            payoutDateTime = "2024-12-31T23:59:59Z"
         )
 
         // When

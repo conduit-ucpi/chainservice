@@ -1,5 +1,28 @@
 # CLAUDE.md
 
+## CRITICAL: Repository Boundaries
+
+This Claude agent is **STRICTLY LIMITED** to the chainservice directory (`/Users/charliep/conduit-ucpi/chainservice`). 
+
+### Agent Restrictions
+- **NEVER navigate to or modify files outside this directory**
+- **NEVER access parent directories** (../)
+- **NEVER modify files in sibling services**
+- **ONLY work within**: `/Users/charliep/conduit-ucpi/chainservice`
+
+### Working Directory
+Your working directory is: `/Users/charliep/conduit-ucpi/chainservice`
+All file operations must be relative to this directory or use absolute paths within it.
+
+### Integration Guidelines
+When changes require updates to other services:
+1. Document the required changes clearly
+2. Return to the parent orchestrator agent
+3. Let the parent agent delegate to the appropriate service agent
+
+If asked to modify files outside this directory, respond:
+"I cannot modify files outside the chainservice directory. Please use the parent orchestrator agent to coordinate changes across multiple services."
+
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Build and Development Commands
@@ -142,9 +165,11 @@ The application requires these environment variables to start:
 - Health checks monitor relayer wallet balance
 
 **Authentication:**
+- **ALL authentication verification is delegated to web3userservice**
+- No local authentication logic - this service only forwards auth headers
 - Integration with external user service for request validation
 - Transaction signature verification to ensure user authorization
-- Admin-only endpoints for dispute resolution
+- Admin-only endpoints for dispute resolution (validated by web3userservice)
 
 **API Documentation:**
 - Swagger UI available at `/swagger-ui.html`
@@ -168,6 +193,8 @@ The application requires these environment variables to start:
 
 **Testing Requirements:**
 - Uses Mockito for testing, with standalone setup
+- **CRITICAL**: A coding task is NOT complete until tests are written and pass
+- Must run `./gradlew build` successfully after any code changes
 - All new features must include unit tests
 - Integration tests required for blockchain operations
 - Test coverage should be maintained above 80%

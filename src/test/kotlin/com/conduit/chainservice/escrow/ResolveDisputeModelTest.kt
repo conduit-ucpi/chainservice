@@ -14,7 +14,13 @@ class ResolveDisputeModelTest {
             contractAddress = "0x1234567890abcdef1234567890abcdef12345678",
             buyerPercentage = 60.0,
             sellerPercentage = 40.0,
-            resolutionNote = "Test resolution"
+            resolutionNote = "Test resolution",
+            buyerEmail = "buyer@test.com",
+            sellerEmail = "seller@test.com",
+            contractDescription = "Test contract description",
+            amount = "100.0",
+            currency = "USDC",
+            payoutDateTime = "2024-12-31T23:59:59Z"
         )
 
         assertEquals("0x1234567890abcdef1234567890abcdef12345678", request.contractAddress)
@@ -28,7 +34,13 @@ class ResolveDisputeModelTest {
     fun `ResolveDisputeRequest should support legacy single recipient resolution`() {
         val request = ResolveDisputeRequest(
             contractAddress = "0x1234567890abcdef1234567890abcdef12345678",
-            recipientAddress = "0x9876543210fedcba9876543210fedcba98765432"
+            recipientAddress = "0x9876543210fedcba9876543210fedcba98765432",
+            buyerEmail = "buyer@test.com",
+            sellerEmail = "seller@test.com",
+            contractDescription = "Test contract description",
+            amount = "100.0",
+            currency = "USDC",
+            payoutDateTime = "2024-12-31T23:59:59Z"
         )
 
         assertEquals("0x1234567890abcdef1234567890abcdef12345678", request.contractAddress)
@@ -91,7 +103,13 @@ class ResolveDisputeModelTest {
             recipientAddress = "0x9876543210fedcba9876543210fedcba98765432",
             buyerPercentage = 100.0,
             sellerPercentage = 0.0,
-            resolutionNote = "Mixed format test"
+            resolutionNote = "Mixed format test",
+            buyerEmail = "buyer@test.com",
+            sellerEmail = "seller@test.com",
+            contractDescription = "Test contract description",
+            amount = "100.0",
+            currency = "USDC",
+            payoutDateTime = "2024-12-31T23:59:59Z"
         )
 
         assertEquals("0x1234567890abcdef1234567890abcdef12345678", requestWithBoth.contractAddress)

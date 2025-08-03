@@ -36,13 +36,26 @@ data class RaiseDisputeRequest(
     @field:NotBlank(message = "Signed transaction is required")
     val signedTransaction: String,
     
-    val buyerEmail: String? = null,
-    val sellerEmail: String? = null,
-    val contractDescription: String? = null,
-    val amount: String? = null,
-    val currency: String? = null,
-    val payoutDateTime: String? = null,
-    val productName: String? = null
+    @field:NotBlank(message = "Buyer email is required")
+    val buyerEmail: String,
+    
+    @field:NotBlank(message = "Seller email is required")
+    val sellerEmail: String,
+    
+    @field:NotBlank(message = "Contract description is required")
+    val contractDescription: String,
+    
+    @field:NotBlank(message = "Amount is required")
+    val amount: String,
+    
+    @field:NotBlank(message = "Currency is required")
+    val currency: String,
+    
+    @field:NotBlank(message = "Payout date time is required")
+    val payoutDateTime: String,
+    
+    @field:NotBlank(message = "Product name is required")
+    val productName: String
 )
 
 data class ClaimFundsRequest(
@@ -68,20 +81,26 @@ data class DepositFundsRequest(
     
     val contractId: String? = null,
     
-    val buyerEmail: String? = null,
-    val sellerEmail: String? = null,
-    val contractDescription: String? = null,
+    @field:NotBlank(message = "Buyer email is required")
+    val buyerEmail: String,
     
-    @field:NotBlank(message = "Amount is required for payment notifications")
+    @field:NotBlank(message = "Seller email is required")
+    val sellerEmail: String,
+    
+    @field:NotBlank(message = "Contract description is required")
+    val contractDescription: String,
+    
+    @field:NotBlank(message = "Amount is required")
     val amount: String,
     
     @field:NotBlank(message = "Currency is required")
     val currency: String,
     
-    @field:NotBlank(message = "Payout date time is required for payment notifications")
+    @field:NotBlank(message = "Payout date time is required")
     val payoutDateTime: String,
     
-    val contractLink: String? = null
+    @field:NotBlank(message = "Contract link is required")
+    val contractLink: String
 )
 
 @ConditionalEmailFields
@@ -97,12 +116,24 @@ data class ResolveDisputeRequest(
     val sellerPercentage: Double? = null,
     val resolutionNote: String? = null,
     
-    val buyerEmail: String? = null,
-    val sellerEmail: String? = null,
-    val contractDescription: String? = null,
-    val amount: String? = null,
-    val currency: String? = null,
-    val payoutDateTime: String? = null,
+    @field:NotBlank(message = "Buyer email is required")
+    val buyerEmail: String,
+    
+    @field:NotBlank(message = "Seller email is required")
+    val sellerEmail: String,
+    
+    @field:NotBlank(message = "Contract description is required")
+    val contractDescription: String,
+    
+    @field:NotBlank(message = "Amount is required")
+    val amount: String,
+    
+    @field:NotBlank(message = "Currency is required")
+    val currency: String,
+    
+    @field:NotBlank(message = "Payout date time is required")
+    val payoutDateTime: String,
+    
     val sellerActualAmount: String? = null,
     val buyerActualAmount: String? = null
 )
