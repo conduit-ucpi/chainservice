@@ -51,6 +51,10 @@ dependencies {
     implementation("com.github.ben-manes.caffeine:caffeine:3.1.8")
     implementation("org.springframework.boot:spring-boot-starter-cache")
     
+    // API Validation Dependencies
+    implementation("io.swagger.parser.v3:swagger-parser:2.1.16")
+    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.15.2")
+    
     // Testing
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.mockito.kotlin:mockito-kotlin:5.1.0")
@@ -72,4 +76,105 @@ tasks.withType<KotlinCompile> {
 
 tasks.withType<Test> {
     useJUnitPlatform()
+}
+
+// Configure Spring Boot main class
+springBoot {
+    mainClass.set("com.conduit.chainservice.ChainServiceApplicationKt")
+}
+
+// Integrate API validation into build process
+tasks.named("check") {
+    dependsOn("validateApiDependencies")
+}
+
+// API Validation Task Properties
+val apiValidationEnabled: String by project.extra { "true" }
+val apiValidationFailOnMismatch: String by project.extra { "true" }
+val apiValidationTimeout: String by project.extra { "30000" }
+val apiValidationEnvironment: String by project.extra { "development" }
+
+// API Validation Tasks
+tasks.register<JavaExec>("validateApiDependencies") {
+    group = "verification"
+    description = "Validates API compatibility with dependent services"
+    
+    dependsOn("compileKotlin")
+    classpath = sourceSets.main.get().runtimeClasspath
+    mainClass = "com.conduit.chainservice.validation.ApiValidationRunner"
+    
+    // Pass properties as system properties
+    systemProperty("api.validation.enabled", apiValidationEnabled)
+    systemProperty("api.validation.failOnMismatch", apiValidationFailOnMismatch)
+    systemProperty("api.validation.timeout", apiValidationTimeout)
+    systemProperty("api.validation.environment", apiValidationEnvironment)
+    
+    // Pass environment variables for service URLs
+    systemProperty("USER_SERVICE_URL", System.getenv("USER_SERVICE_URL") ?: "http://localhost:8080")
+    systemProperty("CONTRACT_SERVICE_URL", System.getenv("CONTRACT_SERVICE_URL") ?: "http://localhost:8080")
+    systemProperty("EMAIL_SERVICE_URL", System.getenv("EMAIL_SERVICE_URL") ?: "http://localhost:8979")
+}
+
+tasks.register<JavaExec>("validateUserServiceApi") {
+    group = "verification"
+    description = "Validates API compatibility with User Service"
+    
+    dependsOn("compileKotlin")
+    classpath = sourceSets.main.get().runtimeClasspath
+    mainClass = "com.conduit.chainservice.validation.ApiValidationRunner"
+    
+    args = listOf("user-service")
+    systemProperty("api.validation.enabled", apiValidationEnabled)
+    systemProperty("api.validation.timeout", apiValidationTimeout)
+    systemProperty("USER_SERVICE_URL", System.getenv("USER_SERVICE_URL") ?: "http://localhost:8080")
+}
+
+tasks.register<JavaExec>("validateContractServiceApi") {
+    group = "verification"
+    description = "Validates API compatibility with Contract Service"
+    
+    dependsOn("compileKotlin")
+    classpath = sourceSets.main.get().runtimeClasspath
+    mainClass = "com.conduit.chainservice.validation.ApiValidationRunner"
+    
+    args = listOf("contract-service")
+    systemProperty("api.validation.enabled", apiValidationEnabled)
+    systemProperty("api.validation.timeout", apiValidationTimeout)
+    systemProperty("CONTRACT_SERVICE_URL", System.getenv("CONTRACT_SERVICE_URL") ?: "http://localhost:8080")
+}
+
+tasks.register<JavaExec>("validateEmailServiceApi") {
+    group = "verification"
+    description = "Validates API compatibility with Email Service"
+    
+    dependsOn("compileKotlin")
+    classpath = sourceSets.main.get().runtimeClasspath
+    mainClass = "com.conduit.chainservice.validation.ApiValidationRunner"
+    
+    args = listOf("email-service")
+    systemProperty("api.validation.enabled", apiValidationEnabled)
+    systemProperty("api.validation.timeout", apiValidationTimeout)
+    systemProperty("EMAIL_SERVICE_URL", System.getenv("EMAIL_SERVICE_URL") ?: "http://localhost:8979")
+}
+
+// Integrate API validation with build process
+tasks.named("build") {
+    if (apiValidationEnabled.toBoolean()) {
+        finalizedBy("validateApiDependencies")
+    }
+}
+
+// Generate API validation report task
+tasks.register<JavaExec>("generateApiValidationReport") {
+    group = "documentation"
+    description = "Generates detailed API validation report"
+    
+    dependsOn("compileKotlin")
+    classpath = sourceSets.main.get().runtimeClasspath
+    mainClass = "com.conduit.chainservice.validation.ApiValidationReportGenerator"
+    
+    systemProperty("api.validation.timeout", apiValidationTimeout)
+    systemProperty("USER_SERVICE_URL", System.getenv("USER_SERVICE_URL") ?: "http://localhost:8080")
+    systemProperty("CONTRACT_SERVICE_URL", System.getenv("CONTRACT_SERVICE_URL") ?: "http://localhost:8080")
+    systemProperty("EMAIL_SERVICE_URL", System.getenv("EMAIL_SERVICE_URL") ?: "http://localhost:8979")
 }

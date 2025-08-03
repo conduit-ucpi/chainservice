@@ -282,18 +282,13 @@ class EscrowControllerDepositFundsTest {
             userWalletAddress = "0x9876543210fedcba9876543210fedcba98765432",
             signedTransaction = "0xf86c8082520894...",
             contractId = null,  // No contract ID provided
-<<<<<<< HEAD
-            amount = "100.00 USDC",
-            currency = "USDC",
-            payoutDateTime = "2024-12-31T23:59:59Z"
-=======
             buyerEmail = "buyer@test.com",
             sellerEmail = "seller@test.com",
             contractDescription = "Test contract description",
             amount = "100.0",
+            currency = "USDC",
             payoutDateTime = "2024-12-31T23:59:59Z",
             contractLink = "https://test.com/contract"
->>>>>>> build-production
         )
 
         runBlocking {

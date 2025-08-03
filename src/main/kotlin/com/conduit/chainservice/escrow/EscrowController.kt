@@ -182,7 +182,7 @@ class EscrowController(
                         val validatedAmount = request.amount ?: throw IllegalStateException("Amount is null despite validation")
                         val validatedPayoutDateTime = request.payoutDateTime ?: throw IllegalStateException("PayoutDateTime is null despite validation")
                         val validatedContractDescription = request.contractDescription ?: throw IllegalStateException("ContractDescription is null despite validation")
-                        val validatedProductName = request.productName ?: throw IllegalStateException("ProductName is null despite validation")
+                        val validatedProductName = request.productName
                         val validatedBuyerEmail = request.buyerEmail ?: throw IllegalStateException("BuyerEmail is null despite validation")
                         val validatedSellerEmail = request.sellerEmail ?: throw IllegalStateException("SellerEmail is null despite validation")
                         val validatedCurrency = request.currency ?: "USDC"
@@ -223,7 +223,7 @@ class EscrowController(
                         logger.error("Failed to send dispute raised notification emails", e)
                     }
                 } else {
-                    logger.warn("Email notification skipped for dispute raised - invalid or missing required fields. Field validation details: buyerEmail=${request.buyerEmail?.let { "present(${it.length} chars)" } ?: "null"}, sellerEmail=${request.sellerEmail?.let { "present(${it.length} chars)" } ?: "null"}, amount=${request.amount?.let { "present($it)" } ?: "null"}, payoutDateTime=${request.payoutDateTime?.let { "present($it)" } ?: "null"}, contractDescription=${request.contractDescription?.let { "present(${it.length} chars)" } ?: "null"}, productName=${request.productName?.let { "present($it)" } ?: "null"}")
+                    logger.warn("Email notification skipped for dispute raised - invalid or missing required fields. Field validation details: buyerEmail=${request.buyerEmail?.let { "present(${it.length} chars)" } ?: "null"}, sellerEmail=${request.sellerEmail?.let { "present(${it.length} chars)" } ?: "null"}, amount=${request.amount?.let { "present($it)" } ?: "null"}, payoutDateTime=${request.payoutDateTime?.let { "present($it)" } ?: "null"}, contractDescription=${request.contractDescription?.let { "present(${it.length} chars)" } ?: "null"}, productName=present(${request.productName})")
                 }
                 
                 ResponseEntity.ok(response)
@@ -443,9 +443,9 @@ class EscrowController(
                                 sellerEmail = request.sellerEmail!!,
                                 buyerEmail = request.buyerEmail!!,
                                 contractDescription = request.contractDescription!!,
-                                amount = request.amount,
-                                currency = request.currency,
-                                payoutDateTime = request.payoutDateTime,
+                                amount = request.amount!!,
+                                currency = request.currency!!,
+                                payoutDateTime = request.payoutDateTime!!,
                                 contractLink = request.contractLink ?: "$serviceLink/contract/${request.contractAddress}",
                                 httpRequest = httpServletRequest
                             ).block()

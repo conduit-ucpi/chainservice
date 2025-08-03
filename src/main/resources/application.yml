@@ -31,7 +31,7 @@ escrow:
     limit-approve-usdc: 60000
 
 auth:
-  user-service-url: ${USER_SERVICE_URL}
+  user-service-url: ${USER_SERVICE_URL:https://api.conduit-ucpi.com/userservice}
   enabled: ${AUTH_ENABLED:true}
 
 contract-service:

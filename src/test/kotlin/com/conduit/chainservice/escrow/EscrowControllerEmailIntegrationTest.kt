@@ -117,18 +117,18 @@ class EscrowControllerEmailIntegrationTest {
 
     @Test
     fun `raise dispute with incomplete email fields should fail validation`() {
-        // Arrange - missing productName
+        // Arrange - productName is now required, so this test should check validation failure for a different reason
         val request = RaiseDisputeRequest(
             contractAddress = "0x1234567890abcdef1234567890abcdef12345678",
             userWalletAddress = "0x9876543210fedcba9876543210fedcba98765432",
             signedTransaction = "0xf86c8082520894...",
             buyerEmail = "buyer@example.com",
             sellerEmail = "seller@example.com",
-            amount = "100.00 USDC",
+            amount = "", // Empty amount should fail validation
             currency = "USDC",
             payoutDateTime = "2024-12-31T23:59:59Z",
-            contractDescription = "Test escrow contract"
-            // productName is missing
+            contractDescription = "Test escrow contract",
+            productName = "Test Product"
         )
 
         // Act & Assert - should fail validation
@@ -154,7 +154,8 @@ class EscrowControllerEmailIntegrationTest {
         val request = RaiseDisputeRequest(
             contractAddress = "0x1234567890abcdef1234567890abcdef12345678",
             userWalletAddress = "0x9876543210fedcba9876543210fedcba98765432",
-            signedTransaction = "0xf86c8082520894..."
+            signedTransaction = "0xf86c8082520894...",
+            productName = "Test Product"
         )
 
         runBlocking {
