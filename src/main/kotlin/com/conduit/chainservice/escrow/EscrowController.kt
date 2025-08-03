@@ -927,7 +927,7 @@ class EscrowController(
         )
         request: BatchContractInfoRequest,
         httpRequest: HttpServletRequest
-    ): ResponseEntity<Any> {
+    ): ResponseEntity<*> {
         return try {
             val userType = httpRequest.getAttribute("userType") as? String
             val userId = httpRequest.getAttribute("userId") as? String
