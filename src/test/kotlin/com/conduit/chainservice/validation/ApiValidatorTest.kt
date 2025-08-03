@@ -23,7 +23,8 @@ class ApiValidatorTest {
         
         assertFalse(result.isServiceAvailable)
         assertTrue(result.hasErrors())
-        assertTrue(result.errors.any { it.type == ErrorType.SERVICE_UNAVAILABLE })
+        // Updated to expect OPENAPI_SPEC_NOT_FOUND since we now skip health checks
+        assertTrue(result.errors.any { it.type == ErrorType.OPENAPI_SPEC_NOT_FOUND })
     }
     
     @Test
@@ -48,7 +49,7 @@ class ApiValidatorTest {
             assertTrue(endpoints.isNotEmpty())
             
             val updateEndpoint = endpoints.find { 
-                it.path == "/api/contracts/{contractId}" && it.method == "PATCH" 
+                it.path == "/api/contracts/{id}" && it.method == "PATCH" 
             }
             assertTrue(updateEndpoint != null)
             assertTrue(updateEndpoint?.requiresAuthentication == true)

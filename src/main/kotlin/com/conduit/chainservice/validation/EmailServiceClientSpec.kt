@@ -104,21 +104,6 @@ object EmailServiceClientSpec {
                 ),
                 requiresAuthentication = true,
                 tags = listOf("email-notifications", "critical")
-            ),
-            
-            // Health endpoint for service availability check
-            ExpectedEndpoint(
-                path = "/actuator/health",
-                method = "GET",
-                description = "Service health check endpoint",
-                responseSchema = mapOf(
-                    "type" to "object",
-                    "properties" to mapOf(
-                        "status" to mapOf("type" to "string")
-                    )
-                ),
-                requiresAuthentication = false,
-                tags = listOf("health")
             )
         )
     }

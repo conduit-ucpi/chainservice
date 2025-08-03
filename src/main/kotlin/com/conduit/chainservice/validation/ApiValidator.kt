@@ -69,33 +69,18 @@ class ApiValidator(
         val endpointValidations = mutableListOf<EndpointValidation>()
         
         try {
-            // First check if service is available
-            val isAvailable = checkServiceAvailability(serviceUrl)
-            if (!isAvailable) {
+            // Skip health check and go straight to fetching OpenAPI spec
+            val openApiSpec = fetchOpenApiSpec(serviceUrl)
+            val isServiceAvailable = openApiSpec != null
+            if (openApiSpec == null) {
                 return ValidationResult(
                     serviceName = serviceName,
                     serviceUrl = serviceUrl,
                     isServiceAvailable = false,
                     errors = listOf(
                         ValidationError(
-                            type = ErrorType.SERVICE_UNAVAILABLE,
-                            message = "Service is not available at $serviceUrl"
-                        )
-                    )
-                )
-            }
-            
-            // Fetch OpenAPI spec
-            val openApiSpec = fetchOpenApiSpec(serviceUrl)
-            if (openApiSpec == null) {
-                return ValidationResult(
-                    serviceName = serviceName,
-                    serviceUrl = serviceUrl,
-                    isServiceAvailable = true,
-                    errors = listOf(
-                        ValidationError(
                             type = ErrorType.OPENAPI_SPEC_NOT_FOUND,
-                            message = "Could not fetch OpenAPI specification from service"
+                            message = "Could not fetch OpenAPI specification from service at any common endpoints"
                         )
                     )
                 )
@@ -128,7 +113,7 @@ class ApiValidator(
             return ValidationResult(
                 serviceName = serviceName,
                 serviceUrl = serviceUrl,
-                isServiceAvailable = true,
+                isServiceAvailable = isServiceAvailable,
                 errors = errors,
                 warnings = warnings,
                 validatedEndpoints = endpointValidations
@@ -177,35 +162,51 @@ class ApiValidator(
     }
     
     /**
-     * Fetches OpenAPI specification from a service.
+     * Fetches OpenAPI specification from a service by trying multiple common endpoint patterns.
      */
     private fun fetchOpenApiSpec(serviceUrl: String): OpenAPI? {
-        return try {
-            val openApiRequest = HttpRequest.newBuilder()
-                .uri(URI.create("$serviceUrl/api-docs"))
-                .timeout(Duration.ofMillis(timeoutMs))
-                .header("Accept", "application/json")
-                .GET()
-                .build()
-            
-            val response = httpClient.send(openApiRequest, HttpResponse.BodyHandlers.ofString())
-            
-            if (response.statusCode() != 200) {
-                logger.warn("Failed to fetch OpenAPI spec: HTTP ${response.statusCode()}")
-                return null
+        val commonEndpoints = listOf(
+            "/api/v3/api-docs",
+            "/v3/api-docs", 
+            "/api/api-docs",
+            "/api-docs"
+        )
+        
+        for (endpoint in commonEndpoints) {
+            try {
+                val fullUrl = "$serviceUrl$endpoint"
+                logger.debug("Trying OpenAPI endpoint: $fullUrl")
+                
+                val openApiRequest = HttpRequest.newBuilder()
+                    .uri(URI.create(fullUrl))
+                    .timeout(Duration.ofMillis(timeoutMs))
+                    .header("Accept", "application/json")
+                    .GET()
+                    .build()
+                
+                val response = httpClient.send(openApiRequest, HttpResponse.BodyHandlers.ofString())
+                
+                if (response.statusCode() == 200) {
+                    logger.info("Found OpenAPI spec at: $fullUrl")
+                    
+                    val parseResult: SwaggerParseResult = OpenAPIParser().readContents(response.body(), null, null)
+                    
+                    if (parseResult.messages.isNotEmpty()) {
+                        logger.warn("OpenAPI parsing warnings: ${parseResult.messages}")
+                    }
+                    
+                    return parseResult.openAPI
+                } else {
+                    logger.debug("OpenAPI endpoint $fullUrl returned HTTP ${response.statusCode()}")
+                }
+            } catch (e: Exception) {
+                logger.debug("Failed to fetch OpenAPI spec from $serviceUrl$endpoint: ${e.message}")
             }
-            
-            val parseResult: SwaggerParseResult = OpenAPIParser().readContents(response.body(), null, null)
-            
-            if (parseResult.messages.isNotEmpty()) {
-                logger.warn("OpenAPI parsing warnings: ${parseResult.messages}")
-            }
-            
-            parseResult.openAPI
-        } catch (e: Exception) {
-            logger.error("Failed to fetch OpenAPI specification", e)
-            null
         }
+        
+        logger.warn("Could not find OpenAPI specification at any common endpoints for $serviceUrl")
+        logger.warn("Tried endpoints: ${commonEndpoints.joinToString(", ")}")
+        return null
     }
     
     /**

@@ -104,11 +104,11 @@ class ConditionalEmailFieldsValidator : ConstraintValidator<ConditionalEmailFiel
         
         val violations = mutableListOf<String>()
         
-        if (amount.isNullOrBlank()) violations.add("amount")
-        if (payoutDateTime.isNullOrBlank()) violations.add("payoutDateTime")
-        if (contractDescription.isNullOrBlank()) violations.add("contractDescription")
-        if (sellerActualAmount.isNullOrBlank()) violations.add("sellerActualAmount")
-        if (buyerActualAmount.isNullOrBlank()) violations.add("buyerActualAmount")
+        if (isInvalidField(amount)) violations.add("amount")
+        if (isInvalidField(payoutDateTime)) violations.add("payoutDateTime")
+        if (isInvalidField(contractDescription)) violations.add("contractDescription")
+        if (isInvalidField(sellerActualAmount)) violations.add("sellerActualAmount")
+        if (isInvalidField(buyerActualAmount)) violations.add("buyerActualAmount")
         
         if (violations.isNotEmpty()) {
             context.disableDefaultConstraintViolation()

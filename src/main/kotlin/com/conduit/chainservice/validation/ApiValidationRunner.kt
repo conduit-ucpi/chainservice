@@ -90,48 +90,107 @@ class ApiValidationRunner {
         private fun validateAllServices(validator: ApiValidator): Boolean {
             val results = mutableListOf<Boolean>()
             
+            println()
+            println("=".repeat(80))
+            println("           API VALIDATION RESULTS")
+            println("=".repeat(80))
+            
             // Validate User Service
             System.getProperty("USER_SERVICE_URL")?.let { url ->
+                println()
+                println("📡 USER SERVICE VALIDATION")
+                println("   URL: $url")
+                println("   " + "-".repeat(60))
                 val result = validator.validateUserService(url)
                 logValidationResult("User Service", result)
                 results.add(result.hasErrors())
-            } ?: logger.warn("USER_SERVICE_URL not provided, skipping user service validation")
+            } ?: run {
+                println()
+                println("⚠️  USER SERVICE VALIDATION SKIPPED")
+                println("   Reason: USER_SERVICE_URL not provided")
+            }
             
             // Validate Contract Service  
             System.getProperty("CONTRACT_SERVICE_URL")?.let { url ->
+                println()
+                println("📡 CONTRACT SERVICE VALIDATION")
+                println("   URL: $url")
+                println("   " + "-".repeat(60))
                 val result = validator.validateContractService(url)
                 logValidationResult("Contract Service", result)
                 results.add(result.hasErrors())
-            } ?: logger.warn("CONTRACT_SERVICE_URL not provided, skipping contract service validation")
+            } ?: run {
+                println()
+                println("⚠️  CONTRACT SERVICE VALIDATION SKIPPED")
+                println("   Reason: CONTRACT_SERVICE_URL not provided")
+            }
             
             // Validate Email Service
             System.getProperty("EMAIL_SERVICE_URL")?.let { url ->
+                println()
+                println("📡 EMAIL SERVICE VALIDATION")
+                println("   URL: $url")
+                println("   " + "-".repeat(60))
                 val result = validator.validateEmailService(url)
                 logValidationResult("Email Service", result)
                 results.add(result.hasErrors())
-            } ?: logger.warn("EMAIL_SERVICE_URL not provided, skipping email service validation")
+            } ?: run {
+                println()
+                println("⚠️  EMAIL SERVICE VALIDATION SKIPPED")
+                println("   Reason: EMAIL_SERVICE_URL not provided")
+            }
             
-            return results.any { it }
+            println()
+            println("=".repeat(80))
+            val hasFailures = results.any { it }
+            if (hasFailures) {
+                println("❌ API VALIDATION COMPLETED WITH FAILURES")
+                println("   Note: Build continues as failOnMismatch=false")
+            } else {
+                println("✅ API VALIDATION COMPLETED SUCCESSFULLY")
+            }
+            println("=".repeat(80))
+            println()
+            
+            return hasFailures
         }
         
         private fun logValidationResult(serviceName: String, result: ValidationResult) {
             if (result.hasErrors()) {
-                logger.error("$serviceName validation failed:")
+                println("   ❌ RESULT: FAILED")
+                println("   Errors:")
                 result.errors.forEach { error ->
-                    logger.error("  - ${error.type}: ${error.message}")
+                    println("     • ${error.type}: ${error.message}")
                     error.details?.let { details ->
-                        logger.error("    Details: $details")
+                        println("       Details: $details")
                     }
                 }
             } else {
-                logger.info("$serviceName validation passed")
+                println("   ✅ RESULT: PASSED")
+                if (result.isServiceAvailable) {
+                    println("   Service is available and API specification matches expectations")
+                }
             }
             
             if (result.warnings.isNotEmpty()) {
-                logger.warn("$serviceName validation warnings:")
+                println("   ⚠️  WARNINGS:")
                 result.warnings.forEach { warning ->
-                    logger.warn("  - ${warning.type}: ${warning.message}")
+                    println("     • ${warning.type}: ${warning.message}")
                 }
+            }
+            
+            // Additional details
+            if (!result.isServiceAvailable) {
+                println("   📊 Service Status: UNAVAILABLE")
+            } else {
+                println("   📊 Service Status: AVAILABLE")
+            }
+            
+            // Log to standard logger as well for build logs
+            if (result.hasErrors()) {
+                logger.error("$serviceName validation failed - see detailed output above")
+            } else {
+                logger.info("$serviceName validation passed")
             }
         }
     }

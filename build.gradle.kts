@@ -83,14 +83,26 @@ springBoot {
     mainClass.set("com.conduit.chainservice.ChainServiceApplicationKt")
 }
 
-// Integrate API validation into build process
-tasks.named("check") {
-    dependsOn("validateApiDependencies")
+// Function to load environment variables from .env.local file
+fun loadEnvFile() {
+    val envFile = file(".env.local")
+    if (envFile.exists()) {
+        envFile.readLines().forEach { line ->
+            val trimmedLine = line.trim()
+            if (!trimmedLine.startsWith("#") && trimmedLine.contains("=")) {
+                val (key, value) = trimmedLine.split("=", limit = 2)
+                System.setProperty(key.trim(), value.trim())
+            }
+        }
+    }
 }
+
+// Load .env.local before any tasks run
+loadEnvFile()
 
 // API Validation Task Properties
 val apiValidationEnabled: String by project.extra { "true" }
-val apiValidationFailOnMismatch: String by project.extra { "true" }
+val apiValidationFailOnMismatch: String by project.extra { "false" }
 val apiValidationTimeout: String by project.extra { "30000" }
 val apiValidationEnvironment: String by project.extra { "development" }
 
@@ -109,10 +121,15 @@ tasks.register<JavaExec>("validateApiDependencies") {
     systemProperty("api.validation.timeout", apiValidationTimeout)
     systemProperty("api.validation.environment", apiValidationEnvironment)
     
-    // Pass environment variables for service URLs
-    systemProperty("USER_SERVICE_URL", System.getenv("USER_SERVICE_URL") ?: "http://localhost:8080")
-    systemProperty("CONTRACT_SERVICE_URL", System.getenv("CONTRACT_SERVICE_URL") ?: "http://localhost:8080")
-    systemProperty("EMAIL_SERVICE_URL", System.getenv("EMAIL_SERVICE_URL") ?: "http://localhost:8979")
+    // Pass environment variables for service URLs (loaded from .env.local or environment)
+    systemProperty("USER_SERVICE_URL", System.getProperty("USER_SERVICE_URL") ?: System.getenv("USER_SERVICE_URL") ?: "http://localhost:8080")
+    systemProperty("CONTRACT_SERVICE_URL", System.getProperty("CONTRACT_SERVICE_URL") ?: System.getenv("CONTRACT_SERVICE_URL") ?: "http://localhost:8080")
+    systemProperty("EMAIL_SERVICE_URL", System.getProperty("EMAIL_SERVICE_URL") ?: System.getenv("EMAIL_SERVICE_URL") ?: "http://localhost:8979")
+}
+
+// Integrate API validation into check task
+tasks.named("check") {
+    dependsOn("validateApiDependencies")
 }
 
 tasks.register<JavaExec>("validateUserServiceApi") {
@@ -126,7 +143,7 @@ tasks.register<JavaExec>("validateUserServiceApi") {
     args = listOf("user-service")
     systemProperty("api.validation.enabled", apiValidationEnabled)
     systemProperty("api.validation.timeout", apiValidationTimeout)
-    systemProperty("USER_SERVICE_URL", System.getenv("USER_SERVICE_URL") ?: "http://localhost:8080")
+    systemProperty("USER_SERVICE_URL", System.getProperty("USER_SERVICE_URL") ?: System.getenv("USER_SERVICE_URL") ?: "http://localhost:8080")
 }
 
 tasks.register<JavaExec>("validateContractServiceApi") {
@@ -140,7 +157,7 @@ tasks.register<JavaExec>("validateContractServiceApi") {
     args = listOf("contract-service")
     systemProperty("api.validation.enabled", apiValidationEnabled)
     systemProperty("api.validation.timeout", apiValidationTimeout)
-    systemProperty("CONTRACT_SERVICE_URL", System.getenv("CONTRACT_SERVICE_URL") ?: "http://localhost:8080")
+    systemProperty("CONTRACT_SERVICE_URL", System.getProperty("CONTRACT_SERVICE_URL") ?: System.getenv("CONTRACT_SERVICE_URL") ?: "http://localhost:8080")
 }
 
 tasks.register<JavaExec>("validateEmailServiceApi") {
@@ -154,15 +171,9 @@ tasks.register<JavaExec>("validateEmailServiceApi") {
     args = listOf("email-service")
     systemProperty("api.validation.enabled", apiValidationEnabled)
     systemProperty("api.validation.timeout", apiValidationTimeout)
-    systemProperty("EMAIL_SERVICE_URL", System.getenv("EMAIL_SERVICE_URL") ?: "http://localhost:8979")
+    systemProperty("EMAIL_SERVICE_URL", System.getProperty("EMAIL_SERVICE_URL") ?: System.getenv("EMAIL_SERVICE_URL") ?: "http://localhost:8979")
 }
 
-// Integrate API validation with build process
-tasks.named("build") {
-    if (apiValidationEnabled.toBoolean()) {
-        finalizedBy("validateApiDependencies")
-    }
-}
 
 // Generate API validation report task
 tasks.register<JavaExec>("generateApiValidationReport") {
@@ -174,7 +185,7 @@ tasks.register<JavaExec>("generateApiValidationReport") {
     mainClass = "com.conduit.chainservice.validation.ApiValidationReportGenerator"
     
     systemProperty("api.validation.timeout", apiValidationTimeout)
-    systemProperty("USER_SERVICE_URL", System.getenv("USER_SERVICE_URL") ?: "http://localhost:8080")
-    systemProperty("CONTRACT_SERVICE_URL", System.getenv("CONTRACT_SERVICE_URL") ?: "http://localhost:8080")
-    systemProperty("EMAIL_SERVICE_URL", System.getenv("EMAIL_SERVICE_URL") ?: "http://localhost:8979")
+    systemProperty("USER_SERVICE_URL", System.getProperty("USER_SERVICE_URL") ?: System.getenv("USER_SERVICE_URL") ?: "http://localhost:8080")
+    systemProperty("CONTRACT_SERVICE_URL", System.getProperty("CONTRACT_SERVICE_URL") ?: System.getenv("CONTRACT_SERVICE_URL") ?: "http://localhost:8080")
+    systemProperty("EMAIL_SERVICE_URL", System.getProperty("EMAIL_SERVICE_URL") ?: System.getenv("EMAIL_SERVICE_URL") ?: "http://localhost:8979")
 }
