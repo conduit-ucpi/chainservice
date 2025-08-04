@@ -1,9 +1,9 @@
 package com.conduit.chainservice.service
 
 import com.conduit.chainservice.config.EscrowProperties
-import com.conduit.chainservice.model.ContractCreationResult
-import com.conduit.chainservice.model.OperationGasCost
-import com.conduit.chainservice.model.TransactionResult
+import com.conduit.chainservice.escrow.models.ContractCreationResult
+import com.utility.chainservice.models.OperationGasCost
+import com.utility.chainservice.models.TransactionResult
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.web3j.crypto.Credentials
@@ -110,17 +110,8 @@ class TransactionRelayService(
             "resolveDispute" to "resolveDispute"
         )
 
-        // Delegate to generic blockchain relay service and convert to legacy format
-        val genericCosts = blockchainRelayService.getOperationGasCosts(operations)
-        return genericCosts.map { genericCost ->
-            OperationGasCost(
-                operation = genericCost.operation,
-                gasLimit = genericCost.gasLimit,
-                gasPriceWei = genericCost.gasPriceWei,
-                totalCostWei = genericCost.totalCostWei,
-                totalCostAvax = genericCost.totalCostAvax
-            )
-        }
+        // Delegate to generic blockchain relay service
+        return blockchainRelayService.getOperationGasCosts(operations)
     }
 
     // Gas transfer methods - delegate to escrow transaction service

@@ -21,7 +21,7 @@ repositories {
 
 dependencies {
     // Blockchain Relay Utility from Jitpack
-    implementation("com.github.charliepank:blockchain-relay-utility:v0.0.11")
+    implementation("com.github.charliepank:blockchain-relay-utility:v0.0.12")
     
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-actuator")

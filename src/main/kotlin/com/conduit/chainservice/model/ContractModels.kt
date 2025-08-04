@@ -40,18 +40,7 @@ enum class ContractStatus {
     CLAIMED     // Funds claimed
 }
 
-data class TransactionResult(
-    val success: Boolean,
-    val transactionHash: String?,
-    val error: String? = null
-)
 
-data class ContractCreationResult(
-    val success: Boolean,
-    val transactionHash: String?,
-    val contractAddress: String?,
-    val error: String? = null
-)
 
 data class ContractEventHistory(
     val contractAddress: String,

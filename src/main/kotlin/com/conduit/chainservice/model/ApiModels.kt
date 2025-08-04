@@ -148,18 +148,6 @@ data class ErrorResponse(
     val timestamp: String
 )
 
-data class OperationGasCost(
-    val operation: String,
-    val gasLimit: Long,
-    val gasPriceWei: BigInteger,
-    val totalCostWei: BigInteger,
-    val totalCostAvax: String
-)
-
-data class GasCostsResponse(
-    val operations: List<OperationGasCost>,
-    val timestamp: String
-)
 
 data class ApproveUSDCRequest(
     @field:NotBlank(message = "User wallet address is required")

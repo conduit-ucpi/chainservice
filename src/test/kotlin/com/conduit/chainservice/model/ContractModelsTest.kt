@@ -29,50 +29,7 @@ class ContractModelsTest {
         assertEquals(BigInteger.valueOf(1000000), contractInfo.amount)
     }
 
-    @Test
-    fun `TransactionResult should handle success case`() {
-        // Given
-        val result = TransactionResult(
-            success = true,
-            transactionHash = "0xabcdef1234567890"
-        )
 
-        // Then
-        assertTrue(result.success)
-        assertEquals("0xabcdef1234567890", result.transactionHash)
-        assertNull(result.error)
-    }
-
-    @Test
-    fun `TransactionResult should handle error case`() {
-        // Given
-        val result = TransactionResult(
-            success = false,
-            transactionHash = null,
-            error = "Transaction failed"
-        )
-
-        // Then
-        assertFalse(result.success)
-        assertNull(result.transactionHash)
-        assertEquals("Transaction failed", result.error)
-    }
-
-    @Test
-    fun `ContractCreationResult should handle success case`() {
-        // Given
-        val result = ContractCreationResult(
-            success = true,
-            transactionHash = "0xabcdef1234567890",
-            contractAddress = "0x1234567890abcdef1234567890abcdef12345678"
-        )
-
-        // Then
-        assertTrue(result.success)
-        assertEquals("0xabcdef1234567890", result.transactionHash)
-        assertEquals("0x1234567890abcdef1234567890abcdef12345678", result.contractAddress)
-        assertNull(result.error)
-    }
 
     @Test
     fun `ContractStatus enum should have all expected values`() {
