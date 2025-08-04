@@ -224,3 +224,22 @@ data class ContractInfoResult(
     val contractInfo: ContractInfo? = null,
     val error: String? = null
 )
+
+// Pure JSON response models for batch-info endpoint
+data class BatchContractInfoJsonResponse(
+    val contracts: Map<String, ContractInfoJson>,
+    val errors: Map<String, String>
+)
+
+data class ContractInfoJson(
+    val contractAddress: String,
+    val status: String,
+    val funded: Boolean,
+    val balance: String,
+    val buyer: String,
+    val seller: String,
+    val expiryTimestamp: Long,
+    val amount: String,
+    val tokenAddress: String,
+    val exists: Boolean
+)

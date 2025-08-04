@@ -1,5 +1,6 @@
 package com.conduit.chainservice.escrow
 
+import com.conduit.chainservice.config.EscrowProperties
 import com.conduit.chainservice.escrow.models.*
 import com.conduit.chainservice.service.ContractQueryService
 import com.conduit.chainservice.service.ContractServiceClient
@@ -35,6 +36,9 @@ class BatchContractInfoControllerSimpleTest {
     private lateinit var emailServiceClient: EmailServiceClient
 
     @Mock
+    private lateinit var escrowProperties: EscrowProperties
+
+    @Mock
     private lateinit var httpServletRequest: HttpServletRequest
 
     private lateinit var escrowController: EscrowController
@@ -46,12 +50,17 @@ class BatchContractInfoControllerSimpleTest {
     @BeforeEach
     fun setUp() {
         MockitoAnnotations.openMocks(this)
+        
+        // Mock the USDC contract address
+        whenever(escrowProperties.usdcContractAddress).thenReturn("0x5425890298aed601595a70AB815c96711a31Bc65")
+        
         escrowController = EscrowController(
             escrowTransactionService,
             contractQueryService,
             contractServiceClient,
             escrowServicePlugin,
-            emailServiceClient
+            emailServiceClient,
+            escrowProperties
         )
     }
 
@@ -83,12 +92,14 @@ class BatchContractInfoControllerSimpleTest {
         val response = escrowController.getBatchContractInfo(request, httpServletRequest)
 
         assertEquals(HttpStatus.OK, response.statusCode)
-        val responseBody = response.body as BatchContractInfoResponse
-        assertEquals(2, responseBody.totalRequested)
-        assertEquals(2, responseBody.totalSuccessful)
-        assertEquals(0, responseBody.totalFailed)
-        assertTrue(responseBody.contracts[contract1]?.success == true)
-        assertTrue(responseBody.contracts[contract2]?.success == true)
+        val responseBody = response.body as BatchContractInfoJsonResponse
+        assertEquals(2, responseBody.contracts.size)
+        assertEquals(0, responseBody.errors.size)
+        assertTrue(responseBody.contracts.containsKey(contract1))
+        assertTrue(responseBody.contracts.containsKey(contract2))
+        assertEquals("ACTIVE", responseBody.contracts[contract1]?.status)
+        assertEquals("ACTIVE", responseBody.contracts[contract2]?.status)
+        assertEquals("0x5425890298aed601595a70AB815c96711a31Bc65", responseBody.contracts[contract1]?.tokenAddress)
     }
 
     @Test
@@ -146,13 +157,13 @@ class BatchContractInfoControllerSimpleTest {
         val response = escrowController.getBatchContractInfo(request, httpServletRequest)
 
         assertEquals(HttpStatus.OK, response.statusCode)
-        val responseBody = response.body as BatchContractInfoResponse
-        assertEquals(2, responseBody.totalRequested)
-        assertEquals(1, responseBody.totalSuccessful)
-        assertEquals(1, responseBody.totalFailed)
-        assertTrue(responseBody.contracts[contract1]?.success == true)
-        assertTrue(responseBody.contracts[contract2]?.success == false)
-        assertEquals("Contract not found", responseBody.contracts[contract2]?.error)
+        val responseBody = response.body as BatchContractInfoJsonResponse
+        assertEquals(1, responseBody.contracts.size)
+        assertEquals(1, responseBody.errors.size)
+        assertTrue(responseBody.contracts.containsKey(contract1))
+        assertTrue(responseBody.errors.containsKey(contract2))
+        assertEquals("ACTIVE", responseBody.contracts[contract1]?.status)
+        assertEquals("Contract not found", responseBody.errors[contract2])
     }
 
     private fun createMockContractInfo(contractAddress: String, buyer: String, seller: String): ContractInfo {

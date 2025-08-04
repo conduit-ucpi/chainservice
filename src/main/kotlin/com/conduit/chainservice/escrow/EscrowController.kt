@@ -1,5 +1,6 @@
 package com.conduit.chainservice.escrow
 
+import com.conduit.chainservice.config.EscrowProperties
 import com.conduit.chainservice.escrow.models.*
 import com.conduit.chainservice.escrow.validation.EmailFieldValidator
 import com.conduit.chainservice.service.ContractQueryService
@@ -34,7 +35,8 @@ class EscrowController(
     private val contractQueryService: ContractQueryService,
     private val contractServiceClient: ContractServiceClient,
     private val escrowServicePlugin: EscrowServicePlugin,
-    private val emailServiceClient: EmailServiceClient
+    private val emailServiceClient: EmailServiceClient,
+    private val escrowProperties: EscrowProperties
 ) {
 
     private val logger = LoggerFactory.getLogger(EscrowController::class.java)
@@ -896,7 +898,7 @@ class EscrowController(
         ApiResponse(
             responseCode = "200",
             description = "Batch query completed (may include partial failures)",
-            content = [Content(schema = Schema(implementation = BatchContractInfoResponse::class))]
+            content = [Content(schema = Schema(implementation = BatchContractInfoJsonResponse::class))]
         ),
         ApiResponse(
             responseCode = "400",
@@ -1006,17 +1008,38 @@ class EscrowController(
                 }
             }
             
-            val totalRequested = request.contractAddresses.size
-            val totalSuccessful = filteredResults.values.count { it.success }
-            val totalFailed = totalRequested - totalSuccessful
+            // Transform to pure JSON format
+            val contractsMap = mutableMapOf<String, ContractInfoJson>()
+            val errorsMap = mutableMapOf<String, String>()
             
-            val response = BatchContractInfoResponse(
-                contracts = filteredResults,
-                totalRequested = totalRequested,
-                totalSuccessful = totalSuccessful,
-                totalFailed = totalFailed,
-                timestamp = Instant.now().toString()
+            filteredResults.forEach { (contractAddress, result) ->
+                if (result.success && result.contractInfo != null) {
+                    val contract = result.contractInfo!!
+                    contractsMap[contractAddress] = ContractInfoJson(
+                        contractAddress = contractAddress,
+                        status = contract.status.name,
+                        funded = contract.funded,
+                        balance = if (contract.funded) contract.amount.toString() else "0",
+                        buyer = contract.buyer,
+                        seller = contract.seller,
+                        expiryTimestamp = contract.expiryTimestamp,
+                        amount = contract.amount.toString(),
+                        tokenAddress = escrowProperties.usdcContractAddress,
+                        exists = true
+                    )
+                } else {
+                    errorsMap[contractAddress] = result.error ?: "Contract not found"
+                }
+            }
+            
+            val response = BatchContractInfoJsonResponse(
+                contracts = contractsMap,
+                errors = errorsMap
             )
+            
+            val totalRequested = request.contractAddresses.size
+            val totalSuccessful = contractsMap.size
+            val totalFailed = errorsMap.size
             
             logger.info("Batch contract info completed: $totalRequested requested, $totalSuccessful successful, $totalFailed failed")
             ResponseEntity.ok(response)

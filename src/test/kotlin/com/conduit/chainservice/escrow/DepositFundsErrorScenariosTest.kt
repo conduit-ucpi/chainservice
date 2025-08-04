@@ -1,5 +1,6 @@
 package com.conduit.chainservice.escrow
 
+import com.conduit.chainservice.config.EscrowProperties
 import com.conduit.chainservice.escrow.models.DepositFundsRequest
 import com.conduit.chainservice.service.ContractServiceClient
 import com.conduit.chainservice.service.ContractQueryService
@@ -46,6 +47,9 @@ class DepositFundsErrorScenariosTest {
     @Mock
     private lateinit var emailServiceClient: EmailServiceClient
 
+    @Mock
+    private lateinit var escrowProperties: EscrowProperties
+
     private lateinit var escrowController: EscrowController
 
     @BeforeEach
@@ -56,7 +60,8 @@ class DepositFundsErrorScenariosTest {
             contractQueryService,
             contractServiceClient,
             escrowServicePlugin,
-            emailServiceClient
+            emailServiceClient,
+            escrowProperties
         )
         
         // Use reflection to set chainId
