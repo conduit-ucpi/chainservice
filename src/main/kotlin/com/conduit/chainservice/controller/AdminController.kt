@@ -5,6 +5,7 @@ import com.conduit.chainservice.escrow.models.AdminResolveContractRequest
 import com.conduit.chainservice.escrow.models.AdminResolveContractResponse
 import com.conduit.chainservice.escrow.models.ResolveDisputeRequest
 import com.conduit.chainservice.service.ContractQueryService
+import com.conduit.chainservice.service.CacheInvalidationService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.media.Content
@@ -28,7 +29,8 @@ import org.springframework.web.bind.annotation.*
 @Tag(name = "Admin Operations", description = "Admin-only escrow contract operations")
 class AdminController(
     private val escrowController: EscrowController,
-    private val contractQueryService: ContractQueryService
+    private val contractQueryService: ContractQueryService,
+    private val cacheInvalidationService: CacheInvalidationService
 ) {
 
     private val logger = LoggerFactory.getLogger(AdminController::class.java)
@@ -179,6 +181,66 @@ class AdminController(
                 error = e.message ?: "Internal server error"
             )
             ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response)
+        }
+    }
+
+    @GetMapping("/cache/stats")
+    @Operation(
+        summary = "Get Multi-Level Cache Statistics (Admin Only)", 
+        description = "Returns comprehensive statistics for all cache levels to monitor selective invalidation effectiveness"
+    )
+    @ApiResponses(value = [
+        ApiResponse(responseCode = "200", description = "Cache statistics retrieved successfully"),
+        ApiResponse(responseCode = "403", description = "Access denied - admin privileges required")
+    ])
+    fun getCacheStats(httpServletRequest: HttpServletRequest): ResponseEntity<Map<String, Any>> {
+        return try {
+            val userType = httpServletRequest.getAttribute("userType") as? String
+            if (userType != "admin") {
+                logger.warn("Non-admin user attempted to access cache stats")
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(
+                    mapOf("error" to "Access denied - admin privileges required")
+                )
+            }
+            
+            val stats = cacheInvalidationService.getCacheStats()
+            ResponseEntity.ok(stats)
+            
+        } catch (e: Exception) {
+            logger.error("Error retrieving cache statistics", e)
+            ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
+                mapOf("error" to (e.message ?: "Failed to retrieve cache statistics"))
+            )
+        }
+    }
+
+    @GetMapping("/cache/analysis")
+    @Operation(
+        summary = "Analyze Cache Effectiveness (Admin Only)",
+        description = "Provides detailed analysis of cache effectiveness and selective invalidation status for debugging cache issues"
+    )
+    @ApiResponses(value = [
+        ApiResponse(responseCode = "200", description = "Cache analysis completed successfully"),
+        ApiResponse(responseCode = "403", description = "Access denied - admin privileges required")
+    ])
+    fun analyzeCacheEffectiveness(httpServletRequest: HttpServletRequest): ResponseEntity<Map<String, Any>> {
+        return try {
+            val userType = httpServletRequest.getAttribute("userType") as? String
+            if (userType != "admin") {
+                logger.warn("Non-admin user attempted to access cache analysis")
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(
+                    mapOf("error" to "Access denied - admin privileges required")
+                )
+            }
+            
+            val analysis = cacheInvalidationService.analyzeCacheEffectiveness()
+            ResponseEntity.ok(analysis)
+            
+        } catch (e: Exception) {
+            logger.error("Error analyzing cache effectiveness", e)
+            ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
+                mapOf("error" to (e.message ?: "Failed to analyze cache effectiveness"))
+            )
         }
     }
 }

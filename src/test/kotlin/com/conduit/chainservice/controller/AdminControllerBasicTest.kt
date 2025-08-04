@@ -3,6 +3,7 @@ package com.conduit.chainservice.controller
 import com.conduit.chainservice.escrow.EscrowController
 import com.conduit.chainservice.escrow.models.AdminResolveContractRequest
 import com.conduit.chainservice.service.ContractQueryService
+import com.conduit.chainservice.service.CacheInvalidationService
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -25,13 +26,16 @@ class AdminControllerBasicTest {
     @Mock
     private lateinit var contractQueryService: ContractQueryService
     
+    @Mock
+    private lateinit var cacheInvalidationService: CacheInvalidationService
+    
     private lateinit var adminController: AdminController
     private val objectMapper = ObjectMapper()
 
     @BeforeEach
     fun setup() {
         MockitoAnnotations.openMocks(this)
-        adminController = AdminController(escrowController, contractQueryService)
+        adminController = AdminController(escrowController, contractQueryService, cacheInvalidationService)
         mockMvc = MockMvcBuilders.standaloneSetup(adminController).build()
     }
 

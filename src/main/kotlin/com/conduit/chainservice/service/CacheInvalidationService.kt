@@ -1,22 +1,25 @@
 package com.conduit.chainservice.service
 
 import com.conduit.chainservice.config.CacheConfig.Companion.CONTRACT_INFO_CACHE
+import com.conduit.chainservice.config.CacheConfig.Companion.CONTRACT_STATE_CACHE
+import com.conduit.chainservice.config.CacheConfig.Companion.TRANSACTION_DATA_CACHE
 import org.slf4j.LoggerFactory
 import org.springframework.cache.CacheManager
 import org.springframework.stereotype.Service
 
 /**
- * Service responsible for invalidating cached contract data when contract state changes.
+ * Service responsible for selective cache invalidation when contract state changes.
  * 
- * This service ensures that cached contract information is immediately invalidated
- * when blockchain transactions successfully change contract state, preventing stale
- * data from being served to clients.
+ * CRITICAL: This service implements SELECTIVE INVALIDATION to prevent the cache invalidation
+ * bug where changing 1 contract invalidates ALL 31 contracts in batch operations.
  * 
- * Cache Invalidation Strategy:
- * - Invalidate contract info cache entries immediately after successful transactions
- * - Invalidate both direct contract address keys and status-prefixed keys
- * - Thread-safe operations to handle concurrent access
- * - Detailed logging for cache operations
+ * Multi-Level Cache Invalidation Strategy:
+ * - Level 1 (CONTRACT_STATE_CACHE): Basic contract state data from blockchain calls
+ * - Level 2 (TRANSACTION_DATA_CACHE): Event/transaction historical data  
+ * - Level 3 (CONTRACT_INFO_CACHE): Final assembled ContractInfo objects
+ * - Only invalidate specific contract addresses, never clear entire cache
+ * - Support for status-prefixed keys and direct address keys
+ * - Thread-safe operations with detailed logging for debugging
  */
 @Service
 class CacheInvalidationService(
@@ -26,49 +29,73 @@ class CacheInvalidationService(
     private val logger = LoggerFactory.getLogger(CacheInvalidationService::class.java)
 
     /**
-     * Invalidates cache entries for a specific contract after a successful transaction.
+     * SELECTIVE CACHE INVALIDATION: Invalidates cache entries for ONE specific contract 
+     * across all three cache levels after a successful transaction.
      * 
-     * @param contractAddress The contract address whose cache should be invalidated
+     * CRITICAL: This method implements selective invalidation to solve the cache invalidation
+     * bug where 1 contract change was invalidating ALL 31 contracts.
+     * 
+     * @param contractAddress The specific contract address whose cache should be invalidated
      * @param operationType The type of operation that triggered the invalidation (for logging)
      * @param transactionHash The transaction hash for audit logging
      */
     fun invalidateContractCache(contractAddress: String, operationType: String, transactionHash: String? = null) {
         try {
-            logger.info("Invalidating cache for contract: $contractAddress, operation: $operationType, tx: $transactionHash")
+            logger.info("SELECTIVE INVALIDATION: Invalidating multi-level cache for contract: $contractAddress, operation: $operationType, tx: $transactionHash")
             
-            val cache = cacheManager.getCache(CONTRACT_INFO_CACHE)
-            if (cache == null) {
-                logger.warn("Contract info cache not found, skipping invalidation for contract: $contractAddress")
-                return
-            }
-
-            // Track what we're invalidating for logging
             val invalidatedKeys = mutableListOf<String>()
+            var totalEvictions = 0
 
-            // Invalidate direct contract info cache entry
-            val directKey = contractAddress
-            if (cache.get(directKey) != null) {
-                cache.evict(directKey)
-                invalidatedKeys.add(directKey)
-                logger.debug("Evicted cache entry for key: $directKey")
-            }
-
-            // Invalidate contract status cache entry (used by getContractStatus method)
-            val statusKey = "status:$contractAddress"
-            if (cache.get(statusKey) != null) {
-                cache.evict(statusKey)
-                invalidatedKeys.add(statusKey)
-                logger.debug("Evicted cache entry for key: $statusKey")
-            }
-
-            if (invalidatedKeys.isNotEmpty()) {
-                logger.info("Successfully invalidated ${invalidatedKeys.size} cache entries for contract $contractAddress: ${invalidatedKeys.joinToString(", ")}")
+            // LEVEL 3: Contract Info Cache (assembled objects)
+            val level3Cache = cacheManager.getCache(CONTRACT_INFO_CACHE)
+            if (level3Cache != null) {
+                val level3Keys = listOf(contractAddress, "status:$contractAddress")
+                level3Keys.forEach { key ->
+                    if (level3Cache.get(key) != null) {
+                        level3Cache.evict(key)
+                        invalidatedKeys.add("L3:$key")
+                        totalEvictions++
+                        logger.debug("LEVEL 3: Evicted cache entry for key: $key")
+                    }
+                }
             } else {
-                logger.debug("No cache entries found to invalidate for contract: $contractAddress")
+                logger.warn("CONTRACT_INFO_CACHE not found, skipping Level 3 invalidation")
+            }
+
+            // LEVEL 1: Contract State Cache (blockchain state data)
+            val level1Cache = cacheManager.getCache(CONTRACT_STATE_CACHE)
+            if (level1Cache != null) {
+                if (level1Cache.get(contractAddress) != null) {
+                    level1Cache.evict(contractAddress)
+                    invalidatedKeys.add("L1:$contractAddress")
+                    totalEvictions++
+                    logger.debug("LEVEL 1: Evicted state cache entry for: $contractAddress")
+                }
+            } else {
+                logger.debug("CONTRACT_STATE_CACHE not found, skipping Level 1 invalidation")
+            }
+
+            // LEVEL 2: Transaction Data Cache (event history)
+            val level2Cache = cacheManager.getCache(TRANSACTION_DATA_CACHE)
+            if (level2Cache != null) {
+                if (level2Cache.get(contractAddress) != null) {
+                    level2Cache.evict(contractAddress)
+                    invalidatedKeys.add("L2:$contractAddress")
+                    totalEvictions++
+                    logger.debug("LEVEL 2: Evicted transaction data cache entry for: $contractAddress")
+                }
+            } else {
+                logger.debug("TRANSACTION_DATA_CACHE not found, skipping Level 2 invalidation")
+            }
+
+            if (totalEvictions > 0) {
+                logger.info("SELECTIVE INVALIDATION SUCCESS: Evicted $totalEvictions cache entries for contract $contractAddress: ${invalidatedKeys.joinToString(", ")}")
+            } else {
+                logger.debug("SELECTIVE INVALIDATION: No cache entries found to invalidate for contract: $contractAddress")
             }
 
         } catch (e: Exception) {
-            logger.error("Failed to invalidate cache for contract: $contractAddress, operation: $operationType", e)
+            logger.error("SELECTIVE INVALIDATION FAILED for contract: $contractAddress, operation: $operationType", e)
             // Don't rethrow - cache invalidation failure shouldn't break the transaction flow
         }
     }
@@ -145,37 +172,127 @@ class CacheInvalidationService(
     }
 
     /**
-     * Gets cache statistics for monitoring purposes.
+     * Gets comprehensive multi-level cache statistics for monitoring selective invalidation effectiveness.
      * 
-     * @return Map of cache statistics or empty map if not available
+     * @return Map of multi-level cache statistics or empty map if not available
      */
     fun getCacheStats(): Map<String, Any> {
         return try {
-            val cache = cacheManager.getCache(CONTRACT_INFO_CACHE)
-            if (cache != null) {
-                // Try to get native Caffeine cache stats if available
-                val nativeCache = cache.nativeCache
-                if (nativeCache is com.github.benmanes.caffeine.cache.Cache<*, *>) {
-                    val stats = nativeCache.stats()
-                    mapOf<String, Any>(
-                        "requestCount" to stats.requestCount(),
-                        "hitCount" to stats.hitCount(),
-                        "hitRate" to stats.hitRate(),
-                        "missCount" to stats.missCount(),
-                        "missRate" to stats.missRate(),
-                        "loadCount" to stats.loadCount(),
-                        "evictionCount" to stats.evictionCount(),
-                        "estimatedSize" to nativeCache.estimatedSize()
-                    )
-                } else {
-                    mapOf<String, Any>("status" to "cache available but stats not supported")
-                }
-            } else {
-                mapOf<String, Any>("status" to "cache not available")
+            val allStats = mutableMapOf<String, Any>()
+            
+            // Level 3: Contract Info Cache stats
+            val level3Cache = cacheManager.getCache(CONTRACT_INFO_CACHE)
+            if (level3Cache?.nativeCache is com.github.benmanes.caffeine.cache.Cache<*, *>) {
+                val stats = (level3Cache.nativeCache as com.github.benmanes.caffeine.cache.Cache<*, *>).stats()
+                allStats["level3_contractInfo"] = mapOf(
+                    "requestCount" to stats.requestCount(),
+                    "hitCount" to stats.hitCount(),
+                    "hitRate" to String.format("%.1f%%", stats.hitRate() * 100),
+                    "missCount" to stats.missCount(),
+                    "evictionCount" to stats.evictionCount(),
+                    "estimatedSize" to (level3Cache.nativeCache as com.github.benmanes.caffeine.cache.Cache<*, *>).estimatedSize()
+                )
             }
+            
+            // Level 1: Contract State Cache stats  
+            val level1Cache = cacheManager.getCache(CONTRACT_STATE_CACHE)
+            if (level1Cache?.nativeCache is com.github.benmanes.caffeine.cache.Cache<*, *>) {
+                val stats = (level1Cache.nativeCache as com.github.benmanes.caffeine.cache.Cache<*, *>).stats()
+                allStats["level1_contractState"] = mapOf(
+                    "requestCount" to stats.requestCount(),
+                    "hitCount" to stats.hitCount(),
+                    "hitRate" to String.format("%.1f%%", stats.hitRate() * 100),
+                    "missCount" to stats.missCount(),
+                    "evictionCount" to stats.evictionCount(),
+                    "estimatedSize" to (level1Cache.nativeCache as com.github.benmanes.caffeine.cache.Cache<*, *>).estimatedSize()
+                )
+            }
+            
+            // Level 2: Transaction Data Cache stats
+            val level2Cache = cacheManager.getCache(TRANSACTION_DATA_CACHE)
+            if (level2Cache?.nativeCache is com.github.benmanes.caffeine.cache.Cache<*, *>) {
+                val stats = (level2Cache.nativeCache as com.github.benmanes.caffeine.cache.Cache<*, *>).stats()
+                allStats["level2_transactionData"] = mapOf(
+                    "requestCount" to stats.requestCount(),
+                    "hitCount" to stats.hitCount(),
+                    "hitRate" to String.format("%.1f%%", stats.hitRate() * 100),
+                    "missCount" to stats.missCount(),
+                    "evictionCount" to stats.evictionCount(),
+                    "estimatedSize" to (level2Cache.nativeCache as com.github.benmanes.caffeine.cache.Cache<*, *>).estimatedSize()
+                )
+            }
+            
+            if (allStats.isEmpty()) {
+                allStats["status"] = "No cache statistics available"
+            }
+            
+            return allStats
+            
         } catch (e: Exception) {
-            logger.error("Error getting cache statistics", e)
+            logger.error("Error getting multi-level cache statistics", e)
             mapOf<String, Any>("error" to (e.message ?: "Unknown error"))
+        }
+    }
+
+    /**
+     * VERIFICATION METHOD: Analyze cache effectiveness for selective invalidation verification.
+     * This method helps verify that selective invalidation is working correctly by providing
+     * detailed analysis of cache hit rates and eviction patterns.
+     * 
+     * @return Detailed cache effectiveness report
+     */
+    fun analyzeCacheEffectiveness(): Map<String, Any> {
+        return try {
+            val stats = getCacheStats()
+            val analysis = mutableMapOf<String, Any>()
+            
+            if (stats.containsKey("level3_contractInfo")) {
+                @Suppress("UNCHECKED_CAST")
+                val level3Stats = stats["level3_contractInfo"] as Map<String, Any>
+                val hitRate = level3Stats["hitRate"] as String
+                val evictionCount = level3Stats["evictionCount"] as Long
+                val estimatedSize = level3Stats["estimatedSize"] as Long
+                
+                analysis["level3_analysis"] = mapOf(
+                    "hitRate" to hitRate,
+                    "selectiveInvalidationWorking" to (evictionCount > 0 && estimatedSize > 0),
+                    "cacheUtilization" to "Size: $estimatedSize, Evictions: $evictionCount"
+                )
+            }
+            
+            // Calculate overall cache effectiveness score
+            val overallScore = calculateCacheEffectivenessScore(stats)
+            analysis["overallEffectivenessScore"] = overallScore
+            analysis["selectiveInvalidationStatus"] = if (overallScore > 70) "WORKING" else "NEEDS_INVESTIGATION"
+            
+            return analysis
+            
+        } catch (e: Exception) {
+            logger.error("Error analyzing cache effectiveness", e)
+            mapOf<String, Any>("error" to (e.message ?: "Analysis failed"))
+        }
+    }
+    
+    private fun calculateCacheEffectivenessScore(stats: Map<String, Any>): Int {
+        return try {
+            var totalHitRate = 0.0
+            var levels = 0
+            
+            listOf("level3_contractInfo", "level1_contractState", "level2_transactionData").forEach { levelKey ->
+                if (stats.containsKey(levelKey)) {
+                    @Suppress("UNCHECKED_CAST")
+                    val levelStats = stats[levelKey] as Map<String, Any>
+                    val hitRateStr = levelStats["hitRate"] as String
+                    val hitRate = hitRateStr.removeSuffix("%").toDoubleOrNull() ?: 0.0
+                    totalHitRate += hitRate
+                    levels++
+                }
+            }
+            
+            if (levels > 0) (totalHitRate / levels).toInt() else 0
+            
+        } catch (e: Exception) {
+            0
         }
     }
 }

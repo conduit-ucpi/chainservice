@@ -32,10 +32,10 @@ class CacheConfig {
         const val GAS_PRICE_CACHE = "gasPrice"
         const val BLOCK_DATA_CACHE = "blockData"
         
-        // TTL settings - Optimized for performance
-        private val CONTRACT_INFO_TTL = Duration.ofMinutes(2)
-        private val CONTRACT_STATE_TTL = Duration.ofMinutes(1)  // Shorter TTL for state data
-        private val TRANSACTION_DATA_TTL = Duration.ofMinutes(5)  // Longer TTL for historical data
+        // TTL settings - Optimized for performance with longer TTLs + selective invalidation
+        private val CONTRACT_INFO_TTL = Duration.ofMinutes(15)      // Increased from 2min to 15min
+        private val CONTRACT_STATE_TTL = Duration.ofMinutes(12)     // Increased from 1min to 12min  
+        private val TRANSACTION_DATA_TTL = Duration.ofMinutes(20)   // Increased from 5min to 20min
         private val GAS_PRICE_TTL = Duration.ofSeconds(30)
         private val BLOCK_DATA_TTL = Duration.ofSeconds(15)
         
