@@ -49,7 +49,7 @@ class ContractQueryServiceTest {
         
         // Remove private method mocking - test will use real implementation
 
-        val result = contractQueryService.getContractsForWallet(walletAddress)
+        val result = contractQueryService.getContractsForWallet(walletAddress, null)
 
         assertEquals(2, result.size)
         assertTrue(result.any { it.contractAddress == contract1 })
@@ -100,7 +100,7 @@ class ContractQueryServiceTest {
         whenever(eventParsingService.findContractsByParticipant(walletAddress))
             .thenReturn(emptyList())
 
-        val result = contractQueryService.getContractsForWallet(walletAddress)
+        val result = contractQueryService.getContractsForWallet(walletAddress, null)
 
         assertEquals(0, result.size)
         verify(eventParsingService).findContractsByParticipant(walletAddress)
@@ -111,7 +111,7 @@ class ContractQueryServiceTest {
         whenever(eventParsingService.findContractsByParticipant(walletAddress))
             .thenThrow(RuntimeException("Blockchain error"))
 
-        val result = contractQueryService.getContractsForWallet(walletAddress)
+        val result = contractQueryService.getContractsForWallet(walletAddress, null)
 
         assertEquals(0, result.size)
     }

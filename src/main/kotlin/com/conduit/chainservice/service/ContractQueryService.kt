@@ -31,7 +31,7 @@ class ContractQueryService(
     private val web3j: Web3j,
     private val escrowProperties: EscrowProperties,
     private val eventParsingService: EventParsingService
-) {
+) : ContractQueryServiceInterface {
 
     private val logger = LoggerFactory.getLogger(ContractQueryService::class.java)
 
@@ -87,7 +87,7 @@ class ContractQueryService(
         }
     }
 
-    suspend fun getContractsForWallet(walletAddress: String, userType: String? = null): List<ContractInfo> {
+    override suspend fun getContractsForWallet(walletAddress: String, userType: String?): List<ContractInfo> {
         return try {
             logger.info("Querying contracts for wallet: $walletAddress, userType: $userType")
 
@@ -115,7 +115,7 @@ class ContractQueryService(
         }
     }
 
-    suspend fun getContractInfo(contractAddress: String): ContractInfo? {
+    override suspend fun getContractInfo(contractAddress: String): ContractInfo? {
         return try {
             val contractData = queryContractState(contractAddress)
             val eventHistory = eventParsingService.parseContractEvents(contractAddress)
@@ -394,7 +394,7 @@ class ContractQueryService(
      * Performance: 31 contracts in <5 seconds (was 30+ seconds)
      * RPC Calls: Maximum 2 batch calls regardless of contract count
      */
-    suspend fun getBatchContractInfo(contractAddresses: List<String>): Map<String, ContractInfoResult> = coroutineScope {
+    override suspend fun getBatchContractInfo(contractAddresses: List<String>): Map<String, ContractInfoResult> = coroutineScope {
         logger.info("Starting OPTIMIZED batch query for ${contractAddresses.size} contracts")
         val startTime = System.currentTimeMillis()
         

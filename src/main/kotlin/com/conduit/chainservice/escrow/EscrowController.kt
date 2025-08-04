@@ -3,7 +3,7 @@ package com.conduit.chainservice.escrow
 import com.conduit.chainservice.config.EscrowProperties
 import com.conduit.chainservice.escrow.models.*
 import com.conduit.chainservice.escrow.validation.EmailFieldValidator
-import com.conduit.chainservice.service.ContractQueryService
+import com.conduit.chainservice.service.ContractQueryServiceInterface
 import com.conduit.chainservice.service.ContractServiceClient
 import com.conduit.chainservice.service.EmailServiceClient
 import com.utility.chainservice.models.OperationGasCost
@@ -32,7 +32,7 @@ import java.time.Instant
 @Tag(name = "Escrow Service", description = "Blockchain escrow contract management and transaction relay API")
 class EscrowController(
     private val escrowTransactionService: EscrowTransactionService,
-    private val contractQueryService: ContractQueryService,
+    private val contractQueryService: ContractQueryServiceInterface,
     private val contractServiceClient: ContractServiceClient,
     private val escrowServicePlugin: EscrowServicePlugin,
     private val emailServiceClient: EmailServiceClient,

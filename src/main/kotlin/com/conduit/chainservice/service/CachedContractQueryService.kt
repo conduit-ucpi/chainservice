@@ -39,25 +39,36 @@ class CachedContractQueryService(
     @Qualifier("originalContractQueryService") private val originalService: ContractQueryService,
     private val cacheMetricsService: CacheMetricsService,
     private val cacheManager: CacheManager
-) {
+) : ContractQueryServiceInterface {
 
     private val logger = LoggerFactory.getLogger(CachedContractQueryService::class.java)
 
-    suspend fun getContractsForWallet(walletAddress: String, userType: String? = null): List<ContractInfo> {
+    override suspend fun getContractsForWallet(walletAddress: String, userType: String?): List<ContractInfo> {
         logger.debug("Getting contracts for wallet: $walletAddress, userType: $userType")
         cacheMetricsService.recordCacheRequest("getContractsForWallet")
         
         return originalService.getContractsForWallet(walletAddress, userType)
     }
 
-    @Cacheable(value = [CONTRACT_INFO_CACHE], key = "#contractAddress")
-    suspend fun getContractInfo(contractAddress: String): ContractInfo? {
-        logger.debug("Cache miss for contract info: $contractAddress")
+    override suspend fun getContractInfo(contractAddress: String): ContractInfo? {
+        // First check if it's in cache already
+        val cachedResult = getCachedContractInfo(contractAddress)
+        if (cachedResult != null) {
+            logger.info("CACHE HIT: getContractInfo for contract $contractAddress - returning cached result")
+            cacheMetricsService.recordCacheHit("contractInfo")
+            return cachedResult
+        }
+        
+        logger.info("CACHE MISS: getContractInfo for contract $contractAddress - querying original service")
         cacheMetricsService.recordCacheMiss("contractInfo")
         
         val result = originalService.getContractInfo(contractAddress)
         if (result != null) {
-            logger.debug("Cached contract info for: $contractAddress")
+            logger.info("CACHED: Contract info stored for $contractAddress")
+            // Manually cache the result
+            cacheContractInfo(contractAddress, result)
+        } else {
+            logger.warn("CACHE MISS: No contract info found for $contractAddress")
         }
         return result
     }
@@ -81,7 +92,7 @@ class CachedContractQueryService(
      * 
      * Performance: 31 contracts in <5 seconds, 80%+ cache hit rate
      */
-    suspend fun getBatchContractInfo(contractAddresses: List<String>): Map<String, ContractInfoResult> = coroutineScope {
+    override suspend fun getBatchContractInfo(contractAddresses: List<String>): Map<String, ContractInfoResult> = coroutineScope {
         logger.info("Starting TWO-LEVEL batch query for ${contractAddresses.size} contracts")
         val startTime = System.currentTimeMillis()
         cacheMetricsService.recordCacheRequest("getBatchContractInfo", contractAddresses.size)
