@@ -25,18 +25,24 @@ class CacheConfig {
     private val logger = LoggerFactory.getLogger(CacheConfig::class.java)
 
     companion object {
-        // Cache names
+        // Cache names - Two-level caching strategy
         const val CONTRACT_INFO_CACHE = "contractInfo"
+        const val CONTRACT_STATE_CACHE = "contractState"  // Level 1: Contract state data
+        const val TRANSACTION_DATA_CACHE = "transactionData"  // Level 2: Event/transaction data
         const val GAS_PRICE_CACHE = "gasPrice"
         const val BLOCK_DATA_CACHE = "blockData"
         
-        // TTL settings
+        // TTL settings - Optimized for performance
         private val CONTRACT_INFO_TTL = Duration.ofMinutes(2)
+        private val CONTRACT_STATE_TTL = Duration.ofMinutes(1)  // Shorter TTL for state data
+        private val TRANSACTION_DATA_TTL = Duration.ofMinutes(5)  // Longer TTL for historical data
         private val GAS_PRICE_TTL = Duration.ofSeconds(30)
         private val BLOCK_DATA_TTL = Duration.ofSeconds(15)
         
-        // Cache size limits
+        // Cache size limits - Increased for batch operations
         private const val CONTRACT_INFO_MAX_SIZE = 10000L
+        private const val CONTRACT_STATE_MAX_SIZE = 15000L  // Larger for state cache
+        private const val TRANSACTION_DATA_MAX_SIZE = 20000L  // Largest for tx data
         private const val GAS_PRICE_MAX_SIZE = 100L
         private const val BLOCK_DATA_MAX_SIZE = 1000L
     }
@@ -50,6 +56,8 @@ class CacheConfig {
         
         val caches = listOf(
             createContractInfoCache(),
+            createContractStateCache(),
+            createTransactionDataCache(),
             createGasPriceCache(),
             createBlockDataCache()
         )
@@ -83,6 +91,30 @@ class CacheConfig {
             .build<Any, Any>()
             
         return CaffeineCache(GAS_PRICE_CACHE, caffeine)
+    }
+
+    private fun createContractStateCache(): CaffeineCache {
+        logger.info("Creating contract state cache with TTL: $CONTRACT_STATE_TTL, max size: $CONTRACT_STATE_MAX_SIZE")
+        
+        val caffeine = Caffeine.newBuilder()
+            .maximumSize(CONTRACT_STATE_MAX_SIZE)
+            .expireAfterWrite(CONTRACT_STATE_TTL)
+            .recordStats()
+            .build<Any, Any>()
+            
+        return CaffeineCache(CONTRACT_STATE_CACHE, caffeine)
+    }
+
+    private fun createTransactionDataCache(): CaffeineCache {
+        logger.info("Creating transaction data cache with TTL: $TRANSACTION_DATA_TTL, max size: $TRANSACTION_DATA_MAX_SIZE")
+        
+        val caffeine = Caffeine.newBuilder()
+            .maximumSize(TRANSACTION_DATA_MAX_SIZE)
+            .expireAfterWrite(TRANSACTION_DATA_TTL)
+            .recordStats()
+            .build<Any, Any>()
+            
+        return CaffeineCache(TRANSACTION_DATA_CACHE, caffeine)
     }
 
     private fun createBlockDataCache(): CaffeineCache {
