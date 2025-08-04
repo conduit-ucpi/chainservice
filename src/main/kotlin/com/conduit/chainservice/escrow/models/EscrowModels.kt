@@ -42,6 +42,7 @@ data class RaiseDisputeRequest(
     val amount: String? = null,
     val currency: String? = null,
     val payoutDateTime: String? = null,
+    val link: String? = null,
     
     @field:NotBlank(message = "Product name is required")
     val productName: String
@@ -98,6 +99,7 @@ data class ResolveDisputeRequest(
     val amount: String? = null,
     val currency: String? = null,
     val payoutDateTime: String? = null,
+    val link: String? = null,
     
     val sellerActualAmount: String? = null,
     val buyerActualAmount: String? = null

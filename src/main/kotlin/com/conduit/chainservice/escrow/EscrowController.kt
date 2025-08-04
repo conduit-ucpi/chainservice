@@ -125,7 +125,7 @@ class EscrowController(
     @PostMapping("/raise-dispute")
     @Operation(
         summary = "Raise Dispute",
-        description = "Raises a dispute on an existing escrow contract by relaying a user-signed transaction. The service provides gas money and forwards the user-signed transaction. The frontend must provide a transaction signed by the buyer or seller's wallet."
+        description = "Raises a dispute on an existing escrow contract by relaying a user-signed transaction. The service provides gas money and forwards the user-signed transaction. The frontend must provide a transaction signed by the buyer or seller's wallet. Optional email notification fields can be provided, including a link parameter that will be included in dispute notification emails."
     )
     @ApiResponses(value = [
         ApiResponse(
@@ -145,7 +145,7 @@ class EscrowController(
             content = [Content(
                 examples = [ExampleObject(
                     name = "Raise Dispute Example",
-                    value = """{"contractAddress": "0x1234567890abcdef1234567890abcdef12345678", "userWalletAddress": "0x9876543210fedcba9876543210fedcba98765432", "signedTransaction": "0xf86c8082520894..."}"""
+                    value = """{"contractAddress": "0x1234567890abcdef1234567890abcdef12345678", "userWalletAddress": "0x9876543210fedcba9876543210fedcba98765432", "signedTransaction": "0xf86c8082520894...", "productName": "Sample Product", "buyerEmail": "buyer@example.com", "sellerEmail": "seller@example.com", "contractDescription": "Product purchase", "amount": "100.00", "currency": "USDC", "payoutDateTime": "2024-12-31T23:59:59Z", "link": "https://app.conduit.com/contract/0x1234567890abcdef1234567890abcdef12345678"}"""
                 )]
             )]
         )
@@ -188,8 +188,9 @@ class EscrowController(
                         val validatedBuyerEmail = request.buyerEmail ?: throw IllegalStateException("BuyerEmail is null despite validation")
                         val validatedSellerEmail = request.sellerEmail ?: throw IllegalStateException("SellerEmail is null despite validation")
                         val validatedCurrency = request.currency ?: "USDC"
+                        val validatedLink = request.link ?: "$serviceLink/contract/${request.contractAddress}"
                         
-                        logger.info("Sending dispute raised emails with validated values: amount=$validatedAmount, payoutDateTime=$validatedPayoutDateTime, description=$validatedContractDescription, product=$validatedProductName")
+                        logger.info("Sending dispute raised emails with validated values: amount=$validatedAmount, payoutDateTime=$validatedPayoutDateTime, description=$validatedContractDescription, product=$validatedProductName, link=$validatedLink")
                         
                         // Send notification to both parties about the dispute
                         runBlocking {
@@ -203,6 +204,7 @@ class EscrowController(
                                 contractDescription = validatedContractDescription,
                                 payoutDateTime = validatedPayoutDateTime,
                                 productName = validatedProductName,
+                                link = validatedLink,
                                 httpRequest = httpRequest
                             ).block()
                             
@@ -216,6 +218,7 @@ class EscrowController(
                                 contractDescription = validatedContractDescription,
                                 payoutDateTime = validatedPayoutDateTime,
                                 productName = validatedProductName,
+                                link = validatedLink,
                                 httpRequest = httpRequest
                             ).block()
                         }
@@ -481,7 +484,7 @@ class EscrowController(
     @PostMapping("/resolve-dispute")
     @Operation(
         summary = "Resolve Dispute (Admin Only)",
-        description = "Resolves a dispute by transferring funds to the specified recipient. This is an admin-only operation."
+        description = "Resolves a dispute by transferring funds to the specified recipient. This is an admin-only operation. Optional email notification fields can be provided, including a link parameter that will be included in dispute resolved notification emails."
     )
     @ApiResponses(value = [
         ApiResponse(
@@ -502,7 +505,7 @@ class EscrowController(
                 examples = [
                     ExampleObject(
                         name = "Percentage-based Resolution",
-                        value = """{"contractAddress": "0x1234...abcd", "buyerPercentage": 60.0, "sellerPercentage": 40.0, "resolutionNote": "Admin resolution note"}"""
+                        value = """{"contractAddress": "0x1234...abcd", "buyerPercentage": 60.0, "sellerPercentage": 40.0, "resolutionNote": "Admin resolution note", "buyerEmail": "buyer@example.com", "sellerEmail": "seller@example.com", "contractDescription": "Product purchase", "amount": "100.00", "currency": "USDC", "payoutDateTime": "2024-12-31T23:59:59Z", "sellerActualAmount": "40.00", "buyerActualAmount": "60.00", "link": "https://app.conduit.com/contract/0x1234...abcd"}"""
                     ),
                     ExampleObject(
                         name = "Legacy Single Recipient (deprecated)",
@@ -582,6 +585,7 @@ class EscrowController(
                         // Calculate percentages if not provided
                         val sellerPercentage = request.sellerPercentage?.toString() ?: (if (request.buyerPercentage != null) (100.0 - request.buyerPercentage!!).toString() else "0")
                         val buyerPercentage = request.buyerPercentage?.toString() ?: (if (request.sellerPercentage != null) (100.0 - request.sellerPercentage!!).toString() else "0")
+                        val validatedLink = request.link ?: "$serviceLink/contract/${request.contractAddress}"
                         
                         runBlocking {
                             // Notify buyer
@@ -597,6 +601,7 @@ class EscrowController(
                                 sellerActualAmount = request.sellerActualAmount!!,
                                 buyerPercentage = buyerPercentage,
                                 buyerActualAmount = request.buyerActualAmount!!,
+                                link = validatedLink,
                                 httpRequest = httpRequest
                             ).block()
                             
@@ -613,6 +618,7 @@ class EscrowController(
                                 sellerActualAmount = request.sellerActualAmount!!,
                                 buyerPercentage = buyerPercentage,
                                 buyerActualAmount = request.buyerActualAmount!!,
+                                link = validatedLink,
                                 httpRequest = httpRequest
                             ).block()
                         }

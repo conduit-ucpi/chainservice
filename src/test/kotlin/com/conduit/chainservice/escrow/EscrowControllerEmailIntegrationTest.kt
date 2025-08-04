@@ -104,7 +104,7 @@ class EscrowControllerEmailIntegrationTest {
             ))
         }
 
-        whenever(emailServiceClient.sendDisputeRaised(any(), any(), any(), any(), any(), any(), any(), any(), any()))
+        whenever(emailServiceClient.sendDisputeRaised(any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
             .thenReturn(Mono.just(SendEmailResponse(true, "msg-123", "Email sent successfully")))
 
         // Act & Assert
@@ -116,7 +116,7 @@ class EscrowControllerEmailIntegrationTest {
 
         // Verify email service was called twice (buyer and seller)
         verify(emailServiceClient, times(2)).sendDisputeRaised(
-            any(), any(), any(), any(), any(), any(), any(), any(), any()
+            any(), any(), any(), any(), any(), any(), any(), any(), any(), any()
         )
     }
 
@@ -144,7 +144,7 @@ class EscrowControllerEmailIntegrationTest {
 
         // Verify email service was never called
         verify(emailServiceClient, never()).sendDisputeRaised(
-            any(), any(), any(), any(), any(), any(), any(), any(), any()
+            any(), any(), any(), any(), any(), any(), any(), any(), any(), any()
         )
         
         // Verify transaction service was never called due to validation failure
@@ -183,7 +183,7 @@ class EscrowControllerEmailIntegrationTest {
 
         // Verify email service was never called
         verify(emailServiceClient, never()).sendDisputeRaised(
-            any(), any(), any(), any(), any(), any(), any(), any(), any()
+            any(), any(), any(), any(), any(), any(), any(), any(), any(), any()
         )
     }
 
@@ -297,7 +297,7 @@ class EscrowControllerEmailIntegrationTest {
             ))
         }
 
-        whenever(emailServiceClient.sendDisputeResolved(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
+        whenever(emailServiceClient.sendDisputeResolved(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
             .thenReturn(Mono.just(SendEmailResponse(true, "msg-123", "Email sent successfully")))
 
         // Act & Assert
@@ -309,7 +309,54 @@ class EscrowControllerEmailIntegrationTest {
 
         // Verify email service was called twice (buyer and seller)
         verify(emailServiceClient, times(2)).sendDisputeResolved(
-            any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()
+            any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()
+        )
+    }
+
+    @Test
+    fun `resolve dispute with custom link should use provided link in email notifications`() {
+        // Arrange
+        val customLink = "https://custom.example.com/contract/0x1234567890abcdef1234567890abcdef12345678"
+        val request = ResolveDisputeRequest(
+            contractAddress = "0x1234567890abcdef1234567890abcdef12345678",
+            buyerPercentage = 60.0,
+            sellerPercentage = 40.0,
+            buyerEmail = "buyer@example.com",
+            sellerEmail = "seller@example.com",
+            amount = "100.00 USDC",
+            currency = "USDC",
+            payoutDateTime = "2024-12-31T23:59:59Z",
+            contractDescription = "Test escrow contract",
+            sellerActualAmount = "40.00 USDC",
+            buyerActualAmount = "60.00 USDC",
+            link = customLink
+        )
+
+        runBlocking {
+            whenever(escrowTransactionService.resolveDisputeWithPercentages(
+                eq(request.contractAddress),
+                eq(60.0),
+                eq(40.0)
+            )).thenReturn(TransactionResult(
+                success = true,
+                transactionHash = "0xabc123...",
+                error = null
+            ))
+        }
+
+        whenever(emailServiceClient.sendDisputeResolved(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), eq(customLink), any()))
+            .thenReturn(Mono.just(SendEmailResponse(true, "msg-123", "Email sent successfully")))
+
+        // Act & Assert
+        mockMvc.perform(post("/api/chain/resolve-dispute")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(objectMapper.writeValueAsString(request)))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.success").value(true))
+
+        // Verify email service was called twice with the custom link
+        verify(emailServiceClient, times(2)).sendDisputeResolved(
+            any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), eq(customLink), any()
         )
     }
 
@@ -337,7 +384,7 @@ class EscrowControllerEmailIntegrationTest {
 
         // Verify email service was never called
         verify(emailServiceClient, never()).sendDisputeResolved(
-            any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()
+            any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()
         )
         
         // Verify transaction service was never called due to validation failure

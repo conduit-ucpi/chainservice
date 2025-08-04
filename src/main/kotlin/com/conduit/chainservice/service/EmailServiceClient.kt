@@ -24,6 +24,7 @@ data class PaymentNotificationRequest(
 data class DisputeRaisedRequest(
     val to: String,
     val buyerEmail: String,
+    val link: String,
     val amount: String,
     val currency: String,
     val description: String,
@@ -43,7 +44,8 @@ data class DisputeResolvedRequest(
     val sellerPercentAmount: String,
     val sellerActualAmount: String,
     val buyerPercentAmount: String,
-    val buyerActualAmount: String
+    val buyerActualAmount: String,
+    val link: String
 )
 
 data class SendEmailResponse(
@@ -157,6 +159,7 @@ class EmailServiceClient(
         contractDescription: String,
         payoutDateTime: String,
         productName: String,
+        link: String,
         httpRequest: HttpServletRequest
     ): Mono<SendEmailResponse> {
         if (!enabled) {
@@ -171,6 +174,7 @@ class EmailServiceClient(
         val emailRequest = DisputeRaisedRequest(
             to = recipientEmail,
             buyerEmail = buyerEmail,
+            link = link,
             amount = amount,
             currency = currency,
             description = contractDescription,
@@ -238,6 +242,7 @@ class EmailServiceClient(
         sellerActualAmount: String,
         buyerPercentage: String,
         buyerActualAmount: String,
+        link: String,
         httpRequest: HttpServletRequest
     ): Mono<SendEmailResponse> {
         if (!enabled) {
@@ -260,7 +265,8 @@ class EmailServiceClient(
             sellerPercentAmount = sellerPercentage,
             sellerActualAmount = sellerActualAmount,
             buyerPercentAmount = buyerPercentage,
-            buyerActualAmount = buyerActualAmount
+            buyerActualAmount = buyerActualAmount,
+            link = link
         )
 
         logger.info("Sending dispute resolved notification email to: $recipientEmail")
