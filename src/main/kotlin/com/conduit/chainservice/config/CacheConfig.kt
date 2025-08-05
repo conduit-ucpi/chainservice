@@ -48,7 +48,6 @@ class CacheConfig {
     }
 
     @Bean
-    @Primary
     fun cacheManager(): SimpleCacheManager {
         logger.info("Initializing cache manager with Caffeine")
         

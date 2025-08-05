@@ -92,19 +92,19 @@ class CacheVerificationTest {
     @Test
     fun `cached service should be marked as Primary and used by Spring`() {
         // This test verifies the Spring configuration is correct
-        val cachedServiceClass = CachedContractQueryService::class.java
+        val stateAwareCachedServiceClass = StateAwareCachedContractQueryService::class.java
         
-        // Check that CachedContractQueryService has @Primary annotation
-        val primaryAnnotation = cachedServiceClass.getAnnotation(org.springframework.context.annotation.Primary::class.java)
-        assertNotNull(primaryAnnotation, "CachedContractQueryService should have @Primary annotation")
+        // Check that StateAwareCachedContractQueryService has @Primary annotation
+        val primaryAnnotation = stateAwareCachedServiceClass.getAnnotation(org.springframework.context.annotation.Primary::class.java)
+        assertNotNull(primaryAnnotation, "StateAwareCachedContractQueryService should have @Primary annotation")
         
         // Check that it implements the interface
-        val interfaces = cachedServiceClass.interfaces
+        val interfaces = stateAwareCachedServiceClass.interfaces
         assertTrue(
             interfaces.contains(ContractQueryServiceInterface::class.java),
-            "CachedContractQueryService should implement ContractQueryServiceInterface"
+            "StateAwareCachedContractQueryService should implement ContractQueryServiceInterface"
         )
         
-        println("✅ Spring configuration verification passed - @Primary annotation found")
+        println("✅ Spring configuration verification passed - @Primary annotation found on StateAwareCachedContractQueryService")
     }
 }

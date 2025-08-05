@@ -34,7 +34,6 @@ import java.time.Instant
  * - Maintains full API compatibility
  */
 @Service
-@Primary
 class CachedContractQueryService(
     @Qualifier("originalContractQueryService") private val originalService: ContractQueryService,
     private val cacheMetricsService: CacheMetricsService,
