@@ -25,6 +25,9 @@ logs/
 # Spring Boot
 application-*.yml
 application-*.properties
+# But keep test profiles
+!application-test.yml
+!application-test.properties
 
 # Environment variables
 .env
