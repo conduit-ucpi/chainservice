@@ -10,6 +10,14 @@ import org.springframework.cache.CacheManager
 import org.springframework.stereotype.Service
 
 /**
+ * DEPRECATED: Use StateAwareCacheInvalidationService instead
+ * 
+ * This service is kept for backward compatibility but should not be used for new code.
+ * The StateAwareCacheInvalidationService provides intelligent cache management with:
+ * - State-aware caching (immutable vs mutable contracts)
+ * - Automatic promotion of contracts to immutable cache when they reach final states
+ * - Better performance for historical data queries
+ * 
  * Service responsible for selective cache invalidation when contract state changes.
  * 
  * CRITICAL: This service implements SELECTIVE INVALIDATION to prevent the cache invalidation
@@ -22,8 +30,11 @@ import org.springframework.stereotype.Service
  * - Only invalidate specific contract addresses, never clear entire cache
  * - Support for status-prefixed keys and direct address keys
  * - Thread-safe operations with detailed logging for debugging
+ * 
+ * @deprecated Use StateAwareCacheInvalidationService instead
  */
 @Service
+@Deprecated("Use StateAwareCacheInvalidationService instead")
 class CacheInvalidationService(
     private val cacheManager: CacheManager
 ) {

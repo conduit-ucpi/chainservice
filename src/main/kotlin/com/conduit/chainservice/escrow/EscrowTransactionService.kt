@@ -3,7 +3,7 @@ package com.conduit.chainservice.escrow
 import com.conduit.chainservice.config.EscrowProperties
 import com.utility.chainservice.BlockchainProperties
 import com.conduit.chainservice.escrow.models.ContractCreationResult
-import com.conduit.chainservice.service.CacheInvalidationService
+import com.conduit.chainservice.service.StateAwareCacheInvalidationService
 import com.utility.chainservice.BlockchainRelayService
 import com.utility.chainservice.models.TransactionResult
 import org.slf4j.LoggerFactory
@@ -25,7 +25,7 @@ import java.math.BigInteger
 @Service
 class EscrowTransactionService(
     private val blockchainRelayService: BlockchainRelayService,
-    private val cacheInvalidationService: CacheInvalidationService,
+    private val cacheInvalidationService: StateAwareCacheInvalidationService,
     private val web3j: Web3j,
     private val relayerCredentials: Credentials,
     private val gasProvider: ContractGasProvider,
@@ -131,7 +131,12 @@ class EscrowTransactionService(
                     logger.info("Escrow contract created successfully at address: $contractAddress")
                     
                     // Invalidate cache for the newly created contract
-                    cacheInvalidationService.invalidateContractCache(contractAddress, "createContract", txHash)
+                    cacheInvalidationService.invalidateContractCacheIntelligently(
+                        contractAddress = contractAddress,
+                        operationType = "createContract",
+                        newStatus = com.conduit.chainservice.escrow.models.ContractStatus.CREATED,
+                        transactionHash = txHash
+                    )
                     
                     ContractCreationResult(
                         success = true,
@@ -225,7 +230,12 @@ class EscrowTransactionService(
                 logger.info("Dispute resolved successfully")
                 
                 // Invalidate cache for the contract whose dispute was resolved
-                cacheInvalidationService.invalidateContractCache(contractAddress, "resolveDispute", txHash)
+                cacheInvalidationService.invalidateContractCacheIntelligently(
+                    contractAddress = contractAddress,
+                    operationType = "resolveDispute",
+                    newStatus = com.conduit.chainservice.escrow.models.ContractStatus.RESOLVED,
+                    transactionHash = txHash
+                )
                 
                 TransactionResult(
                     success = true,
@@ -329,7 +339,12 @@ class EscrowTransactionService(
                 logger.info("Dispute resolved successfully with percentages")
                 
                 // Invalidate cache for the contract whose dispute was resolved
-                cacheInvalidationService.invalidateContractCache(contractAddress, "resolveDisputeWithPercentages", txHash)
+                cacheInvalidationService.invalidateContractCacheIntelligently(
+                    contractAddress = contractAddress,
+                    operationType = "resolveDisputeWithPercentages",
+                    newStatus = com.conduit.chainservice.escrow.models.ContractStatus.RESOLVED,
+                    transactionHash = txHash
+                )
                 
                 TransactionResult(
                     success = true,
@@ -359,7 +374,12 @@ class EscrowTransactionService(
         
         // Invalidate cache on successful transaction - use contract address from result
         if (result.success && result.transactionHash != null && result.contractAddress != null) {
-            cacheInvalidationService.invalidateContractCache(result.contractAddress!!, "raiseDispute", result.transactionHash!!)
+            cacheInvalidationService.invalidateContractCacheIntelligently(
+                contractAddress = result.contractAddress!!,
+                operationType = "raiseDispute",
+                newStatus = com.conduit.chainservice.escrow.models.ContractStatus.DISPUTED,
+                transactionHash = result.transactionHash
+            )
         } else if (result.success && result.contractAddress == null) {
             logger.warn("Contract address not available from blockchain relay service for raiseDispute cache invalidation")
         }
@@ -372,7 +392,12 @@ class EscrowTransactionService(
         
         // Invalidate cache on successful transaction - use contract address from result
         if (result.success && result.transactionHash != null && result.contractAddress != null) {
-            cacheInvalidationService.invalidateContractCache(result.contractAddress!!, "claimFunds", result.transactionHash!!)
+            cacheInvalidationService.invalidateContractCacheIntelligently(
+                contractAddress = result.contractAddress!!,
+                operationType = "claimFunds",
+                newStatus = com.conduit.chainservice.escrow.models.ContractStatus.CLAIMED,
+                transactionHash = result.transactionHash
+            )
         } else if (result.success && result.contractAddress == null) {
             logger.warn("Contract address not available from blockchain relay service for claimFunds cache invalidation")
         }
@@ -385,7 +410,12 @@ class EscrowTransactionService(
         
         // Invalidate cache on successful transaction - use contract address from result
         if (result.success && result.transactionHash != null && result.contractAddress != null) {
-            cacheInvalidationService.invalidateContractCache(result.contractAddress!!, "depositFunds", result.transactionHash!!)
+            cacheInvalidationService.invalidateContractCacheIntelligently(
+                contractAddress = result.contractAddress!!,
+                operationType = "depositFunds",
+                newStatus = com.conduit.chainservice.escrow.models.ContractStatus.ACTIVE,
+                transactionHash = result.transactionHash
+            )
         } else if (result.success && result.contractAddress == null) {
             logger.warn("Contract address not available from blockchain relay service for depositFunds cache invalidation")
         }
