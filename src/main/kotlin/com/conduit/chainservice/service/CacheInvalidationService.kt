@@ -1,8 +1,10 @@
 package com.conduit.chainservice.service
 
-import com.conduit.chainservice.config.CacheConfig.Companion.CONTRACT_INFO_CACHE
-import com.conduit.chainservice.config.CacheConfig.Companion.CONTRACT_STATE_CACHE
-import com.conduit.chainservice.config.CacheConfig.Companion.TRANSACTION_DATA_CACHE
+import com.conduit.chainservice.config.StateAwareCacheConfig.Companion.CONTRACT_INFO_IMMUTABLE_CACHE
+import com.conduit.chainservice.config.StateAwareCacheConfig.Companion.CONTRACT_INFO_MUTABLE_CACHE
+import com.conduit.chainservice.config.StateAwareCacheConfig.Companion.CONTRACT_STATE_IMMUTABLE_CACHE
+import com.conduit.chainservice.config.StateAwareCacheConfig.Companion.CONTRACT_STATE_MUTABLE_CACHE
+import com.conduit.chainservice.config.StateAwareCacheConfig.Companion.TRANSACTION_DATA_CACHE
 import org.slf4j.LoggerFactory
 import org.springframework.cache.CacheManager
 import org.springframework.stereotype.Service
@@ -46,33 +48,66 @@ class CacheInvalidationService(
             val invalidatedKeys = mutableListOf<String>()
             var totalEvictions = 0
 
-            // LEVEL 3: Contract Info Cache (assembled objects)
-            val level3Cache = cacheManager.getCache(CONTRACT_INFO_CACHE)
-            if (level3Cache != null) {
-                val level3Keys = listOf(contractAddress, "status:$contractAddress")
+            // LEVEL 3: Contract Info Cache (assembled objects) - Check both immutable and mutable caches
+            val immutableL3Cache = cacheManager.getCache(CONTRACT_INFO_IMMUTABLE_CACHE)
+            val mutableL3Cache = cacheManager.getCache(CONTRACT_INFO_MUTABLE_CACHE)
+            
+            val level3Keys = listOf(contractAddress, "status:$contractAddress")
+            
+            // Check immutable cache
+            if (immutableL3Cache != null) {
                 level3Keys.forEach { key ->
-                    if (level3Cache.get(key) != null) {
-                        level3Cache.evict(key)
-                        invalidatedKeys.add("L3:$key")
+                    if (immutableL3Cache.get(key) != null) {
+                        immutableL3Cache.evict(key)
+                        invalidatedKeys.add("L3-IMMUTABLE:$key")
                         totalEvictions++
-                        logger.debug("LEVEL 3: Evicted cache entry for key: $key")
+                        logger.debug("LEVEL 3 IMMUTABLE: Evicted cache entry for key: $key")
                     }
                 }
             } else {
-                logger.warn("CONTRACT_INFO_CACHE not found, skipping Level 3 invalidation")
+                logger.warn("CONTRACT_INFO_IMMUTABLE_CACHE not found, skipping Level 3 immutable invalidation")
             }
-
-            // LEVEL 1: Contract State Cache (blockchain state data)
-            val level1Cache = cacheManager.getCache(CONTRACT_STATE_CACHE)
-            if (level1Cache != null) {
-                if (level1Cache.get(contractAddress) != null) {
-                    level1Cache.evict(contractAddress)
-                    invalidatedKeys.add("L1:$contractAddress")
-                    totalEvictions++
-                    logger.debug("LEVEL 1: Evicted state cache entry for: $contractAddress")
+            
+            // Check mutable cache
+            if (mutableL3Cache != null) {
+                level3Keys.forEach { key ->
+                    if (mutableL3Cache.get(key) != null) {
+                        mutableL3Cache.evict(key)
+                        invalidatedKeys.add("L3-MUTABLE:$key")
+                        totalEvictions++
+                        logger.debug("LEVEL 3 MUTABLE: Evicted cache entry for key: $key")
+                    }
                 }
             } else {
-                logger.debug("CONTRACT_STATE_CACHE not found, skipping Level 1 invalidation")
+                logger.warn("CONTRACT_INFO_MUTABLE_CACHE not found, skipping Level 3 mutable invalidation")
+            }
+
+            // LEVEL 1: Contract State Cache (blockchain state data) - Check both immutable and mutable caches
+            val immutableL1Cache = cacheManager.getCache(CONTRACT_STATE_IMMUTABLE_CACHE)
+            val mutableL1Cache = cacheManager.getCache(CONTRACT_STATE_MUTABLE_CACHE)
+            
+            // Check immutable state cache
+            if (immutableL1Cache != null) {
+                if (immutableL1Cache.get(contractAddress) != null) {
+                    immutableL1Cache.evict(contractAddress)
+                    invalidatedKeys.add("L1-IMMUTABLE:$contractAddress")
+                    totalEvictions++
+                    logger.debug("LEVEL 1 IMMUTABLE: Evicted state cache entry for: $contractAddress")
+                }
+            } else {
+                logger.debug("CONTRACT_STATE_IMMUTABLE_CACHE not found, skipping Level 1 immutable invalidation")
+            }
+            
+            // Check mutable state cache
+            if (mutableL1Cache != null) {
+                if (mutableL1Cache.get(contractAddress) != null) {
+                    mutableL1Cache.evict(contractAddress)
+                    invalidatedKeys.add("L1-MUTABLE:$contractAddress")
+                    totalEvictions++
+                    logger.debug("LEVEL 1 MUTABLE: Evicted state cache entry for: $contractAddress")
+                }
+            } else {
+                logger.debug("CONTRACT_STATE_MUTABLE_CACHE not found, skipping Level 1 mutable invalidation")
             }
 
             // LEVEL 2: Transaction Data Cache (event history)
@@ -141,14 +176,53 @@ class CacheInvalidationService(
         try {
             logger.warn("Invalidating ALL contract cache entries. Reason: $reason")
             
-            val cache = cacheManager.getCache(CONTRACT_INFO_CACHE)
-            if (cache == null) {
-                logger.warn("Contract info cache not found, cannot clear all entries")
-                return
+            var clearedCaches = 0
+            
+            // Clear immutable contract info cache
+            val immutableInfoCache = cacheManager.getCache(CONTRACT_INFO_IMMUTABLE_CACHE)
+            if (immutableInfoCache != null) {
+                immutableInfoCache.clear()
+                clearedCaches++
+                logger.warn("Cleared immutable contract info cache")
             }
-
-            cache.clear()
-            logger.warn("Successfully cleared all contract info cache entries. Reason: $reason")
+            
+            // Clear mutable contract info cache
+            val mutableInfoCache = cacheManager.getCache(CONTRACT_INFO_MUTABLE_CACHE)
+            if (mutableInfoCache != null) {
+                mutableInfoCache.clear()
+                clearedCaches++
+                logger.warn("Cleared mutable contract info cache")
+            }
+            
+            // Clear immutable state cache
+            val immutableStateCache = cacheManager.getCache(CONTRACT_STATE_IMMUTABLE_CACHE)
+            if (immutableStateCache != null) {
+                immutableStateCache.clear()
+                clearedCaches++
+                logger.warn("Cleared immutable contract state cache")
+            }
+            
+            // Clear mutable state cache
+            val mutableStateCache = cacheManager.getCache(CONTRACT_STATE_MUTABLE_CACHE)
+            if (mutableStateCache != null) {
+                mutableStateCache.clear()
+                clearedCaches++
+                logger.warn("Cleared mutable contract state cache")
+            }
+            
+            // Clear transaction data cache
+            val transactionCache = cacheManager.getCache(TRANSACTION_DATA_CACHE)
+            if (transactionCache != null) {
+                transactionCache.clear()
+                clearedCaches++
+                logger.warn("Cleared transaction data cache")
+            }
+            
+            if (clearedCaches > 0) {
+                logger.warn("Successfully cleared $clearedCaches cache types. Reason: $reason")
+            } else {
+                logger.warn("No contract caches found to clear. Reason: $reason")
+            }
             
         } catch (e: Exception) {
             logger.error("Failed to clear all contract cache entries. Reason: $reason", e)
@@ -163,8 +237,9 @@ class CacheInvalidationService(
      */
     fun isCacheAvailable(): Boolean {
         return try {
-            val cache = cacheManager.getCache(CONTRACT_INFO_CACHE)
-            cache != null
+            val immutableCache = cacheManager.getCache(CONTRACT_INFO_IMMUTABLE_CACHE)
+            val mutableCache = cacheManager.getCache(CONTRACT_INFO_MUTABLE_CACHE)
+            immutableCache != null && mutableCache != null
         } catch (e: Exception) {
             logger.error("Error checking cache availability", e)
             false
@@ -180,31 +255,59 @@ class CacheInvalidationService(
         return try {
             val allStats = mutableMapOf<String, Any>()
             
-            // Level 3: Contract Info Cache stats
-            val level3Cache = cacheManager.getCache(CONTRACT_INFO_CACHE)
-            if (level3Cache?.nativeCache is com.github.benmanes.caffeine.cache.Cache<*, *>) {
-                val stats = (level3Cache.nativeCache as com.github.benmanes.caffeine.cache.Cache<*, *>).stats()
-                allStats["level3_contractInfo"] = mapOf(
+            // Level 3: Contract Info Cache stats - Immutable
+            val level3ImmutableCache = cacheManager.getCache(CONTRACT_INFO_IMMUTABLE_CACHE)
+            if (level3ImmutableCache?.nativeCache is com.github.benmanes.caffeine.cache.Cache<*, *>) {
+                val stats = (level3ImmutableCache.nativeCache as com.github.benmanes.caffeine.cache.Cache<*, *>).stats()
+                allStats["level3_contractInfo_immutable"] = mapOf(
                     "requestCount" to stats.requestCount(),
                     "hitCount" to stats.hitCount(),
                     "hitRate" to String.format("%.1f%%", stats.hitRate() * 100),
                     "missCount" to stats.missCount(),
                     "evictionCount" to stats.evictionCount(),
-                    "estimatedSize" to (level3Cache.nativeCache as com.github.benmanes.caffeine.cache.Cache<*, *>).estimatedSize()
+                    "estimatedSize" to (level3ImmutableCache.nativeCache as com.github.benmanes.caffeine.cache.Cache<*, *>).estimatedSize()
                 )
             }
             
-            // Level 1: Contract State Cache stats  
-            val level1Cache = cacheManager.getCache(CONTRACT_STATE_CACHE)
-            if (level1Cache?.nativeCache is com.github.benmanes.caffeine.cache.Cache<*, *>) {
-                val stats = (level1Cache.nativeCache as com.github.benmanes.caffeine.cache.Cache<*, *>).stats()
-                allStats["level1_contractState"] = mapOf(
+            // Level 3: Contract Info Cache stats - Mutable
+            val level3MutableCache = cacheManager.getCache(CONTRACT_INFO_MUTABLE_CACHE)
+            if (level3MutableCache?.nativeCache is com.github.benmanes.caffeine.cache.Cache<*, *>) {
+                val stats = (level3MutableCache.nativeCache as com.github.benmanes.caffeine.cache.Cache<*, *>).stats()
+                allStats["level3_contractInfo_mutable"] = mapOf(
                     "requestCount" to stats.requestCount(),
                     "hitCount" to stats.hitCount(),
                     "hitRate" to String.format("%.1f%%", stats.hitRate() * 100),
                     "missCount" to stats.missCount(),
                     "evictionCount" to stats.evictionCount(),
-                    "estimatedSize" to (level1Cache.nativeCache as com.github.benmanes.caffeine.cache.Cache<*, *>).estimatedSize()
+                    "estimatedSize" to (level3MutableCache.nativeCache as com.github.benmanes.caffeine.cache.Cache<*, *>).estimatedSize()
+                )
+            }
+            
+            // Level 1: Contract State Cache stats - Immutable
+            val level1ImmutableCache = cacheManager.getCache(CONTRACT_STATE_IMMUTABLE_CACHE)
+            if (level1ImmutableCache?.nativeCache is com.github.benmanes.caffeine.cache.Cache<*, *>) {
+                val stats = (level1ImmutableCache.nativeCache as com.github.benmanes.caffeine.cache.Cache<*, *>).stats()
+                allStats["level1_contractState_immutable"] = mapOf(
+                    "requestCount" to stats.requestCount(),
+                    "hitCount" to stats.hitCount(),
+                    "hitRate" to String.format("%.1f%%", stats.hitRate() * 100),
+                    "missCount" to stats.missCount(),
+                    "evictionCount" to stats.evictionCount(),
+                    "estimatedSize" to (level1ImmutableCache.nativeCache as com.github.benmanes.caffeine.cache.Cache<*, *>).estimatedSize()
+                )
+            }
+            
+            // Level 1: Contract State Cache stats - Mutable
+            val level1MutableCache = cacheManager.getCache(CONTRACT_STATE_MUTABLE_CACHE)
+            if (level1MutableCache?.nativeCache is com.github.benmanes.caffeine.cache.Cache<*, *>) {
+                val stats = (level1MutableCache.nativeCache as com.github.benmanes.caffeine.cache.Cache<*, *>).stats()
+                allStats["level1_contractState_mutable"] = mapOf(
+                    "requestCount" to stats.requestCount(),
+                    "hitCount" to stats.hitCount(),
+                    "hitRate" to String.format("%.1f%%", stats.hitRate() * 100),
+                    "missCount" to stats.missCount(),
+                    "evictionCount" to stats.evictionCount(),
+                    "estimatedSize" to (level1MutableCache.nativeCache as com.github.benmanes.caffeine.cache.Cache<*, *>).estimatedSize()
                 )
             }
             
@@ -246,14 +349,28 @@ class CacheInvalidationService(
             val stats = getCacheStats()
             val analysis = mutableMapOf<String, Any>()
             
-            if (stats.containsKey("level3_contractInfo")) {
+            if (stats.containsKey("level3_contractInfo_immutable")) {
                 @Suppress("UNCHECKED_CAST")
-                val level3Stats = stats["level3_contractInfo"] as Map<String, Any>
+                val level3Stats = stats["level3_contractInfo_immutable"] as Map<String, Any>
                 val hitRate = level3Stats["hitRate"] as String
                 val evictionCount = level3Stats["evictionCount"] as Long
                 val estimatedSize = level3Stats["estimatedSize"] as Long
                 
-                analysis["level3_analysis"] = mapOf(
+                analysis["level3_immutable_analysis"] = mapOf(
+                    "hitRate" to hitRate,
+                    "selectiveInvalidationWorking" to (evictionCount > 0 && estimatedSize > 0),
+                    "cacheUtilization" to "Size: $estimatedSize, Evictions: $evictionCount"
+                )
+            }
+            
+            if (stats.containsKey("level3_contractInfo_mutable")) {
+                @Suppress("UNCHECKED_CAST")
+                val level3Stats = stats["level3_contractInfo_mutable"] as Map<String, Any>
+                val hitRate = level3Stats["hitRate"] as String
+                val evictionCount = level3Stats["evictionCount"] as Long
+                val estimatedSize = level3Stats["estimatedSize"] as Long
+                
+                analysis["level3_mutable_analysis"] = mapOf(
                     "hitRate" to hitRate,
                     "selectiveInvalidationWorking" to (evictionCount > 0 && estimatedSize > 0),
                     "cacheUtilization" to "Size: $estimatedSize, Evictions: $evictionCount"
@@ -278,7 +395,13 @@ class CacheInvalidationService(
             var totalHitRate = 0.0
             var levels = 0
             
-            listOf("level3_contractInfo", "level1_contractState", "level2_transactionData").forEach { levelKey ->
+            listOf(
+                "level3_contractInfo_immutable", 
+                "level3_contractInfo_mutable",
+                "level1_contractState_immutable", 
+                "level1_contractState_mutable",
+                "level2_transactionData"
+            ).forEach { levelKey ->
                 if (stats.containsKey(levelKey)) {
                     @Suppress("UNCHECKED_CAST")
                     val levelStats = stats[levelKey] as Map<String, Any>

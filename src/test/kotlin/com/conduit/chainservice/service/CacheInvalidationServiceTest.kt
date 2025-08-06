@@ -1,8 +1,10 @@
 package com.conduit.chainservice.service
 
-import com.conduit.chainservice.config.CacheConfig.Companion.CONTRACT_INFO_CACHE
-import com.conduit.chainservice.config.CacheConfig.Companion.CONTRACT_STATE_CACHE
-import com.conduit.chainservice.config.CacheConfig.Companion.TRANSACTION_DATA_CACHE
+import com.conduit.chainservice.config.StateAwareCacheConfig.Companion.CONTRACT_INFO_IMMUTABLE_CACHE
+import com.conduit.chainservice.config.StateAwareCacheConfig.Companion.CONTRACT_INFO_MUTABLE_CACHE
+import com.conduit.chainservice.config.StateAwareCacheConfig.Companion.CONTRACT_STATE_IMMUTABLE_CACHE
+import com.conduit.chainservice.config.StateAwareCacheConfig.Companion.CONTRACT_STATE_MUTABLE_CACHE
+import com.conduit.chainservice.config.StateAwareCacheConfig.Companion.TRANSACTION_DATA_CACHE
 import com.conduit.chainservice.escrow.models.ContractInfo
 import com.conduit.chainservice.escrow.models.ContractStatus
 import java.time.Instant
@@ -17,22 +19,28 @@ import java.math.BigInteger
 class CacheInvalidationServiceTest {
 
     private lateinit var cacheManager: CacheManager
-    private lateinit var level3Cache: Cache  // CONTRACT_INFO_CACHE
-    private lateinit var level1Cache: Cache  // CONTRACT_STATE_CACHE
-    private lateinit var level2Cache: Cache  // TRANSACTION_DATA_CACHE
+    private lateinit var level3ImmutableCache: Cache  // CONTRACT_INFO_IMMUTABLE_CACHE
+    private lateinit var level3MutableCache: Cache    // CONTRACT_INFO_MUTABLE_CACHE
+    private lateinit var level1ImmutableCache: Cache  // CONTRACT_STATE_IMMUTABLE_CACHE
+    private lateinit var level1MutableCache: Cache    // CONTRACT_STATE_MUTABLE_CACHE
+    private lateinit var level2Cache: Cache           // TRANSACTION_DATA_CACHE
     private lateinit var cacheInvalidationService: CacheInvalidationService
 
     @BeforeEach
     fun setUp() {
         cacheManager = mock()
-        level3Cache = mock()
-        level1Cache = mock()
+        level3ImmutableCache = mock()
+        level3MutableCache = mock()
+        level1ImmutableCache = mock()
+        level1MutableCache = mock()
         level2Cache = mock()
         cacheInvalidationService = CacheInvalidationService(cacheManager)
         
         // Setup default cache manager behavior for all cache levels
-        whenever(cacheManager.getCache(CONTRACT_INFO_CACHE)).thenReturn(level3Cache)
-        whenever(cacheManager.getCache(CONTRACT_STATE_CACHE)).thenReturn(level1Cache)
+        whenever(cacheManager.getCache(CONTRACT_INFO_IMMUTABLE_CACHE)).thenReturn(level3ImmutableCache)
+        whenever(cacheManager.getCache(CONTRACT_INFO_MUTABLE_CACHE)).thenReturn(level3MutableCache)
+        whenever(cacheManager.getCache(CONTRACT_STATE_IMMUTABLE_CACHE)).thenReturn(level1ImmutableCache)
+        whenever(cacheManager.getCache(CONTRACT_STATE_MUTABLE_CACHE)).thenReturn(level1MutableCache)
         whenever(cacheManager.getCache(TRANSACTION_DATA_CACHE)).thenReturn(level2Cache)
     }
 
@@ -45,28 +53,36 @@ class CacheInvalidationServiceTest {
         
         // Setup cache entries at all levels for this specific contract
         val contractInfo = createTestContractInfo(contractAddress)
-        whenever(level3Cache.get(contractAddress)).thenReturn(Cache.ValueWrapper { contractInfo })
-        whenever(level3Cache.get("status:$contractAddress")).thenReturn(Cache.ValueWrapper { ContractStatus.ACTIVE })
-        whenever(level1Cache.get(contractAddress)).thenReturn(Cache.ValueWrapper { mapOf("funded" to true) })
+        whenever(level3ImmutableCache.get(contractAddress)).thenReturn(Cache.ValueWrapper { contractInfo })
+        whenever(level3ImmutableCache.get("status:$contractAddress")).thenReturn(Cache.ValueWrapper { ContractStatus.CLAIMED })
+        whenever(level3MutableCache.get(contractAddress)).thenReturn(Cache.ValueWrapper { contractInfo })
+        whenever(level3MutableCache.get("status:$contractAddress")).thenReturn(Cache.ValueWrapper { ContractStatus.ACTIVE })
+        whenever(level1ImmutableCache.get(contractAddress)).thenReturn(Cache.ValueWrapper { mapOf("funded" to true) })
+        whenever(level1MutableCache.get(contractAddress)).thenReturn(Cache.ValueWrapper { mapOf("funded" to true) })
         whenever(level2Cache.get(contractAddress)).thenReturn(Cache.ValueWrapper { "transactionData" })
 
         // When - SELECTIVE INVALIDATION: Only invalidate this specific contract
         cacheInvalidationService.invalidateContractCache(contractAddress, operationType, transactionHash)
 
         // Then - VERIFY SELECTIVE INVALIDATION: Only this contract's cache entries are evicted
-        // Level 3 (CONTRACT_INFO_CACHE) - Contract info and status entries
-        verify(level3Cache).evict(contractAddress)
-        verify(level3Cache).evict("status:$contractAddress")
+        // Level 3 - Contract info and status entries (both immutable and mutable)
+        verify(level3ImmutableCache).evict(contractAddress)
+        verify(level3ImmutableCache).evict("status:$contractAddress")
+        verify(level3MutableCache).evict(contractAddress)
+        verify(level3MutableCache).evict("status:$contractAddress")
         
-        // Level 1 (CONTRACT_STATE_CACHE) - State data
-        verify(level1Cache).evict(contractAddress)
+        // Level 1 - State data (both immutable and mutable)
+        verify(level1ImmutableCache).evict(contractAddress)
+        verify(level1MutableCache).evict(contractAddress)
         
-        // Level 2 (TRANSACTION_DATA_CACHE) - Transaction data
+        // Level 2 - Transaction data
         verify(level2Cache).evict(contractAddress)
         
         // CRITICAL: Verify no cache.clear() calls that would invalidate ALL contracts
-        verify(level3Cache, never()).clear()
-        verify(level1Cache, never()).clear()
+        verify(level3ImmutableCache, never()).clear()
+        verify(level3MutableCache, never()).clear()
+        verify(level1ImmutableCache, never()).clear()
+        verify(level1MutableCache, never()).clear()
         verify(level2Cache, never()).clear()
     }
 
@@ -79,9 +95,12 @@ class CacheInvalidationServiceTest {
         
         // All contracts are cached at all levels
         listOf(targetContract, otherContract1, otherContract2).forEach { address ->
-            whenever(level3Cache.get(address)).thenReturn(Cache.ValueWrapper { createTestContractInfo(address) })
-            whenever(level3Cache.get("status:$address")).thenReturn(Cache.ValueWrapper { ContractStatus.ACTIVE })
-            whenever(level1Cache.get(address)).thenReturn(Cache.ValueWrapper { mapOf("funded" to true) })
+            whenever(level3ImmutableCache.get(address)).thenReturn(Cache.ValueWrapper { createTestContractInfo(address) })
+            whenever(level3ImmutableCache.get("status:$address")).thenReturn(Cache.ValueWrapper { ContractStatus.CLAIMED })
+            whenever(level3MutableCache.get(address)).thenReturn(Cache.ValueWrapper { createTestContractInfo(address) })
+            whenever(level3MutableCache.get("status:$address")).thenReturn(Cache.ValueWrapper { ContractStatus.ACTIVE })
+            whenever(level1ImmutableCache.get(address)).thenReturn(Cache.ValueWrapper { mapOf("funded" to true) })
+            whenever(level1MutableCache.get(address)).thenReturn(Cache.ValueWrapper { mapOf("funded" to true) })
             whenever(level2Cache.get(address)).thenReturn(Cache.ValueWrapper { "transactionData" })
         }
 
@@ -89,25 +108,36 @@ class CacheInvalidationServiceTest {
         cacheInvalidationService.invalidateContractCache(targetContract, "raiseDispute", "0xtxhash")
 
         // Then - CRITICAL: Only target contract should be invalidated
-        verify(level3Cache).evict(targetContract)
-        verify(level3Cache).evict("status:$targetContract")
-        verify(level1Cache).evict(targetContract)
+        verify(level3ImmutableCache).evict(targetContract)
+        verify(level3ImmutableCache).evict("status:$targetContract")
+        verify(level3MutableCache).evict(targetContract)
+        verify(level3MutableCache).evict("status:$targetContract")
+        verify(level1ImmutableCache).evict(targetContract)
+        verify(level1MutableCache).evict(targetContract)
         verify(level2Cache).evict(targetContract)
         
         // CRITICAL: Other contracts should remain untouched (no eviction calls for them)
-        verify(level3Cache, never()).evict(otherContract1)
-        verify(level3Cache, never()).evict("status:$otherContract1")
-        verify(level1Cache, never()).evict(otherContract1)
+        verify(level3ImmutableCache, never()).evict(otherContract1)
+        verify(level3ImmutableCache, never()).evict("status:$otherContract1")
+        verify(level3MutableCache, never()).evict(otherContract1)
+        verify(level3MutableCache, never()).evict("status:$otherContract1")
+        verify(level1ImmutableCache, never()).evict(otherContract1)
+        verify(level1MutableCache, never()).evict(otherContract1)
         verify(level2Cache, never()).evict(otherContract1)
         
-        verify(level3Cache, never()).evict(otherContract2)
-        verify(level3Cache, never()).evict("status:$otherContract2")
-        verify(level1Cache, never()).evict(otherContract2)
+        verify(level3ImmutableCache, never()).evict(otherContract2)
+        verify(level3ImmutableCache, never()).evict("status:$otherContract2")
+        verify(level3MutableCache, never()).evict(otherContract2)
+        verify(level3MutableCache, never()).evict("status:$otherContract2")
+        verify(level1ImmutableCache, never()).evict(otherContract2)
+        verify(level1MutableCache, never()).evict(otherContract2)
         verify(level2Cache, never()).evict(otherContract2)
         
         // CRITICAL: No global cache clearing that would affect all contracts
-        verify(level3Cache, never()).clear()
-        verify(level1Cache, never()).clear()
+        verify(level3ImmutableCache, never()).clear()
+        verify(level3MutableCache, never()).clear()
+        verify(level1ImmutableCache, never()).clear()
+        verify(level1MutableCache, never()).clear()
         verify(level2Cache, never()).clear()
     }
 
@@ -117,17 +147,17 @@ class CacheInvalidationServiceTest {
         val contractAddress = "0x1234567890abcdef1234567890abcdef12345678"
         val operationType = "depositFunds"
         
-        whenever(level3Cache.get(contractAddress)).thenReturn(null)
-        whenever(level3Cache.get("status:$contractAddress")).thenReturn(null)
-        whenever(level1Cache.get(contractAddress)).thenReturn(null)
+        whenever(level3ImmutableCache.get(contractAddress)).thenReturn(null)
+        whenever(level3ImmutableCache.get("status:$contractAddress")).thenReturn(null)
+        whenever(level1ImmutableCache.get(contractAddress)).thenReturn(null)
         whenever(level2Cache.get(contractAddress)).thenReturn(null)
 
         // When
         cacheInvalidationService.invalidateContractCache(contractAddress, operationType)
 
         // Then - No evictions should occur since no entries exist
-        verify(level3Cache, never()).evict(any())
-        verify(level1Cache, never()).evict(any())
+        verify(level3ImmutableCache, never()).evict(any())
+        verify(level1ImmutableCache, never()).evict(any())
         verify(level2Cache, never()).evict(any())
     }
 
@@ -137,16 +167,16 @@ class CacheInvalidationServiceTest {
         val contractAddress = "0x1234567890abcdef1234567890abcdef12345678"
         val operationType = "raiseDispute"
         
-        whenever(cacheManager.getCache(CONTRACT_INFO_CACHE)).thenReturn(null)
-        whenever(cacheManager.getCache(CONTRACT_STATE_CACHE)).thenReturn(null)
+        whenever(cacheManager.getCache(CONTRACT_INFO_IMMUTABLE_CACHE)).thenReturn(null)
+        whenever(cacheManager.getCache(CONTRACT_STATE_IMMUTABLE_CACHE)).thenReturn(null)
         whenever(cacheManager.getCache(TRANSACTION_DATA_CACHE)).thenReturn(null)
 
         // When - should not throw exception
         cacheInvalidationService.invalidateContractCache(contractAddress, operationType)
 
         // Then - no cache operations should be attempted on any level
-        verifyNoInteractions(level3Cache)
-        verifyNoInteractions(level1Cache)
+        verifyNoInteractions(level3ImmutableCache)
+        verifyNoInteractions(level1ImmutableCache)
         verifyNoInteractions(level2Cache)
     }
 
@@ -156,13 +186,13 @@ class CacheInvalidationServiceTest {
         val contractAddress = "0x1234567890abcdef1234567890abcdef12345678"
         val operationType = "claimFunds"
         
-        whenever(level3Cache.get(contractAddress)).thenThrow(RuntimeException("Cache error"))
+        whenever(level3ImmutableCache.get(contractAddress)).thenThrow(RuntimeException("Cache error"))
 
         // When - should not throw exception
         cacheInvalidationService.invalidateContractCache(contractAddress, operationType)
 
         // Then - method completes without throwing, and Level 3 cache get was attempted
-        verify(level3Cache).get(contractAddress)
+        verify(level3ImmutableCache).get(contractAddress)
     }
 
     @Test
@@ -178,8 +208,8 @@ class CacheInvalidationServiceTest {
         
         // Setup cache entries
         contractAddresses.forEach { address ->
-            whenever(level3Cache.get(address)).thenReturn(Cache.ValueWrapper { createTestContractInfo(address) })
-            whenever(level3Cache.get("status:$address")).thenReturn(Cache.ValueWrapper { ContractStatus.ACTIVE })
+            whenever(level3ImmutableCache.get(address)).thenReturn(Cache.ValueWrapper { createTestContractInfo(address) })
+            whenever(level3ImmutableCache.get("status:$address")).thenReturn(Cache.ValueWrapper { ContractStatus.ACTIVE })
         }
 
         // When
@@ -187,8 +217,8 @@ class CacheInvalidationServiceTest {
 
         // Then
         contractAddresses.forEach { address ->
-            verify(level3Cache).evict(address)
-            verify(level3Cache).evict("status:$address")
+            verify(level3ImmutableCache).evict(address)
+            verify(level3ImmutableCache).evict("status:$address")
         }
     }
 
@@ -202,7 +232,7 @@ class CacheInvalidationServiceTest {
         cacheInvalidationService.invalidateMultipleContractCache(emptyList, operationType)
 
         // Then - no cache operations should occur
-        verifyNoInteractions(level3Cache)
+        verifyNoInteractions(level3ImmutableCache)
     }
 
     @Test
@@ -215,21 +245,21 @@ class CacheInvalidationServiceTest {
         val operationType = "partialFailure"
         
         // Setup first contract to succeed
-        whenever(level3Cache.get(contractAddresses[0])).thenReturn(Cache.ValueWrapper { createTestContractInfo(contractAddresses[0]) })
-        whenever(level3Cache.get("status:${contractAddresses[0]}")).thenReturn(Cache.ValueWrapper { ContractStatus.ACTIVE })
+        whenever(level3ImmutableCache.get(contractAddresses[0])).thenReturn(Cache.ValueWrapper { createTestContractInfo(contractAddresses[0]) })
+        whenever(level3ImmutableCache.get("status:${contractAddresses[0]}")).thenReturn(Cache.ValueWrapper { ContractStatus.ACTIVE })
         
         // Setup second contract to fail
-        whenever(level3Cache.get(contractAddresses[1])).thenThrow(RuntimeException("Cache error"))
+        whenever(level3ImmutableCache.get(contractAddresses[1])).thenThrow(RuntimeException("Cache error"))
 
         // When - should not throw exception
         cacheInvalidationService.invalidateMultipleContractCache(contractAddresses, operationType)
 
         // Then - first contract should be processed successfully
-        verify(level3Cache).evict(contractAddresses[0])
-        verify(level3Cache).evict("status:${contractAddresses[0]}")
+        verify(level3ImmutableCache).evict(contractAddresses[0])
+        verify(level3ImmutableCache).evict("status:${contractAddresses[0]}")
         
         // Second contract get operation should be attempted
-        verify(level3Cache).get(contractAddresses[1])
+        verify(level3ImmutableCache).get(contractAddresses[1])
     }
 
     @Test
@@ -241,20 +271,20 @@ class CacheInvalidationServiceTest {
         cacheInvalidationService.invalidateAllContractCache(reason)
 
         // Then
-        verify(level3Cache).clear()
+        verify(level3ImmutableCache).clear()
     }
 
     @Test
     fun `invalidateAllContractCache should handle null cache gracefully`() {
         // Given
         val reason = "Cache not available"
-        whenever(cacheManager.getCache(CONTRACT_INFO_CACHE)).thenReturn(null)
+        whenever(cacheManager.getCache(CONTRACT_INFO_IMMUTABLE_CACHE)).thenReturn(null)
 
         // When - should not throw exception
         cacheInvalidationService.invalidateAllContractCache(reason)
 
         // Then - no cache operations should be attempted
-        verifyNoInteractions(level3Cache)
+        verifyNoInteractions(level3ImmutableCache)
     }
 
     @Test
@@ -271,7 +301,7 @@ class CacheInvalidationServiceTest {
     @Test
     fun `isCacheAvailable should return false when cache is null`() {
         // Given
-        whenever(cacheManager.getCache(CONTRACT_INFO_CACHE)).thenReturn(null)
+        whenever(cacheManager.getCache(CONTRACT_INFO_IMMUTABLE_CACHE)).thenReturn(null)
 
         // When
         val result = cacheInvalidationService.isCacheAvailable()
@@ -283,7 +313,7 @@ class CacheInvalidationServiceTest {
     @Test
     fun `isCacheAvailable should return false when exception occurs`() {
         // Given
-        whenever(cacheManager.getCache(CONTRACT_INFO_CACHE)).thenThrow(RuntimeException("Cache error"))
+        whenever(cacheManager.getCache(CONTRACT_INFO_IMMUTABLE_CACHE)).thenThrow(RuntimeException("Cache error"))
 
         // When
         val result = cacheInvalidationService.isCacheAvailable()
@@ -298,7 +328,7 @@ class CacheInvalidationServiceTest {
         val caffeineCache = mock<com.github.benmanes.caffeine.cache.Cache<Any, Any>>()
         val stats = mock<com.github.benmanes.caffeine.cache.stats.CacheStats>()
         
-        whenever(level3Cache.nativeCache).thenReturn(caffeineCache)
+        whenever(level3ImmutableCache.nativeCache).thenReturn(caffeineCache)
         whenever(caffeineCache.stats()).thenReturn(stats)
         whenever(stats.requestCount()).thenReturn(100L)
         whenever(stats.hitCount()).thenReturn(80L)
@@ -313,10 +343,10 @@ class CacheInvalidationServiceTest {
         val result = cacheInvalidationService.getCacheStats()
 
         // Then - Should return multi-level stats format
-        assertTrue(result.containsKey("level3_contractInfo"))
+        assertTrue(result.containsKey("level3_contractInfo_immutable"))
         
         @Suppress("UNCHECKED_CAST")
-        val level3Stats = result["level3_contractInfo"] as Map<String, Any>
+        val level3Stats = result["level3_contractInfo_immutable"] as Map<String, Any>
         assertEquals(100L, level3Stats["requestCount"])
         assertEquals(80L, level3Stats["hitCount"])
         assertEquals("80.0%", level3Stats["hitRate"])
@@ -329,7 +359,7 @@ class CacheInvalidationServiceTest {
     fun `getCacheStats should handle non-Caffeine cache`() {
         // Given
         val nonCaffeineCache = "Not a Caffeine cache"
-        whenever(level3Cache.nativeCache).thenReturn(nonCaffeineCache)
+        whenever(level3ImmutableCache.nativeCache).thenReturn(nonCaffeineCache)
 
         // When
         val result = cacheInvalidationService.getCacheStats()
@@ -341,8 +371,8 @@ class CacheInvalidationServiceTest {
     @Test
     fun `getCacheStats should handle null cache`() {
         // Given
-        whenever(cacheManager.getCache(CONTRACT_INFO_CACHE)).thenReturn(null)
-        whenever(cacheManager.getCache(CONTRACT_STATE_CACHE)).thenReturn(null)
+        whenever(cacheManager.getCache(CONTRACT_INFO_IMMUTABLE_CACHE)).thenReturn(null)
+        whenever(cacheManager.getCache(CONTRACT_STATE_IMMUTABLE_CACHE)).thenReturn(null)
         whenever(cacheManager.getCache(TRANSACTION_DATA_CACHE)).thenReturn(null)
 
         // When
@@ -355,7 +385,7 @@ class CacheInvalidationServiceTest {
     @Test
     fun `getCacheStats should handle exceptions`() {
         // Given
-        whenever(cacheManager.getCache(CONTRACT_INFO_CACHE)).thenThrow(RuntimeException("Stats error"))
+        whenever(cacheManager.getCache(CONTRACT_INFO_IMMUTABLE_CACHE)).thenThrow(RuntimeException("Stats error"))
 
         // When
         val result = cacheInvalidationService.getCacheStats()
@@ -375,8 +405,8 @@ class CacheInvalidationServiceTest {
         val level1Stats = mock<com.github.benmanes.caffeine.cache.stats.CacheStats>()
         val level2Stats = mock<com.github.benmanes.caffeine.cache.stats.CacheStats>()
         
-        // Setup Level 3 (CONTRACT_INFO_CACHE)
-        whenever(level3Cache.nativeCache).thenReturn(level3CaffeineCache)
+        // Setup Level 3 (CONTRACT_INFO_IMMUTABLE_CACHE)
+        whenever(level3ImmutableCache.nativeCache).thenReturn(level3CaffeineCache)
         whenever(level3CaffeineCache.stats()).thenReturn(level3Stats)
         whenever(level3Stats.requestCount()).thenReturn(100L)
         whenever(level3Stats.hitCount()).thenReturn(90L)
@@ -385,8 +415,8 @@ class CacheInvalidationServiceTest {
         whenever(level3Stats.evictionCount()).thenReturn(2L)
         whenever(level3CaffeineCache.estimatedSize()).thenReturn(30L)
         
-        // Setup Level 1 (CONTRACT_STATE_CACHE)
-        whenever(level1Cache.nativeCache).thenReturn(level1CaffeineCache)
+        // Setup Level 1 (CONTRACT_STATE_IMMUTABLE_CACHE)
+        whenever(level1ImmutableCache.nativeCache).thenReturn(level1CaffeineCache)
         whenever(level1CaffeineCache.stats()).thenReturn(level1Stats)
         whenever(level1Stats.requestCount()).thenReturn(80L)
         whenever(level1Stats.hitCount()).thenReturn(75L)
@@ -409,12 +439,12 @@ class CacheInvalidationServiceTest {
         val result = cacheInvalidationService.getCacheStats()
 
         // Then - Verify multi-level cache statistics are returned
-        assertTrue(result.containsKey("level3_contractInfo"))
-        assertTrue(result.containsKey("level1_contractState"))
+        assertTrue(result.containsKey("level3_contractInfo_immutable"))
+        assertTrue(result.containsKey("level1_contractState_immutable"))
         assertTrue(result.containsKey("level2_transactionData"))
         
         @Suppress("UNCHECKED_CAST")
-        val level3StatsResult = result["level3_contractInfo"] as Map<String, Any>
+        val level3StatsResult = result["level3_contractInfo_immutable"] as Map<String, Any>
         assertEquals(100L, level3StatsResult["requestCount"])
         assertEquals(90L, level3StatsResult["hitCount"])
         assertEquals("90.0%", level3StatsResult["hitRate"])
@@ -422,7 +452,7 @@ class CacheInvalidationServiceTest {
         assertEquals(30L, level3StatsResult["estimatedSize"])
         
         @Suppress("UNCHECKED_CAST")
-        val level1StatsResult = result["level1_contractState"] as Map<String, Any>
+        val level1StatsResult = result["level1_contractState_immutable"] as Map<String, Any>
         assertEquals("93.8%", level1StatsResult["hitRate"])
         assertEquals(1L, level1StatsResult["evictionCount"])
     }
@@ -433,7 +463,7 @@ class CacheInvalidationServiceTest {
         val caffeineCache = mock<com.github.benmanes.caffeine.cache.Cache<Any, Any>>()
         val stats = mock<com.github.benmanes.caffeine.cache.stats.CacheStats>()
         
-        whenever(level3Cache.nativeCache).thenReturn(caffeineCache)
+        whenever(level3ImmutableCache.nativeCache).thenReturn(caffeineCache)
         whenever(caffeineCache.stats()).thenReturn(stats)
         whenever(stats.requestCount()).thenReturn(100L)
         whenever(stats.hitCount()).thenReturn(90L)
@@ -446,12 +476,12 @@ class CacheInvalidationServiceTest {
         val result = cacheInvalidationService.analyzeCacheEffectiveness()
         
         // Then - Should indicate selective invalidation is working
-        assertTrue(result.containsKey("level3_analysis"))
+        assertTrue(result.containsKey("level3_immutable_analysis"))
         assertTrue(result.containsKey("overallEffectivenessScore"))
         assertTrue(result.containsKey("selectiveInvalidationStatus"))
         
         @Suppress("UNCHECKED_CAST")
-        val level3Analysis = result["level3_analysis"] as Map<String, Any>
+        val level3Analysis = result["level3_immutable_analysis"] as Map<String, Any>
         assertEquals("90.0%", level3Analysis["hitRate"])
         assertEquals(true, level3Analysis["selectiveInvalidationWorking"])
         assertEquals("Size: 25, Evictions: 5", level3Analysis["cacheUtilization"])
