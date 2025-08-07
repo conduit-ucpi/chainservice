@@ -56,15 +56,15 @@ class StateAwareCacheConfig {
         // Final states that should be cached indefinitely
         val IMMUTABLE_STATES = setOf(
             ContractStatus.CLAIMED,
-            ContractStatus.RESOLVED, 
-            ContractStatus.EXPIRED
+            ContractStatus.RESOLVED
         )
         
         // Active states that need TTL for real-time updates
         val MUTABLE_STATES = setOf(
             ContractStatus.CREATED,
             ContractStatus.ACTIVE,
-            ContractStatus.DISPUTED
+            ContractStatus.DISPUTED,
+            ContractStatus.EXPIRED
         )
     }
 

@@ -97,18 +97,20 @@ class StateAwareCacheOptimizationTest {
         // Test immutable states
         assert(stateAwareCacheConfig.isImmutableState(ContractStatus.CLAIMED))
         assert(stateAwareCacheConfig.isImmutableState(ContractStatus.RESOLVED))
-        assert(stateAwareCacheConfig.isImmutableState(ContractStatus.EXPIRED))
         
         // Test mutable states
         assert(!stateAwareCacheConfig.isImmutableState(ContractStatus.CREATED))
         assert(!stateAwareCacheConfig.isImmutableState(ContractStatus.ACTIVE))
         assert(!stateAwareCacheConfig.isImmutableState(ContractStatus.DISPUTED))
+        assert(!stateAwareCacheConfig.isImmutableState(ContractStatus.EXPIRED))
         
         // Test cache name selection
         assertEquals(StateAwareCacheConfig.CONTRACT_INFO_IMMUTABLE_CACHE, 
                     stateAwareCacheConfig.getContractInfoCacheName(ContractStatus.CLAIMED))
         assertEquals(StateAwareCacheConfig.CONTRACT_INFO_MUTABLE_CACHE, 
                     stateAwareCacheConfig.getContractInfoCacheName(ContractStatus.ACTIVE))
+        assertEquals(StateAwareCacheConfig.CONTRACT_INFO_MUTABLE_CACHE, 
+                    stateAwareCacheConfig.getContractInfoCacheName(ContractStatus.EXPIRED))
         
         println("✅ State classification working correctly")
     }
