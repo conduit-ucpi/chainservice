@@ -83,5 +83,20 @@ jobs:
               -e MIN_GAS_WEI=${{ vars.MIN_GAS_WEI }} \
               -e EMAIL_SERVICE_URL=${{ vars.EMAIL_SERVICE_URL }} \
               -e SERVICE_LINK=${{ vars.SERVICE_LINK }} \
+              -e SERVER_PORT=${{ vars.SERVER_PORT }} \
+              -e CHAIN_ID=${{ vars.CHAIN_ID }} \
+              -e PRICE_MULTIPLIER=${{ vars.PRICE_MULTIPLIER }} \
+              -e MAX_GAS_LIMIT=${{ vars.MAX_GAS_LIMIT }} \
+              -e MAX_GAS_COST_WEI=${{ vars.MAX_GAS_COST_WEI }} \
+              -e GAS_MULTIPLIER=${{ vars.GAS_MULTIPLIER }} \
+              -e GAS_LIMIT_CREATE_CONTRACT=${{ vars.GAS_LIMIT_CREATE_CONTRACT }} \
+              -e GAS_LIMIT_DEPOSIT=${{ vars.GAS_LIMIT_DEPOSIT }} \
+              -e GAS_LIMIT_DISPUTE=${{ vars.GAS_LIMIT_DISPUTE }} \
+              -e GAS_LIMIT_CLAIM=${{ vars.GAS_LIMIT_CLAIM }} \
+              -e GAS_LIMIT_RESOLVE=${{ vars.GAS_LIMIT_RESOLVE }} \
+              -e GAS_LIMIT_APPROVE_USDC=${{ vars.GAS_LIMIT_APPROVE_USDC }} \
+              -e AUTH_ENABLED=${{ vars.AUTH_ENABLED }} \
+              -e CONTRACT_SERVICE_ENABLED=${{ vars.CONTRACT_SERVICE_ENABLED }} \
+              -e EMAIL_SERVICE_ENABLED=${{ vars.EMAIL_SERVICE_ENABLED }} \
               ghcr.io/${{ env.REPO_LOWER }}:${{ env.GIT_SHA }}
           '

@@ -148,7 +148,6 @@ The application requires these environment variables to start:
 - `RPC_URL` - Avalanche testnet RPC endpoint
 - `USDC_CONTRACT_ADDRESS` - USDC token contract address
 - `CONTRACT_FACTORY_ADDRESS` - Escrow contract factory address
-- `TRUSTED_FORWARDER_ADDRESS` - MinimalForwarder contract address for EIP-2771 meta-transactions
 - `RELAYER_PRIVATE_KEY` - Private key for gas-paying wallet (must be 0x-prefixed hex)
 - `RELAYER_WALLET_ADDRESS` - Address of the relayer wallet
 - `CREATOR_FEE_USDC_X_1M` - Fee amount in USDC multiplied by 1 million (e.g., 1000000 = 1 USDC) to be paid to the creator on contract deposit (special case: 0.001 USDC contracts always have 0 creator fee)
