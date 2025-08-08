@@ -106,7 +106,6 @@ Content-Type: application/json
 
 ### 4. Resolve Dispute (Admin Only)
 
-#### Option A: Percentage-based Resolution (Recommended)
 ```http
 POST /api/admin/contracts/{contractId}/resolve
 Content-Type: application/json
@@ -116,30 +115,6 @@ Cookie: {admin auth cookies}
     "buyerPercentage": 60.0,
     "sellerPercentage": 40.0,
     "resolutionNote": "Admin resolution: buyer provided evidence of delivery issues"
-}
-```
-
-#### Option B: Enhanced Resolve Dispute (Supports both formats)
-```http
-POST /api/chain/resolve-dispute
-Content-Type: application/json
-
-{
-    "contractAddress": "0x...",
-    "buyerPercentage": 60.0,
-    "sellerPercentage": 40.0,
-    "resolutionNote": "Percentage-based resolution"
-}
-```
-
-#### Option C: Legacy Single Recipient (Deprecated)
-```http
-POST /api/chain/resolve-dispute
-Content-Type: application/json
-
-{
-    "contractAddress": "0x...",
-    "recipientAddress": "0x..."
 }
 ```
 

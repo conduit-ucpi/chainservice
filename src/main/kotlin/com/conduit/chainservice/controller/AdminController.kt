@@ -154,7 +154,8 @@ class AdminController(
                 currency = request.currency,
                 payoutDateTime = request.payoutDateTime,
                 sellerActualAmount = request.sellerActualAmount,
-                buyerActualAmount = request.buyerActualAmount
+                buyerActualAmount = request.buyerActualAmount,
+                link = request.link
             )
             
             logger.info("Delegating to escrow controller for dispute resolution")

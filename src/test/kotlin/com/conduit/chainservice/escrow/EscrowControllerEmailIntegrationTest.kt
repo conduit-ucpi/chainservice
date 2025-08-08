@@ -4,10 +4,13 @@ import com.conduit.chainservice.config.EscrowProperties
 import com.conduit.chainservice.escrow.models.RaiseDisputeRequest
 import com.conduit.chainservice.escrow.models.ResolveDisputeRequest
 import com.conduit.chainservice.escrow.models.DepositFundsRequest
+import com.conduit.chainservice.escrow.models.AdminResolveContractRequest
+import com.conduit.chainservice.controller.AdminController
 import com.conduit.chainservice.service.ContractQueryService
 import com.conduit.chainservice.service.ContractServiceClient
 import com.conduit.chainservice.service.EmailServiceClient
 import com.conduit.chainservice.service.SendEmailResponse
+import com.conduit.chainservice.service.CacheInvalidationService
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.utility.chainservice.models.TransactionResult
 import jakarta.servlet.http.HttpServletRequest
@@ -50,8 +53,12 @@ class EscrowControllerEmailIntegrationTest {
 
     @Mock
     private lateinit var escrowProperties: EscrowProperties
+    
+    @Mock
+    private lateinit var cacheInvalidationService: CacheInvalidationService
 
     private lateinit var escrowController: EscrowController
+    private lateinit var adminController: AdminController
 
     @BeforeEach
     fun setup() {
@@ -73,8 +80,15 @@ class EscrowControllerEmailIntegrationTest {
         val chainIdField = EscrowController::class.java.getDeclaredField("chainId")
         chainIdField.isAccessible = true
         chainIdField.set(escrowController, "43113")
+        
+        // Create AdminController with the escrowController
+        adminController = AdminController(
+            escrowController,
+            contractQueryService,
+            cacheInvalidationService
+        )
 
-        mockMvc = MockMvcBuilders.standaloneSetup(escrowController).build()
+        mockMvc = MockMvcBuilders.standaloneSetup(adminController, escrowController).build()
     }
 
     @Test
@@ -271,8 +285,8 @@ class EscrowControllerEmailIntegrationTest {
     @Test
     fun `resolve dispute with complete email fields should send resolved notifications`() {
         // Arrange
-        val request = ResolveDisputeRequest(
-            contractAddress = "0x1234567890abcdef1234567890abcdef12345678",
+        val contractAddress = "0x1234567890abcdef1234567890abcdef12345678"
+        val adminRequest = AdminResolveContractRequest(
             buyerPercentage = 60.0,
             sellerPercentage = 40.0,
             buyerEmail = "buyer@example.com",
@@ -287,7 +301,7 @@ class EscrowControllerEmailIntegrationTest {
 
         runBlocking {
             whenever(escrowTransactionService.resolveDisputeWithPercentages(
-                eq(request.contractAddress),
+                eq(contractAddress),
                 eq(60.0),
                 eq(40.0)
             )).thenReturn(TransactionResult(
@@ -301,9 +315,10 @@ class EscrowControllerEmailIntegrationTest {
             .thenReturn(Mono.just(SendEmailResponse(true, "msg-123", "Email sent successfully")))
 
         // Act & Assert
-        mockMvc.perform(post("/api/chain/resolve-dispute")
+        mockMvc.perform(post("/api/admin/contracts/$contractAddress/resolve")
             .contentType(MediaType.APPLICATION_JSON)
-            .content(objectMapper.writeValueAsString(request)))
+            .requestAttr("userType", "admin")
+            .content(objectMapper.writeValueAsString(adminRequest)))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.success").value(true))
 
@@ -317,8 +332,8 @@ class EscrowControllerEmailIntegrationTest {
     fun `resolve dispute with custom link should use provided link in email notifications`() {
         // Arrange
         val customLink = "https://custom.example.com/contract/0x1234567890abcdef1234567890abcdef12345678"
-        val request = ResolveDisputeRequest(
-            contractAddress = "0x1234567890abcdef1234567890abcdef12345678",
+        val contractAddress = "0x1234567890abcdef1234567890abcdef12345678"
+        val adminRequest = AdminResolveContractRequest(
             buyerPercentage = 60.0,
             sellerPercentage = 40.0,
             buyerEmail = "buyer@example.com",
@@ -334,7 +349,7 @@ class EscrowControllerEmailIntegrationTest {
 
         runBlocking {
             whenever(escrowTransactionService.resolveDisputeWithPercentages(
-                eq(request.contractAddress),
+                eq(contractAddress),
                 eq(60.0),
                 eq(40.0)
             )).thenReturn(TransactionResult(
@@ -348,9 +363,10 @@ class EscrowControllerEmailIntegrationTest {
             .thenReturn(Mono.just(SendEmailResponse(true, "msg-123", "Email sent successfully")))
 
         // Act & Assert
-        mockMvc.perform(post("/api/chain/resolve-dispute")
+        mockMvc.perform(post("/api/admin/contracts/$contractAddress/resolve")
             .contentType(MediaType.APPLICATION_JSON)
-            .content(objectMapper.writeValueAsString(request)))
+            .requestAttr("userType", "admin")
+            .content(objectMapper.writeValueAsString(adminRequest)))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.success").value(true))
 
@@ -361,10 +377,10 @@ class EscrowControllerEmailIntegrationTest {
     }
 
     @Test
-    fun `resolve dispute with incomplete email fields should fail validation`() {
-        // Arrange - missing sellerActualAmount and buyerActualAmount
-        val request = ResolveDisputeRequest(
-            contractAddress = "0x1234567890abcdef1234567890abcdef12345678",
+    fun `resolve dispute with incomplete email fields should skip email notification`() {
+        // Arrange - missing sellerActualAmount and buyerActualAmount (optional fields needed for email)
+        val contractAddress = "0x1234567890abcdef1234567890abcdef12345678"
+        val adminRequest = AdminResolveContractRequest(
             buyerPercentage = 60.0,
             sellerPercentage = 40.0,
             buyerEmail = "buyer@example.com",
@@ -373,23 +389,39 @@ class EscrowControllerEmailIntegrationTest {
             currency = "USDC",
             payoutDateTime = "2024-12-31T23:59:59Z",
             contractDescription = "Test escrow contract"
-            // sellerActualAmount and buyerActualAmount are missing
+            // sellerActualAmount and buyerActualAmount are missing (nulls)
         )
 
-        // Act & Assert - should fail validation
-        mockMvc.perform(post("/api/chain/resolve-dispute")
-            .contentType(MediaType.APPLICATION_JSON)
-            .content(objectMapper.writeValueAsString(request)))
-            .andExpect(status().isBadRequest)
+        runBlocking {
+            whenever(escrowTransactionService.resolveDisputeWithPercentages(
+                eq(contractAddress),
+                eq(60.0),
+                eq(40.0)
+            )).thenReturn(com.utility.chainservice.models.TransactionResult(
+                success = true,
+                transactionHash = "0xabc123...",
+                error = null
+            ))
+        }
 
-        // Verify email service was never called
+        // Act & Assert - should succeed but skip email notification
+        mockMvc.perform(post("/api/admin/contracts/$contractAddress/resolve")
+            .contentType(MediaType.APPLICATION_JSON)
+            .requestAttr("userType", "admin")
+            .content(objectMapper.writeValueAsString(adminRequest)))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.success").value(true))
+
+        // Verify email service was never called due to missing fields
         verify(emailServiceClient, never()).sendDisputeResolved(
             any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()
         )
         
-        // Verify transaction service was never called due to validation failure
+        // Verify transaction service was called (business logic succeeded)
         runBlocking {
-            verify(escrowTransactionService, never()).resolveDisputeWithPercentages(any(), any(), any())
+            verify(escrowTransactionService, times(1)).resolveDisputeWithPercentages(
+                eq(contractAddress), eq(60.0), eq(40.0)
+            )
         }
     }
 }

@@ -4,6 +4,7 @@ import jakarta.validation.Constraint
 import jakarta.validation.ConstraintValidator
 import jakarta.validation.ConstraintValidatorContext
 import jakarta.validation.Payload
+import org.slf4j.LoggerFactory
 import kotlin.reflect.KClass
 
 /**
@@ -127,6 +128,8 @@ class ConditionalEmailFieldsValidator : ConstraintValidator<ConditionalEmailFiel
  */
 object EmailFieldValidator {
     
+    private val logger = LoggerFactory.getLogger(EmailFieldValidator::class.java)
+    
     /**
      * Checks if a field value is valid for email notifications.
      * Valid means: not null, not blank, and not any common problematic values
@@ -171,13 +174,29 @@ object EmailFieldValidator {
         sellerActualAmount: String?,
         buyerActualAmount: String?
     ): Boolean {
-        return isValidEmailField(buyerEmail) &&
-               isValidEmailField(sellerEmail) &&
-               isValidEmailField(amount) &&
-               isValidEmailField(payoutDateTime) &&
-               isValidEmailField(contractDescription) &&
-               isValidEmailField(sellerActualAmount) &&
-               isValidEmailField(buyerActualAmount)
+        logger.debug("EmailFieldValidator: Validating dispute resolved email fields")
+        
+        val validations = mapOf(
+            "buyerEmail" to isValidEmailField(buyerEmail),
+            "sellerEmail" to isValidEmailField(sellerEmail),
+            "amount" to isValidEmailField(amount),
+            "payoutDateTime" to isValidEmailField(payoutDateTime),
+            "contractDescription" to isValidEmailField(contractDescription),
+            "sellerActualAmount" to isValidEmailField(sellerActualAmount),
+            "buyerActualAmount" to isValidEmailField(buyerActualAmount)
+        )
+        
+        val allValid = validations.values.all { it }
+        
+        if (logger.isDebugEnabled) {
+            validations.forEach { (field, isValid) ->
+                val status = if (isValid) "✓" else "❌"
+                logger.debug("EmailFieldValidator:   $field: $status")
+            }
+            logger.debug("EmailFieldValidator: Overall validation result: ${if (allValid) "PASS" else "FAIL"}")
+        }
+        
+        return allValid
     }
     
     /**

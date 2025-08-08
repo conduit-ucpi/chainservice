@@ -79,44 +79,6 @@ Resolves a disputed escrow contract by distributing funds according to specified
 - `404`: Contract not found
 - `500`: Internal server error or blockchain communication failure
 
-## Enhanced User Endpoints
-
-### Resolve Dispute (Enhanced)
-
-The enhanced resolve dispute endpoint now supports both percentage-based and legacy single-recipient resolution.
-
-**Endpoint:** `POST /api/chain/resolve-dispute`
-
-**Authentication:** Admin required
-
-#### Format 1: Percentage-based Resolution (Recommended)
-
-**Request Body:**
-```json
-{
-  "contractAddress": "0x1234567890abcdef1234567890abcdef12345678",
-  "buyerPercentage": 60.0,
-  "sellerPercentage": 40.0,
-  "resolutionNote": "Percentage-based resolution"
-}
-```
-
-#### Format 2: Legacy Single Recipient (Deprecated)
-
-**Request Body:**
-```json
-{
-  "contractAddress": "0x1234567890abcdef1234567890abcdef12345678",
-  "recipientAddress": "0x9876543210fedcba9876543210fedcba98765432"
-}
-```
-
-**Automatic Format Detection:**
-- If `buyerPercentage` and `sellerPercentage` are provided → percentage-based resolution
-- If `recipientAddress` is provided → legacy single recipient resolution
-- If neither format is complete → validation error
-
-**Response:** Same format as admin endpoint
 
 ## Existing Endpoints
 

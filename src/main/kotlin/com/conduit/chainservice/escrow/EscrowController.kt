@@ -481,44 +481,16 @@ class EscrowController(
         }
     }
 
-    @PostMapping("/resolve-dispute")
-    @Operation(
-        summary = "Resolve Dispute (Admin Only)",
-        description = "Resolves a dispute by transferring funds to the specified recipient. This is an admin-only operation. Optional email notification fields can be provided, including a link parameter that will be included in dispute resolved notification emails."
-    )
-    @ApiResponses(value = [
-        ApiResponse(
-            responseCode = "200",
-            description = "Dispute resolved successfully",
-            content = [Content(schema = Schema(implementation = ResolveDisputeResponse::class))]
-        ),
-        ApiResponse(
-            responseCode = "400",
-            description = "Invalid request or resolution failed",
-            content = [Content(schema = Schema(implementation = ResolveDisputeResponse::class))]
-        )
-    ])
+    // Internal method called by AdminController for dispute resolution
+    // Not exposed as an external endpoint - use /api/admin/contracts/{id}/resolve instead
     fun resolveDispute(
-        @Valid @RequestBody
-        @io.swagger.v3.oas.annotations.parameters.RequestBody(
-            content = [Content(
-                examples = [
-                    ExampleObject(
-                        name = "Percentage-based Resolution",
-                        value = """{"contractAddress": "0x1234...abcd", "buyerPercentage": 60.0, "sellerPercentage": 40.0, "resolutionNote": "Admin resolution note", "buyerEmail": "buyer@example.com", "sellerEmail": "seller@example.com", "contractDescription": "Product purchase", "amount": "100.00", "currency": "USDC", "payoutDateTime": "2024-12-31T23:59:59Z", "sellerActualAmount": "40.00", "buyerActualAmount": "60.00", "link": "https://app.conduit.com/contract/0x1234...abcd"}"""
-                    ),
-                    ExampleObject(
-                        name = "Legacy Single Recipient (deprecated)",
-                        value = """{"contractAddress": "0x1234...abcd", "recipientAddress": "0x5678...efgh"}"""
-                    )
-                ]
-            )]
-        )
         request: ResolveDisputeRequest,
         httpRequest: HttpServletRequest
     ): ResponseEntity<ResolveDisputeResponse> {
         return try {
             logger.info("Resolve dispute request received for contract: ${request.contractAddress}")
+            logger.debug("Dispute resolution request details - buyerPercentage: ${request.buyerPercentage}%, sellerPercentage: ${request.sellerPercentage}%, resolutionNote: ${request.resolutionNote?.let { "present(${it.length} chars)" } ?: "null"}")
+            logger.debug("Request has email fields: buyerEmail=${request.buyerEmail != null}, sellerEmail=${request.sellerEmail != null}, amount=${request.amount != null}, currency=${request.currency ?: "default(USDC)"}")
             
             val result = runBlocking {
                 // Check if percentage-based resolution is requested
@@ -572,7 +544,13 @@ class EscrowController(
                 logger.info("Dispute resolved successfully: ${result.transactionHash}")
                 
                 // Send dispute resolved email notifications if all required fields are provided
-                if (EmailFieldValidator.canSendDisputeResolvedEmail(
+                logger.debug("Checking email field validation for dispute resolution notification")
+                logger.debug("Email fields - buyerEmail: ${if (request.buyerEmail.isNullOrBlank()) "MISSING/BLANK" else "present(${request.buyerEmail.length} chars)"}, sellerEmail: ${if (request.sellerEmail.isNullOrBlank()) "MISSING/BLANK" else "present(${request.sellerEmail.length} chars)"}")
+                logger.debug("Email fields - amount: ${if (request.amount.isNullOrBlank()) "MISSING/BLANK" else "present(${request.amount})"}, payoutDateTime: ${if (request.payoutDateTime.isNullOrBlank()) "MISSING/BLANK" else "present(${request.payoutDateTime})"}")
+                logger.debug("Email fields - contractDescription: ${if (request.contractDescription.isNullOrBlank()) "MISSING/BLANK" else "present(${request.contractDescription.length} chars)"}")
+                logger.debug("Email fields - sellerActualAmount: ${if (request.sellerActualAmount.isNullOrBlank()) "MISSING/BLANK" else "present(${request.sellerActualAmount})"}, buyerActualAmount: ${if (request.buyerActualAmount.isNullOrBlank()) "MISSING/BLANK" else "present(${request.buyerActualAmount})"}")
+                
+                val canSendEmail = EmailFieldValidator.canSendDisputeResolvedEmail(
                     request.buyerEmail,
                     request.sellerEmail,
                     request.amount,
@@ -580,47 +558,71 @@ class EscrowController(
                     request.contractDescription,
                     request.sellerActualAmount,
                     request.buyerActualAmount
-                )) {
+                )
+                logger.debug("Email field validation result: $canSendEmail")
+                
+                if (canSendEmail) {
                     try {
+                        logger.debug("Preparing to send dispute resolved emails to both buyer and seller")
+                        
                         // Calculate percentages if not provided
                         val sellerPercentage = request.sellerPercentage?.toString() ?: (if (request.buyerPercentage != null) (100.0 - request.buyerPercentage!!).toString() else "0")
                         val buyerPercentage = request.buyerPercentage?.toString() ?: (if (request.sellerPercentage != null) (100.0 - request.sellerPercentage!!).toString() else "0")
                         val validatedLink = request.link ?: "$serviceLink/contract/${request.contractAddress}"
                         
+                        logger.debug("Email calculation - buyerPercentage: $buyerPercentage%, sellerPercentage: $sellerPercentage%")
+                        logger.debug("Email link: $validatedLink")
+                        
                         runBlocking {
-                            // Notify buyer
-                            emailServiceClient.sendDisputeResolved(
-                                recipientEmail = request.buyerEmail!!,
-                                amount = request.amount!!,
-                                currency = request.currency ?: "USDC",
-                                buyerEmail = request.buyerEmail!!,
-                                sellerEmail = request.sellerEmail!!,
-                                contractDescription = request.contractDescription!!,
-                                payoutDateTime = request.payoutDateTime!!,
-                                sellerPercentage = sellerPercentage,
-                                sellerActualAmount = request.sellerActualAmount!!,
-                                buyerPercentage = buyerPercentage,
-                                buyerActualAmount = request.buyerActualAmount!!,
-                                link = validatedLink,
-                                httpRequest = httpRequest
-                            ).block()
+                            logger.debug("Sending dispute resolved email to buyer: ${request.buyerEmail}")
+                            try {
+                                // Notify buyer
+                                val buyerEmailResult = emailServiceClient.sendDisputeResolved(
+                                    recipientEmail = request.buyerEmail!!,
+                                    amount = request.amount!!,
+                                    currency = request.currency ?: "USDC",
+                                    buyerEmail = request.buyerEmail!!,
+                                    sellerEmail = request.sellerEmail!!,
+                                    contractDescription = request.contractDescription!!,
+                                    payoutDateTime = request.payoutDateTime!!,
+                                    sellerPercentage = sellerPercentage,
+                                    sellerActualAmount = request.sellerActualAmount!!,
+                                    buyerPercentage = buyerPercentage,
+                                    buyerActualAmount = request.buyerActualAmount!!,
+                                    link = validatedLink,
+                                    httpRequest = httpRequest
+                                ).block()
+                                
+                                logger.debug("Buyer email result: ${buyerEmailResult?.let { "success=${it.success}, messageId=${it.messageId}, message=${it.message}" } ?: "null response"}")
+                            } catch (e: Exception) {
+                                logger.error("Failed to send dispute resolved email to buyer: ${request.buyerEmail}", e)
+                                throw e
+                            }
                             
-                            // Notify seller
-                            emailServiceClient.sendDisputeResolved(
-                                recipientEmail = request.sellerEmail!!,
-                                amount = request.amount!!,
-                                currency = request.currency ?: "USDC",
-                                buyerEmail = request.buyerEmail!!,
-                                sellerEmail = request.sellerEmail!!,
-                                contractDescription = request.contractDescription!!,
-                                payoutDateTime = request.payoutDateTime!!,
-                                sellerPercentage = sellerPercentage,
-                                sellerActualAmount = request.sellerActualAmount!!,
-                                buyerPercentage = buyerPercentage,
-                                buyerActualAmount = request.buyerActualAmount!!,
-                                link = validatedLink,
-                                httpRequest = httpRequest
-                            ).block()
+                            logger.debug("Sending dispute resolved email to seller: ${request.sellerEmail}")
+                            try {
+                                // Notify seller
+                                val sellerEmailResult = emailServiceClient.sendDisputeResolved(
+                                    recipientEmail = request.sellerEmail!!,
+                                    amount = request.amount!!,
+                                    currency = request.currency ?: "USDC",
+                                    buyerEmail = request.buyerEmail!!,
+                                    sellerEmail = request.sellerEmail!!,
+                                    contractDescription = request.contractDescription!!,
+                                    payoutDateTime = request.payoutDateTime!!,
+                                    sellerPercentage = sellerPercentage,
+                                    sellerActualAmount = request.sellerActualAmount!!,
+                                    buyerPercentage = buyerPercentage,
+                                    buyerActualAmount = request.buyerActualAmount!!,
+                                    link = validatedLink,
+                                    httpRequest = httpRequest
+                                ).block()
+                                
+                                logger.debug("Seller email result: ${sellerEmailResult?.let { "success=${it.success}, messageId=${it.messageId}, message=${it.message}" } ?: "null response"}")
+                            } catch (e: Exception) {
+                                logger.error("Failed to send dispute resolved email to seller: ${request.sellerEmail}", e)
+                                throw e
+                            }
                         }
                         logger.info("Dispute resolved notification emails sent successfully to both parties")
                     } catch (e: Exception) {
@@ -628,7 +630,16 @@ class EscrowController(
                         logger.error("Failed to send dispute resolved notification emails", e)
                     }
                 } else {
-                    logger.info("Email notification skipped for dispute resolution - missing required fields. Required: buyerEmail, sellerEmail, amount, payoutDateTime, contractDescription, sellerActualAmount, buyerActualAmount")
+                    logger.warn("Email notification skipped for dispute resolution - validation failed")
+                    logger.debug("Missing or invalid email fields - this prevents email notification but does not affect dispute resolution:")
+                    logger.debug("  - buyerEmail: ${if (request.buyerEmail.isNullOrBlank()) "❌ MISSING/BLANK" else "✓ valid"}")
+                    logger.debug("  - sellerEmail: ${if (request.sellerEmail.isNullOrBlank()) "❌ MISSING/BLANK" else "✓ valid"}")
+                    logger.debug("  - amount: ${if (request.amount.isNullOrBlank()) "❌ MISSING/BLANK" else "✓ valid"}")
+                    logger.debug("  - payoutDateTime: ${if (request.payoutDateTime.isNullOrBlank()) "❌ MISSING/BLANK" else "✓ valid"}")
+                    logger.debug("  - contractDescription: ${if (request.contractDescription.isNullOrBlank()) "❌ MISSING/BLANK" else "✓ valid"}")
+                    logger.debug("  - sellerActualAmount: ${if (request.sellerActualAmount.isNullOrBlank()) "❌ MISSING/BLANK" else "✓ valid"}")
+                    logger.debug("  - buyerActualAmount: ${if (request.buyerActualAmount.isNullOrBlank()) "❌ MISSING/BLANK" else "✓ valid"}")
+                    logger.info("Dispute resolution completed successfully, but email notifications were skipped due to missing required email fields")
                 }
                 
                 ResponseEntity.ok(response)

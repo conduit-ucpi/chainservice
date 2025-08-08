@@ -190,7 +190,8 @@ data class AdminResolveContractRequest(
     val payoutDateTime: String,
     
     val sellerActualAmount: String? = null,
-    val buyerActualAmount: String? = null
+    val buyerActualAmount: String? = null,
+    val link: String? = null
 )
 
 data class AdminResolveContractResponse(
