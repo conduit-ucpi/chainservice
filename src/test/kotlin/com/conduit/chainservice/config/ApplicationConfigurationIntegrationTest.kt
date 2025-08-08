@@ -27,8 +27,13 @@ class ApplicationConfigurationIntegrationTest {
                 "escrow.usdcContractAddress=0x1234567890123456789012345678901234567890",
                 "escrow.contractFactoryAddress=0x1234567890123456789012345678901234567890",
                 "escrow.creatorFee=1000000",
-                "escrow.gas.limitCreateContract=500000",
-                "escrow.gas.limitDeposit=74161",
+                "escrow.limitCreateContract=273000",
+                "escrow.limitDeposit=86500",
+                "escrow.limitDispute=8800",
+                "escrow.limitClaim=40800",
+                "escrow.limitResolve=68000",
+                "escrow.limitApproveUsdc=60000",
+                "escrow.gasMultiplier=1.11",
                 "auth.userServiceUrl=http://localhost:8080",
                 "auth.enabled=true"
             )
@@ -43,8 +48,13 @@ class ApplicationConfigurationIntegrationTest {
                 assertEquals("0x1234567890123456789012345678901234567890", escrowProps.usdcContractAddress)
                 assertEquals("0x1234567890123456789012345678901234567890", escrowProps.contractFactoryAddress)
                 assertEquals(java.math.BigInteger.valueOf(1000000), escrowProps.creatorFee)
-                assertEquals(500000L, escrowProps.gas.limitCreateContract)
-                assertEquals(74161L, escrowProps.gas.limitDeposit)
+                assertEquals(273000L, escrowProps.limitCreateContract)
+                assertEquals(86500L, escrowProps.limitDeposit)
+                assertEquals(8800L, escrowProps.limitDispute)
+                assertEquals(40800L, escrowProps.limitClaim)
+                assertEquals(68000L, escrowProps.limitResolve)
+                assertEquals(60000L, escrowProps.limitApproveUsdc)
+                assertEquals(1.11, escrowProps.gasMultiplier, 0.001)
                 
                 assertEquals("http://localhost:8080", authProps.userServiceUrl)
                 assertTrue(authProps.enabled)
@@ -75,19 +85,31 @@ class ApplicationConfigurationIntegrationTest {
     }
 
     @Test
-    fun `should use default values when optional properties are not provided`() {
+    fun `should use application yml default values when env vars are not provided`() {
         contextRunner
             .withPropertyValues(
+                // Simulating application.yml defaults (no env vars provided)
+                "escrow.limitCreateContract=273000",
+                "escrow.limitDeposit=86500", 
+                "escrow.limitDispute=8800",
+                "escrow.limitClaim=40800",
+                "escrow.limitResolve=68000",
+                "escrow.limitApproveUsdc=60000",
+                "escrow.gasMultiplier=1.11",
                 "auth.userServiceUrl=http://localhost:8080"
-                // Omitting optional properties to test defaults
             )
             .run { context ->
                 val escrowProps = context.getBean(EscrowProperties::class.java)
                 val authProps = context.getBean(AuthProperties::class.java)
                 
                 assertEquals(java.math.BigInteger.ZERO, escrowProps.creatorFee) // Default value
-                assertEquals(500000L, escrowProps.gas.limitCreateContract) // Default value
-                assertEquals(74161L, escrowProps.gas.limitDeposit) // Default value
+                assertEquals(273000L, escrowProps.limitCreateContract) // Default value
+                assertEquals(86500L, escrowProps.limitDeposit) // Default value
+                assertEquals(8800L, escrowProps.limitDispute) // Default value
+                assertEquals(40800L, escrowProps.limitClaim) // Default value
+                assertEquals(68000L, escrowProps.limitResolve) // Default value
+                assertEquals(60000L, escrowProps.limitApproveUsdc) // Default value
+                assertEquals(1.11, escrowProps.gasMultiplier, 0.001) // Default value
                 assertTrue(authProps.enabled) // Default value
             }
     }

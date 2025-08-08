@@ -33,16 +33,17 @@ class ConfigurationIntegrationTest {
                 "blockchain.gas.price-multiplier=1.7",
                 "blockchain.gas.minimum-gas-price-wei=6",
                 
-                // Escrow properties (kebab-case)
+                // Escrow properties (kebab-case - flattened structure)
                 "escrow.usdc-contract-address=0x5425890298aed601595a70AB815c96711a31Bc65",
                 "escrow.contract-factory-address=0x1234567890123456789012345678901234567890",
                 "escrow.creator-fee=1000000",
-                "escrow.gas.limit-create-contract=500000",
-                "escrow.gas.limit-deposit=74161",
-                "escrow.gas.limit-dispute=9633",
-                "escrow.gas.limit-claim=51702",
-                "escrow.gas.limit-resolve=200000",
-                "escrow.gas.limit-approve-usdc=60000",
+                "escrow.limit-create-contract=273000",
+                "escrow.limit-deposit=86500",
+                "escrow.limit-dispute=8800",
+                "escrow.limit-claim=40800",
+                "escrow.limit-resolve=68000",
+                "escrow.limit-approve-usdc=60000",
+                "escrow.gas-multiplier=1.11",
                 
                 // Auth properties (kebab-case)
                 "auth.user-service-url=http://localhost:8080",
@@ -67,8 +68,13 @@ class ConfigurationIntegrationTest {
                     assertEquals("0x5425890298aed601595a70AB815c96711a31Bc65", escrowProps.usdcContractAddress)
                     assertEquals("0x1234567890123456789012345678901234567890", escrowProps.contractFactoryAddress)
                     assertEquals(java.math.BigInteger.valueOf(1000000), escrowProps.creatorFee)
-                    assertEquals(500000L, escrowProps.gas.limitCreateContract)
-                    assertEquals(74161L, escrowProps.gas.limitDeposit)
+                    assertEquals(273000L, escrowProps.limitCreateContract)
+                    assertEquals(86500L, escrowProps.limitDeposit)
+                    assertEquals(8800L, escrowProps.limitDispute)
+                    assertEquals(40800L, escrowProps.limitClaim)
+                    assertEquals(68000L, escrowProps.limitResolve)
+                    assertEquals(60000L, escrowProps.limitApproveUsdc)
+                    assertEquals(1.11, escrowProps.gasMultiplier, 0.001)
                     
                     // Verify auth properties
                     assertEquals("http://localhost:8080", authProps.userServiceUrl)

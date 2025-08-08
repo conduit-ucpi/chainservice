@@ -18,7 +18,6 @@ import org.web3j.protocol.Web3j
 import org.web3j.crypto.Credentials
 import org.web3j.tx.gas.ContractGasProvider
 import com.conduit.chainservice.config.EscrowProperties
-import com.conduit.chainservice.config.EscrowGasProperties
 import java.math.BigInteger
 import org.junit.jupiter.api.Assertions.assertEquals
 
@@ -71,16 +70,9 @@ class StateAwareCacheInvalidationDepositFundsTest {
     fun setup() {
         MockitoAnnotations.openMocks(this)
         
-        // Setup escrow properties with gas configuration
-        val gasProperties = EscrowGasProperties(
-            limitCreateContract = 273000L,
-            limitDeposit = 86500L,
-            limitDispute = 8800L,
-            limitClaim = 40800L,
-            limitResolve = 68000L,
-            limitApproveUsdc = 60000L
-        )
-        whenever(escrowProperties.gas).thenReturn(gasProperties)
+        // Setup escrow properties with direct values (no nested gas structure)
+        whenever(escrowProperties.limitDeposit).thenReturn(86500L)
+        whenever(escrowProperties.gasMultiplier).thenReturn(1.11)
 
         // Setup cache mocks
         whenever(cacheManager.getCache(StateAwareCacheConfig.CONTRACT_INFO_MUTABLE_CACHE))
@@ -105,8 +97,15 @@ class StateAwareCacheInvalidationDepositFundsTest {
             web3j,
             relayerCredentials,
             gasProvider,
-            escrowProperties,
-            chainId
+            chainId,
+            "0x5425890298aed601595a70AB815c96711a31Bc65", // usdcContractAddress
+            "0x1234567890123456789012345678901234567890", // contractFactoryAddress
+            "1000000", // creatorFee
+            8800L, // limitDispute
+            40800L, // limitClaim
+            86500L, // limitDeposit
+            60000L, // limitApproveUsdc
+            1.11 // gasMultiplier
         )
     }
 
