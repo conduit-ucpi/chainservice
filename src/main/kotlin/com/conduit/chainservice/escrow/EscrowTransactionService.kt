@@ -370,7 +370,12 @@ class EscrowTransactionService(
 
     // Delegate gas transfer operations to generic service with cache invalidation
     suspend fun raiseDisputeWithGasTransfer(userWalletAddress: String, signedTransactionHex: String): TransactionResult {
-        val result = blockchainRelayService.processTransactionWithGasTransfer(userWalletAddress, signedTransactionHex, "raiseDispute")
+        val result = blockchainRelayService.processTransactionWithGasTransfer(
+            userWalletAddress, 
+            signedTransactionHex, 
+            "raiseDispute",
+            BigInteger.valueOf(escrowProperties.gas.limitDispute)
+        )
         
         // Invalidate cache on successful transaction - use contract address from result
         if (result.success && result.transactionHash != null && result.contractAddress != null) {
@@ -388,7 +393,12 @@ class EscrowTransactionService(
     }
 
     suspend fun claimFundsWithGasTransfer(userWalletAddress: String, signedTransactionHex: String): TransactionResult {
-        val result = blockchainRelayService.processTransactionWithGasTransfer(userWalletAddress, signedTransactionHex, "claimFunds")
+        val result = blockchainRelayService.processTransactionWithGasTransfer(
+            userWalletAddress, 
+            signedTransactionHex, 
+            "claimFunds",
+            BigInteger.valueOf(escrowProperties.gas.limitClaim)
+        )
         
         // Invalidate cache on successful transaction - use contract address from result
         if (result.success && result.transactionHash != null && result.contractAddress != null) {
@@ -406,7 +416,12 @@ class EscrowTransactionService(
     }
 
     suspend fun depositFundsWithGasTransfer(userWalletAddress: String, signedTransactionHex: String): TransactionResult {
-        val result = blockchainRelayService.processTransactionWithGasTransfer(userWalletAddress, signedTransactionHex, "depositFunds")
+        val result = blockchainRelayService.processTransactionWithGasTransfer(
+            userWalletAddress, 
+            signedTransactionHex, 
+            "depositFunds",
+            BigInteger.valueOf(escrowProperties.gas.limitDeposit)
+        )
         
         // Invalidate cache on successful transaction - use contract address from result
         if (result.success && result.transactionHash != null && result.contractAddress != null) {
@@ -424,7 +439,12 @@ class EscrowTransactionService(
     }
 
     suspend fun approveUSDCWithGasTransfer(userWalletAddress: String, signedTransactionHex: String): TransactionResult {
-        val result = blockchainRelayService.processTransactionWithGasTransfer(userWalletAddress, signedTransactionHex, "approveUSDC")
+        val result = blockchainRelayService.processTransactionWithGasTransfer(
+            userWalletAddress, 
+            signedTransactionHex, 
+            "approveUSDC",
+            BigInteger.valueOf(escrowProperties.gas.limitApproveUsdc)
+        )
         
         // For approveUSDC, we're approving the USDC contract to spend tokens on behalf of the escrow contract
         // This doesn't directly change contract state, but we might want to invalidate cache for related contracts

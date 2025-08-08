@@ -28,7 +28,7 @@ class UtilityServiceConfiguration(
         "raiseDispute" to escrowProperties.gas.limitDispute,
         "claimFunds" to escrowProperties.gas.limitClaim,
         "resolveDispute" to escrowProperties.gas.limitResolve,
-        "approveUSDC" to escrowProperties.gas.limitApproveUSDC
+        "approveUSDC" to escrowProperties.gas.limitApproveUsdc
     )
 
     // Additional escrow-specific properties

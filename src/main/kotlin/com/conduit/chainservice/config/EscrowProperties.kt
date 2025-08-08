@@ -17,5 +17,5 @@ data class EscrowGasProperties(
     var limitDispute: Long = 9633,
     var limitClaim: Long = 51702,
     var limitResolve: Long = 200000,
-    var limitApproveUSDC: Long = 60000
+    var limitApproveUsdc: Long = 60000
 )

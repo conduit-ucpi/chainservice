@@ -18,6 +18,7 @@ import org.web3j.protocol.Web3j
 import org.web3j.crypto.Credentials
 import org.web3j.tx.gas.ContractGasProvider
 import com.conduit.chainservice.config.EscrowProperties
+import com.conduit.chainservice.config.EscrowGasProperties
 import java.math.BigInteger
 import org.junit.jupiter.api.Assertions.assertEquals
 
@@ -69,6 +70,17 @@ class StateAwareCacheInvalidationDepositFundsTest {
     @BeforeEach
     fun setup() {
         MockitoAnnotations.openMocks(this)
+        
+        // Setup escrow properties with gas configuration
+        val gasProperties = EscrowGasProperties(
+            limitCreateContract = 273000L,
+            limitDeposit = 86500L,
+            limitDispute = 8800L,
+            limitClaim = 40800L,
+            limitResolve = 68000L,
+            limitApproveUsdc = 60000L
+        )
+        whenever(escrowProperties.gas).thenReturn(gasProperties)
 
         // Setup cache mocks
         whenever(cacheManager.getCache(StateAwareCacheConfig.CONTRACT_INFO_MUTABLE_CACHE))
@@ -110,9 +122,10 @@ class StateAwareCacheInvalidationDepositFundsTest {
         )
 
         whenever(blockchainRelayService.processTransactionWithGasTransfer(
-            userWalletAddress,
-            signedTransaction,
-            "depositFunds"
+            any(),
+            any(),
+            any(),
+            any()
         )).thenReturn(successResult)
 
         // When no cached data exists (new contract)
@@ -157,9 +170,10 @@ class StateAwareCacheInvalidationDepositFundsTest {
         )
 
         whenever(blockchainRelayService.processTransactionWithGasTransfer(
-            userWalletAddress,
-            signedTransaction,
-            "depositFunds"
+            any(),
+            any(),
+            any(),
+            any()
         )).thenReturn(successResult)
 
         // When cached data exists in mutable caches (contract was CREATED status)
@@ -204,9 +218,10 @@ class StateAwareCacheInvalidationDepositFundsTest {
         )
 
         whenever(blockchainRelayService.processTransactionWithGasTransfer(
-            userWalletAddress,
-            signedTransaction,
-            "depositFunds"
+            any(),
+            any(),
+            any(),
+            any()
         )).thenReturn(failedResult)
 
         // When: Deposit funds is called and fails
@@ -242,9 +257,10 @@ class StateAwareCacheInvalidationDepositFundsTest {
         )
 
         whenever(blockchainRelayService.processTransactionWithGasTransfer(
-            userWalletAddress,
-            signedTransaction,
-            "depositFunds"
+            any(),
+            any(),
+            any(),
+            any()
         )).thenReturn(resultWithoutAddress)
 
         // When: Deposit funds is called
