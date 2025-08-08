@@ -19,19 +19,20 @@ blockchain:
     minimum-gas-price-wei: ${MIN_GAS_WEI:6}
     max-gas-cost-limit: ${MAX_GAS_LIMIT:1} #set ridiculously low so any non-specified function call will fail
     max-gas-cost-wei: ${MAX_GAS_COST_WEI:1} #same
+    multiplier: ${GAS_MULTIPLIER:1.11}
 
 escrow:
   usdc-contract-address: ${USDC_CONTRACT_ADDRESS}
   contract-factory-address: ${CONTRACT_FACTORY_ADDRESS}
   creator-fee: ${CREATOR_FEE_USDC_X_1M}
-  gas:
-    # defaults all calculated from foundry
-    limit-create-contract: ${GAS_LIMIT_CREATE_CONTRACT:273000} 
-    limit-deposit: ${GAS_LIMIT_DEPOSIT:86500}
-    limit-dispute: ${GAS_LIMIT_DISPUTE:8800}
-    limit-claim: ${GAS_LIMIT_CLAIM:40800}
-    limit-resolve: ${GAS_LIMIT_RESOLVE:68000}
-    limit-approve-usdc: ${GAS_LIMIT_APPROVE_USDC:60000}
+  # gas limits calculated from foundry
+  limit-create-contract: ${GAS_LIMIT_CREATE_CONTRACT:273000} 
+  limit-deposit: ${GAS_LIMIT_DEPOSIT:86500}
+  limit-dispute: ${GAS_LIMIT_DISPUTE:8800}
+  limit-claim: ${GAS_LIMIT_CLAIM:40800}
+  limit-resolve: ${GAS_LIMIT_RESOLVE:68000}
+  limit-approve-usdc: ${GAS_LIMIT_APPROVE_USDC:60000}
+  gas-multiplier: ${GAS_MULTIPLIER:1.11}
 
 auth:
   user-service-url: ${USER_SERVICE_URL:https://api.conduit-ucpi.com/userservice}

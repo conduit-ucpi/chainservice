@@ -8,14 +8,11 @@ data class EscrowProperties(
     var usdcContractAddress: String = "",
     var contractFactoryAddress: String = "",
     var creatorFee: BigInteger = BigInteger.ZERO,
-    var gas: EscrowGasProperties = EscrowGasProperties()
-)
-
-data class EscrowGasProperties(
-    var limitCreateContract: Long = 500000,
-    var limitDeposit: Long = 74161, 
-    var limitDispute: Long = 9633,
-    var limitClaim: Long = 51702,
-    var limitResolve: Long = 200000,
-    var limitApproveUsdc: Long = 60000
+    var limitCreateContract: Long = 0,
+    var limitDeposit: Long = 0, 
+    var limitDispute: Long = 0,
+    var limitClaim: Long = 0,
+    var limitResolve: Long = 0,
+    var limitApproveUsdc: Long = 0,
+    var gasMultiplier: Double = 0.0
 )

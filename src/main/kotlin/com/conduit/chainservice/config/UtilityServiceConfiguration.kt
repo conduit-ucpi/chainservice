@@ -23,12 +23,12 @@ class UtilityServiceConfiguration(
 
     @Bean
     fun gasLimitsConfig(): Map<String, Long> = mapOf(
-        "createContract" to escrowProperties.gas.limitCreateContract,
-        "depositFunds" to escrowProperties.gas.limitDeposit,
-        "raiseDispute" to escrowProperties.gas.limitDispute,
-        "claimFunds" to escrowProperties.gas.limitClaim,
-        "resolveDispute" to escrowProperties.gas.limitResolve,
-        "approveUSDC" to escrowProperties.gas.limitApproveUsdc
+        "createContract" to escrowProperties.limitCreateContract,
+        "depositFunds" to escrowProperties.limitDeposit,
+        "raiseDispute" to escrowProperties.limitDispute,
+        "claimFunds" to escrowProperties.limitClaim,
+        "resolveDispute" to escrowProperties.limitResolve,
+        "approveUSDC" to escrowProperties.limitApproveUsdc
     )
 
     // Additional escrow-specific properties

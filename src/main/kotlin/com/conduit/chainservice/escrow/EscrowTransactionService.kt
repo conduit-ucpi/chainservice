@@ -1,6 +1,6 @@
 package com.conduit.chainservice.escrow
 
-import com.conduit.chainservice.config.EscrowProperties
+import org.springframework.beans.factory.annotation.Value
 import com.utility.chainservice.BlockchainProperties
 import com.conduit.chainservice.escrow.models.ContractCreationResult
 import com.conduit.chainservice.service.StateAwareCacheInvalidationService
@@ -29,8 +29,15 @@ class EscrowTransactionService(
     private val web3j: Web3j,
     private val relayerCredentials: Credentials,
     private val gasProvider: ContractGasProvider,
-    private val escrowProperties: EscrowProperties,
-    private val chainId: Long
+    private val chainId: Long,
+    @Value("\${escrow.usdc-contract-address}") private val usdcContractAddress: String,
+    @Value("\${escrow.contract-factory-address}") private val contractFactoryAddress: String,
+    @Value("\${escrow.creator-fee}") private val creatorFee: String,
+    @Value("\${escrow.limit-dispute}") private val limitDispute: Long,
+    @Value("\${escrow.limit-claim}") private val limitClaim: Long,
+    @Value("\${escrow.limit-deposit}") private val limitDeposit: Long,
+    @Value("\${escrow.limit-approve-usdc}") private val limitApproveUsdc: Long,
+    @Value("\${escrow.gas-multiplier}") private val gasMultiplier: Double
 ) {
 
     private val logger = LoggerFactory.getLogger(EscrowTransactionService::class.java)
@@ -46,15 +53,15 @@ class EscrowTransactionService(
             logger.info("Creating escrow contract for buyer: $buyer, seller: $seller, amount: $amount")
 
             // Determine creator fee with special case logic
-            val creatorFee = if (amount == BigInteger.valueOf(1000)) { // 0.001 USDC = 1000 units (6 decimals)
+            val creatorFeeAmount = if (amount == BigInteger.valueOf(1000)) { // 0.001 USDC = 1000 units (6 decimals)
                 BigInteger.ZERO
             } else {
-                escrowProperties.creatorFee
+                BigInteger(creatorFee)
             }
 
             // Validate creator fee
-            if (creatorFee >= amount) {
-                logger.error("Creator fee ($creatorFee) must be less than contract amount ($amount)")
+            if (creatorFeeAmount >= amount) {
+                logger.error("Creator fee ($creatorFeeAmount) must be less than contract amount ($amount)")
                 return ContractCreationResult(
                     success = false,
                     transactionHash = null,
@@ -80,7 +87,7 @@ class EscrowTransactionService(
                     Uint256(amount),
                     Uint256(BigInteger.valueOf(expiryTimestamp)),
                     Utf8String(description),
-                    Uint256(creatorFee)
+                    Uint256(creatorFeeAmount)
                 ),
                 emptyList()
             )
@@ -91,7 +98,7 @@ class EscrowTransactionService(
                 nonce,
                 gasPrice,
                 gasLimit,
-                escrowProperties.contractFactoryAddress,
+                contractFactoryAddress,
                 BigInteger.ZERO,
                 functionData
             )
@@ -374,7 +381,7 @@ class EscrowTransactionService(
             userWalletAddress, 
             signedTransactionHex, 
             "raiseDispute",
-            BigInteger.valueOf(escrowProperties.gas.limitDispute)
+            BigInteger.valueOf((limitDispute * gasMultiplier).toLong())
         )
         
         // Invalidate cache on successful transaction - use contract address from result
@@ -397,7 +404,7 @@ class EscrowTransactionService(
             userWalletAddress, 
             signedTransactionHex, 
             "claimFunds",
-            BigInteger.valueOf(escrowProperties.gas.limitClaim)
+            BigInteger.valueOf((limitClaim * gasMultiplier).toLong())
         )
         
         // Invalidate cache on successful transaction - use contract address from result
@@ -420,7 +427,7 @@ class EscrowTransactionService(
             userWalletAddress, 
             signedTransactionHex, 
             "depositFunds",
-            BigInteger.valueOf(escrowProperties.gas.limitDeposit)
+            BigInteger.valueOf((limitDeposit * gasMultiplier).toLong())
         )
         
         // Invalidate cache on successful transaction - use contract address from result
@@ -443,7 +450,7 @@ class EscrowTransactionService(
             userWalletAddress, 
             signedTransactionHex, 
             "approveUSDC",
-            BigInteger.valueOf(escrowProperties.gas.limitApproveUsdc)
+            BigInteger.valueOf((limitApproveUsdc * gasMultiplier).toLong())
         )
         
         // For approveUSDC, we're approving the USDC contract to spend tokens on behalf of the escrow contract
