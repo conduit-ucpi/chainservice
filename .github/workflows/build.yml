@@ -4,12 +4,13 @@ on:
     branches: [ "build-production", "build-test" ]
 
 jobs:
-  build-and-deploy:
+  build:
     runs-on: ubuntu-latest
-    environment: ${{ github.ref_name == 'build-production' && 'production' || 'test' }}
     permissions:
       contents: read
       packages: write
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tag }}
   
     steps:
       - uses: actions/checkout@v4
@@ -36,9 +37,11 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Lowercase the repo name and set git SHA
+        id: meta
         run: |
           echo "REPO_LOWER=$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
           echo "GIT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+          echo "tag=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
@@ -52,6 +55,17 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: ${{ github.ref_name == 'build-production' && 'production' || 'test' }}
+    
+    steps:
+      - name: Lowercase the repo name
+        run: |
+          echo "REPO_LOWER=$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+          echo "GIT_SHA=${{ needs.build.outputs.image-tag }}" >> $GITHUB_ENV
+      
       - name: Deploy to remote server
         run: |
           mkdir -p ~/.ssh
