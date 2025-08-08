@@ -589,6 +589,7 @@ class EscrowController(
                                     sellerActualAmount = request.sellerActualAmount!!,
                                     buyerPercentage = buyerPercentage,
                                     buyerActualAmount = request.buyerActualAmount!!,
+                                    productName = request.productName,
                                     link = validatedLink,
                                     httpRequest = httpRequest
                                 ).block()
@@ -614,6 +615,7 @@ class EscrowController(
                                     sellerActualAmount = request.sellerActualAmount!!,
                                     buyerPercentage = buyerPercentage,
                                     buyerActualAmount = request.buyerActualAmount!!,
+                                    productName = request.productName,
                                     link = validatedLink,
                                     httpRequest = httpRequest
                                 ).block()

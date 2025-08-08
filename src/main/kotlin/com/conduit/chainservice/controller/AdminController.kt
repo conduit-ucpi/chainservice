@@ -143,6 +143,7 @@ class AdminController(
             // Convert AdminResolveContractRequest to ResolveDisputeRequest to reuse existing logic
             val resolveDisputeRequest = ResolveDisputeRequest(
                 contractAddress = contractAddress,
+                productName = request.productName,
                 recipientAddress = null, // Use percentage-based resolution
                 buyerPercentage = request.buyerPercentage,
                 sellerPercentage = request.sellerPercentage,

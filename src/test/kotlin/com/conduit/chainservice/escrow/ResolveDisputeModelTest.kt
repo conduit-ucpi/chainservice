@@ -12,6 +12,7 @@ class ResolveDisputeModelTest {
     fun `ResolveDisputeRequest should support percentage-based resolution`() {
         val request = ResolveDisputeRequest(
             contractAddress = "0x1234567890abcdef1234567890abcdef12345678",
+            productName = "Test Product",
             buyerPercentage = 60.0,
             sellerPercentage = 40.0,
             resolutionNote = "Test resolution",
@@ -34,6 +35,7 @@ class ResolveDisputeModelTest {
     fun `ResolveDisputeRequest should support legacy single recipient resolution`() {
         val request = ResolveDisputeRequest(
             contractAddress = "0x1234567890abcdef1234567890abcdef12345678",
+            productName = "Test Product",
             recipientAddress = "0x9876543210fedcba9876543210fedcba98765432",
             buyerEmail = "buyer@test.com",
             sellerEmail = "seller@test.com",
@@ -59,6 +61,7 @@ class ResolveDisputeModelTest {
             buyerEmail = "buyer@test.com",
             sellerEmail = "seller@test.com",
             contractDescription = "Test contract description",
+            productName = "Test Product",
             amount = "100.0",
             currency = "USDC",
             payoutDateTime = "2024-12-31T23:59:59Z"
@@ -100,6 +103,7 @@ class ResolveDisputeModelTest {
         // This tests backward compatibility - the request model can handle both formats
         val requestWithBoth = ResolveDisputeRequest(
             contractAddress = "0x1234567890abcdef1234567890abcdef12345678",
+            productName = "Test Product",
             recipientAddress = "0x9876543210fedcba9876543210fedcba98765432",
             buyerPercentage = 100.0,
             sellerPercentage = 0.0,

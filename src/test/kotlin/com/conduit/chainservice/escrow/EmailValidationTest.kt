@@ -109,6 +109,7 @@ class EmailValidationTest {
     fun `ResolveDisputeRequest with no email fields should pass validation`() {
         val request = ResolveDisputeRequest(
             contractAddress = "0x1234567890abcdef1234567890abcdef12345678",
+            productName = "Test Product",
             buyerPercentage = 60.0,
             sellerPercentage = 40.0,
             buyerEmail = "buyer@example.com",
@@ -129,6 +130,7 @@ class EmailValidationTest {
     fun `ResolveDisputeRequest with emails but missing required fields should fail validation`() {
         val request = ResolveDisputeRequest(
             contractAddress = "0x1234567890abcdef1234567890abcdef12345678",
+            productName = "Test Product",
             buyerPercentage = 60.0,
             sellerPercentage = 40.0,
             buyerEmail = "buyer@example.com",
@@ -156,6 +158,7 @@ class EmailValidationTest {
     fun `ResolveDisputeRequest with all required fields should pass validation`() {
         val request = ResolveDisputeRequest(
             contractAddress = "0x1234567890abcdef1234567890abcdef12345678",
+            productName = "Test Product",
             buyerPercentage = 60.0,
             sellerPercentage = 40.0,
             buyerEmail = "buyer@example.com",

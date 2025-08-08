@@ -45,6 +45,7 @@ data class DisputeResolvedRequest(
     val sellerActualAmount: String,
     val buyerPercentAmount: String,
     val buyerActualAmount: String,
+    val productName: String,
     val link: String
 )
 
@@ -242,6 +243,7 @@ class EmailServiceClient(
         sellerActualAmount: String,
         buyerPercentage: String,
         buyerActualAmount: String,
+        productName: String,
         link: String,
         httpRequest: HttpServletRequest
     ): Mono<SendEmailResponse> {
@@ -266,6 +268,7 @@ class EmailServiceClient(
             sellerActualAmount = sellerActualAmount,
             buyerPercentAmount = buyerPercentage,
             buyerActualAmount = buyerActualAmount,
+            productName = productName,
             link = link
         )
 

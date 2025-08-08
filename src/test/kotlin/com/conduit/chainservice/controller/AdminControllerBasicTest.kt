@@ -49,6 +49,7 @@ class AdminControllerBasicTest {
             buyerEmail = "buyer@test.com",
             sellerEmail = "seller@test.com",
             contractDescription = "Test contract",
+            productName = "Test Product",
             amount = "1000000",
             currency = "USDC",
             payoutDateTime = "1722598500"
@@ -75,6 +76,7 @@ class AdminControllerBasicTest {
             buyerEmail = "buyer@test.com",
             sellerEmail = "seller@test.com",
             contractDescription = "Test contract",
+            productName = "Test Product",
             amount = "1000000",
             currency = "USDC",
             payoutDateTime = "1722598500"
@@ -101,6 +103,7 @@ class AdminControllerBasicTest {
             buyerEmail = "buyer@test.com",
             sellerEmail = "seller@test.com",
             contractDescription = "Test contract",
+            productName = "Test Product",
             amount = "1000000",
             currency = "USDC",
             payoutDateTime = "1722598500"
@@ -127,6 +130,7 @@ class AdminControllerBasicTest {
             buyerEmail = "buyer@test.com",
             sellerEmail = "seller@test.com",
             contractDescription = "Test contract",
+            productName = "Test Product",
             amount = "1000000",
             currency = "USDC",
             payoutDateTime = "1722598500"
