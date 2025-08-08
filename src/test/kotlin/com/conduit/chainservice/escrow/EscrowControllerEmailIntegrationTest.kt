@@ -312,7 +312,7 @@ class EscrowControllerEmailIntegrationTest {
             ))
         }
 
-        whenever(emailServiceClient.sendDisputeResolved(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
+        whenever(emailServiceClient.sendDisputeResolved(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
             .thenReturn(Mono.just(SendEmailResponse(true, "msg-123", "Email sent successfully")))
 
         // Act & Assert
@@ -325,7 +325,7 @@ class EscrowControllerEmailIntegrationTest {
 
         // Verify email service was called twice (buyer and seller)
         verify(emailServiceClient, times(2)).sendDisputeResolved(
-            any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()
+            any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()
         )
     }
 
@@ -361,7 +361,7 @@ class EscrowControllerEmailIntegrationTest {
             ))
         }
 
-        whenever(emailServiceClient.sendDisputeResolved(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), eq(customLink), any()))
+        whenever(emailServiceClient.sendDisputeResolved(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), eq(customLink), any()))
             .thenReturn(Mono.just(SendEmailResponse(true, "msg-123", "Email sent successfully")))
 
         // Act & Assert
@@ -374,7 +374,7 @@ class EscrowControllerEmailIntegrationTest {
 
         // Verify email service was called twice with the custom link
         verify(emailServiceClient, times(2)).sendDisputeResolved(
-            any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), eq(customLink), any()
+            any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), eq(customLink), any()
         )
     }
 
@@ -417,7 +417,7 @@ class EscrowControllerEmailIntegrationTest {
 
         // Verify email service was never called due to missing fields
         verify(emailServiceClient, never()).sendDisputeResolved(
-            any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()
+            any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()
         )
         
         // Verify transaction service was called (business logic succeeded)
