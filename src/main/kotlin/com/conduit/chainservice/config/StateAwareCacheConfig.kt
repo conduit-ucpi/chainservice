@@ -1,7 +1,9 @@
 package com.conduit.chainservice.config
 
+import com.conduit.chainservice.escrow.models.ContractInfo
 import com.conduit.chainservice.escrow.models.ContractStatus
 import com.github.benmanes.caffeine.cache.Caffeine
+import com.github.benmanes.caffeine.cache.Expiry
 import org.slf4j.LoggerFactory
 import org.springframework.cache.annotation.EnableCaching
 import org.springframework.cache.caffeine.CaffeineCache
@@ -10,6 +12,7 @@ import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.context.annotation.Primary
 import java.time.Duration
+import java.time.Instant
 
 /**
  * STATE-AWARE Cache configuration optimized for blockchain immutability patterns.
@@ -117,16 +120,64 @@ class StateAwareCacheConfig {
     }
 
     /**
-     * MUTABLE CONTRACT INFO CACHE  
+     * MUTABLE CONTRACT INFO CACHE WITH DYNAMIC TTL
      * For contracts in active states that can still change.
-     * SHORT TTL for real-time updates.
+     * 
+     * REVOLUTIONARY FEATURE: ACTIVE contracts get TTL matching their actual expiry time!
+     * - ACTIVE contracts: TTL = expiryTimestamp - currentTime (automatic expiry on contract expiration)
+     * - Other mutable states: Fixed 5-minute TTL for real-time updates
+     * 
+     * This ensures ACTIVE contracts automatically expire from cache exactly when they become EXPIRED,
+     * triggering fresh blockchain queries that will return the correct EXPIRED status.
      */
     private fun createMutableContractInfoCache(): CaffeineCache {
-        logger.info("Creating MUTABLE contract info cache with TTL: $MUTABLE_CONTRACT_INFO_TTL, max size: $MUTABLE_CONTRACT_INFO_MAX_SIZE")
+        logger.info("Creating MUTABLE contract info cache with DYNAMIC TTL for ACTIVE contracts, max size: $MUTABLE_CONTRACT_INFO_MAX_SIZE")
         
         val caffeine = Caffeine.newBuilder()
             .maximumSize(MUTABLE_CONTRACT_INFO_MAX_SIZE)
-            .expireAfterWrite(MUTABLE_CONTRACT_INFO_TTL)
+            .expireAfter(object : Expiry<Any, Any> {
+                override fun expireAfterCreate(key: Any, value: Any, currentTime: Long): Long {
+                    return calculateDynamicTTL(value, "create")
+                }
+                
+                override fun expireAfterUpdate(key: Any, value: Any, currentTime: Long, currentDuration: Long): Long {
+                    return calculateDynamicTTL(value, "update")
+                }
+                
+                override fun expireAfterRead(key: Any, value: Any, currentTime: Long, currentDuration: Long): Long {
+                    // Don't change TTL on reads - keep existing duration
+                    return currentDuration
+                }
+                
+                private fun calculateDynamicTTL(value: Any, operation: String): Long {
+                    return try {
+                        if (value is ContractInfo && value.status == ContractStatus.ACTIVE) {
+                            val currentTime = Instant.now().epochSecond
+                            val timeToExpiry = value.expiryTimestamp - currentTime
+                            
+                            if (timeToExpiry > 0) {
+                                val dynamicTTL = Duration.ofSeconds(timeToExpiry).toNanos()
+                                logger.debug("DYNAMIC TTL: ACTIVE contract ${value.contractAddress} cached with TTL ${timeToExpiry}s (expires at ${value.expiryTimestamp}) on $operation")
+                                dynamicTTL
+                            } else {
+                                // Contract already expired - expire immediately from cache
+                                logger.debug("DYNAMIC TTL: ACTIVE contract ${value.contractAddress} already expired (${timeToExpiry}s ago), immediate cache expiry on $operation")
+                                0L
+                            }
+                        } else {
+                            // Non-ACTIVE contracts use standard TTL
+                            val standardTTL = MUTABLE_CONTRACT_INFO_TTL.toNanos()
+                            if (value is ContractInfo) {
+                                logger.trace("STANDARD TTL: ${value.status} contract ${value.contractAddress} cached with standard TTL ${MUTABLE_CONTRACT_INFO_TTL.toMinutes()}min on $operation")
+                            }
+                            standardTTL
+                        }
+                    } catch (e: Exception) {
+                        logger.warn("Error calculating dynamic TTL on $operation, falling back to standard TTL", e)
+                        MUTABLE_CONTRACT_INFO_TTL.toNanos()
+                    }
+                }
+            })
             .recordStats()
             .build<Any, Any>()
             
@@ -151,16 +202,70 @@ class StateAwareCacheConfig {
     }
 
     /**
-     * MUTABLE CONTRACT STATE CACHE
+     * MUTABLE CONTRACT STATE CACHE WITH DYNAMIC TTL
      * State data for contracts that can still change.
-     * SHORT TTL for real-time updates.
+     * 
+     * MATCHES CONTRACT INFO CACHE: Uses same dynamic TTL logic for consistency.
+     * This ensures both contract info and state data expire simultaneously for ACTIVE contracts.
      */
     private fun createMutableContractStateCache(): CaffeineCache {
-        logger.info("Creating MUTABLE contract state cache with TTL: $MUTABLE_CONTRACT_STATE_TTL, max size: $MUTABLE_CONTRACT_STATE_MAX_SIZE")
+        logger.info("Creating MUTABLE contract state cache with DYNAMIC TTL for ACTIVE contracts, max size: $MUTABLE_CONTRACT_STATE_MAX_SIZE")
         
         val caffeine = Caffeine.newBuilder()
             .maximumSize(MUTABLE_CONTRACT_STATE_MAX_SIZE)
-            .expireAfterWrite(MUTABLE_CONTRACT_STATE_TTL)
+            .expireAfter(object : Expiry<Any, Any> {
+                override fun expireAfterCreate(key: Any, value: Any, currentTime: Long): Long {
+                    return calculateStateDynamicTTL(value, "create")
+                }
+                
+                override fun expireAfterUpdate(key: Any, value: Any, currentTime: Long, currentDuration: Long): Long {
+                    return calculateStateDynamicTTL(value, "update")
+                }
+                
+                override fun expireAfterRead(key: Any, value: Any, currentTime: Long, currentDuration: Long): Long {
+                    return currentDuration
+                }
+                
+                @Suppress("UNCHECKED_CAST")
+                private fun calculateStateDynamicTTL(value: Any, operation: String): Long {
+                    return try {
+                        if (value is Map<*, *>) {
+                            val stateMap = value as Map<String, Any>
+                            val expiryTimestamp = stateMap["expiryTimestamp"] as? Long
+                            val funded = stateMap["funded"] as? Boolean ?: false
+                            val disputed = stateMap["disputed"] as? Boolean ?: false
+                            val resolved = stateMap["resolved"] as? Boolean ?: false
+                            val claimed = stateMap["claimed"] as? Boolean ?: false
+                            
+                            // Calculate status from state data
+                            val currentTime = Instant.now().epochSecond
+                            val isActive = funded && !disputed && !resolved && !claimed && 
+                                          expiryTimestamp != null && currentTime <= expiryTimestamp
+                            
+                            if (isActive && expiryTimestamp != null) {
+                                val timeToExpiry = expiryTimestamp - currentTime
+                                if (timeToExpiry > 0) {
+                                    val dynamicTTL = Duration.ofSeconds(timeToExpiry).toNanos()
+                                    logger.debug("DYNAMIC STATE TTL: ACTIVE contract state cached with TTL ${timeToExpiry}s on $operation")
+                                    dynamicTTL
+                                } else {
+                                    logger.debug("DYNAMIC STATE TTL: ACTIVE contract state already expired, immediate cache expiry on $operation")
+                                    0L
+                                }
+                            } else {
+                                val standardTTL = MUTABLE_CONTRACT_STATE_TTL.toNanos()
+                                logger.trace("STANDARD STATE TTL: Non-ACTIVE contract state cached with standard TTL ${MUTABLE_CONTRACT_STATE_TTL.toMinutes()}min on $operation")
+                                standardTTL
+                            }
+                        } else {
+                            MUTABLE_CONTRACT_STATE_TTL.toNanos()
+                        }
+                    } catch (e: Exception) {
+                        logger.warn("Error calculating dynamic state TTL on $operation, falling back to standard TTL", e)
+                        MUTABLE_CONTRACT_STATE_TTL.toNanos()
+                    }
+                }
+            })
             .recordStats()
             .build<Any, Any>()
             
