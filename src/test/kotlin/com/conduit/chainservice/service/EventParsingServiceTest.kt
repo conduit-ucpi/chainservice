@@ -62,7 +62,10 @@ class EventParsingServiceTest {
         whenever(ethBlockNumberRequest.send()).thenReturn(ethBlockNumber)
         whenever(ethBlockNumber.blockNumber).thenReturn(currentBlockNumber)
         
-        eventParsingService = EventParsingService(web3j, escrowProperties)
+        val circuitBreaker = mock<com.conduit.chainservice.service.RpcCircuitBreaker>()
+        whenever(circuitBreaker.getCircuitStatus()).thenReturn(emptyMap())
+        
+        eventParsingService = EventParsingService(web3j, escrowProperties, circuitBreaker)
     }
 
     @Test

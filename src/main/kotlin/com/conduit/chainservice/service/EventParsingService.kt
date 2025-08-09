@@ -19,15 +19,77 @@ import org.web3j.protocol.core.methods.request.EthFilter
 import org.web3j.protocol.core.methods.response.Log
 import org.web3j.utils.Numeric
 import java.math.BigInteger
+import java.net.SocketTimeoutException
 import java.time.Instant
+import kotlinx.coroutines.delay
 
 @Service
 class EventParsingService(
     private val web3j: Web3j,
-    private val escrowProperties: EscrowProperties
+    private val escrowProperties: EscrowProperties,
+    private val circuitBreaker: RpcCircuitBreaker
 ) {
 
     private val logger = LoggerFactory.getLogger(EventParsingService::class.java)
+
+    private suspend fun <T> retryWithBackoff(
+        operation: String,
+        maxRetries: Int = 3,
+        initialDelayMs: Long = 1000,
+        action: suspend () -> T
+    ): T? {
+        // Check circuit breaker before attempting
+        val circuitStatus = circuitBreaker.getCircuitStatus()
+        if (circuitStatus[operation]?.contains("OPEN") == true) {
+            logger.warn("Circuit breaker is OPEN for operation: $operation, skipping request")
+            return null
+        }
+        
+        var attempt = 0
+        var lastException: Exception? = null
+        
+        while (attempt < maxRetries) {
+            try {
+                val result = action()
+                // Reset any failure tracking on success
+                return result
+            } catch (e: SocketTimeoutException) {
+                attempt++
+                lastException = e
+                
+                // Track failure in circuit breaker
+                try {
+                    circuitBreaker.executeWithCircuitBreaker(operation) {
+                        throw e
+                    }
+                } catch (_: Exception) {
+                    // Expected - we're just tracking the failure
+                }
+                
+                if (attempt < maxRetries) {
+                    val delayMs = initialDelayMs * (1L shl (attempt - 1)) // Exponential backoff
+                    logger.warn("$operation failed with timeout on attempt $attempt/$maxRetries, retrying in ${delayMs}ms")
+                    delay(delayMs)
+                } else {
+                    logger.error("$operation failed after $maxRetries attempts with timeout", e)
+                }
+            } catch (e: Exception) {
+                // Track non-timeout failures too
+                try {
+                    circuitBreaker.executeWithCircuitBreaker(operation) {
+                        throw e
+                    }
+                } catch (_: Exception) {
+                    // Expected - we're just tracking the failure
+                }
+                
+                logger.error("$operation failed with non-timeout exception", e)
+                throw e
+            }
+        }
+        
+        return null
+    }
 
     private val contractCreatedEvent = Event(
         "ContractCreated",
@@ -74,8 +136,8 @@ class EventParsingService(
     )
 
     suspend fun parseContractEvents(contractAddress: String): ContractEventHistory {
-        return try {
-            logger.info("Parsing events for contract: $contractAddress")
+        return retryWithBackoff("parseContractEvents($contractAddress)") {
+            logger.debug("Parsing events for contract: $contractAddress")
 
             val filter = EthFilter(
                 DefaultBlockParameterName.EARLIEST,
@@ -90,11 +152,7 @@ class EventParsingService(
             }.sortedBy { it.timestamp }
 
             ContractEventHistory(contractAddress, events)
-
-        } catch (e: Exception) {
-            logger.error("Error parsing events for contract: $contractAddress", e)
-            ContractEventHistory(contractAddress, emptyList())
-        }
+        } ?: ContractEventHistory(contractAddress, emptyList())
     }
 
     suspend fun findContractsByParticipant(walletAddress: String): List<String> {
@@ -123,22 +181,24 @@ class EventParsingService(
             while (chunkStart <= currentBlock) {
                 val chunkEnd = minOf(chunkStart.add(chunkSize), currentBlock)
                 
-                try {
+                val chunkLogs = retryWithBackoff("ethGetLogs chunk $chunkStart-$chunkEnd") {
                     val chunkFilter = EthFilter(
                         org.web3j.protocol.core.DefaultBlockParameter.valueOf(chunkStart),
                         org.web3j.protocol.core.DefaultBlockParameter.valueOf(chunkEnd),
                         escrowProperties.contractFactoryAddress
                     )
                     
-                    val chunkLogs = web3j.ethGetLogs(chunkFilter).send().logs ?: emptyList()
+                    web3j.ethGetLogs(chunkFilter).send().logs ?: emptyList()
+                }
+                
+                if (chunkLogs != null) {
                     allEventLogs.addAll(chunkLogs.map { it as org.web3j.protocol.core.methods.response.Log })
                     
                     if (chunkLogs.isNotEmpty()) {
                         logger.warn("Chunk $chunkStart-$chunkEnd: Found ${chunkLogs.size} events")
                     }
-                    
-                } catch (e: Exception) {
-                    logger.warn("Error searching chunk $chunkStart-$chunkEnd: ${e.message}")
+                } else {
+                    logger.warn("Chunk $chunkStart-$chunkEnd failed after retries, skipping")
                 }
                 
                 chunkStart = chunkEnd.add(BigInteger.ONE)
@@ -208,14 +268,14 @@ class EventParsingService(
             
 
             // Now filter the events for buyer/seller matches using chunked approach
-            fun searchWalletEvents(topicPosition: Int, role: String): List<org.web3j.protocol.core.methods.response.Log> {
+            suspend fun searchWalletEvents(topicPosition: Int, role: String): List<org.web3j.protocol.core.methods.response.Log> {
                 val matchingLogs = mutableListOf<org.web3j.protocol.core.methods.response.Log>()
                 
                 var chunkStart = fromBlock
                 while (chunkStart <= currentBlock) {
                     val chunkEnd = minOf(chunkStart.add(chunkSize), currentBlock)
                     
-                    try {
+                    val chunkLogs = retryWithBackoff("ethGetLogs $role chunk $chunkStart-$chunkEnd") {
                         val filter = EthFilter(
                             org.web3j.protocol.core.DefaultBlockParameter.valueOf(chunkStart),
                             org.web3j.protocol.core.DefaultBlockParameter.valueOf(chunkEnd),
@@ -239,15 +299,17 @@ class EventParsingService(
                         
                         filter.addOptionalTopics(*topics.toTypedArray())
                         
-                        val chunkLogs = web3j.ethGetLogs(filter).send().logs ?: emptyList()
+                        web3j.ethGetLogs(filter).send().logs ?: emptyList()
+                    }
+                    
+                    if (chunkLogs != null) {
                         matchingLogs.addAll(chunkLogs.map { it as org.web3j.protocol.core.methods.response.Log })
                         
                         if (chunkLogs.isNotEmpty()) {
                             logger.debug("Chunk $chunkStart-$chunkEnd: Found ${chunkLogs.size} events where wallet is $role")
                         }
-                        
-                    } catch (e: Exception) {
-                        logger.warn("Error searching $role chunk $chunkStart-$chunkEnd: ${e.message}")
+                    } else {
+                        logger.warn("$role chunk $chunkStart-$chunkEnd failed after retries, skipping")
                     }
                     
                     chunkStart = chunkEnd.add(BigInteger.ONE)
@@ -320,7 +382,7 @@ class EventParsingService(
             while (chunkStart <= currentBlock) {
                 val chunkEnd = minOf(chunkStart.add(chunkSize), currentBlock)
                 
-                try {
+                val chunkLogs = retryWithBackoff("ethGetLogs findAllContracts chunk $chunkStart-$chunkEnd") {
                     val chunkFilter = EthFilter(
                         org.web3j.protocol.core.DefaultBlockParameter.valueOf(chunkStart),
                         org.web3j.protocol.core.DefaultBlockParameter.valueOf(chunkEnd),
@@ -330,7 +392,10 @@ class EventParsingService(
                     // Add the ContractCreated event signature
                     chunkFilter.addSingleTopic(EventEncoder.encode(contractCreatedEvent))
                     
-                    val chunkLogs = web3j.ethGetLogs(chunkFilter).send().logs
+                    web3j.ethGetLogs(chunkFilter).send().logs
+                }
+                
+                if (chunkLogs != null) {
                     logger.debug("Found ${chunkLogs.size} ContractCreated events in chunk $chunkStart-$chunkEnd")
                     
                     // Extract contract addresses from the logs
@@ -345,9 +410,8 @@ class EventParsingService(
                             logger.warn("Error parsing contract creation log", e)
                         }
                     }
-                    
-                } catch (e: Exception) {
-                    logger.warn("Error searching chunk $chunkStart-$chunkEnd", e)
+                } else {
+                    logger.warn("findAllContracts chunk $chunkStart-$chunkEnd failed after retries, skipping")
                 }
                 
                 chunkStart = chunkEnd.add(BigInteger.ONE)

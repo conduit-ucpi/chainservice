@@ -2,6 +2,7 @@ package com.conduit.chainservice.controller
 
 import com.conduit.chainservice.config.EscrowProperties
 import com.conduit.chainservice.service.CacheMetricsService
+import com.conduit.chainservice.service.RpcCircuitBreaker
 import com.utility.chainservice.BlockchainProperties
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.media.Content
@@ -30,7 +31,8 @@ class HealthController(
     private val relayerCredentials: Credentials,
     private val blockchainProperties: BlockchainProperties,
     private val escrowProperties: EscrowProperties,
-    private val cacheMetricsService: CacheMetricsService
+    private val cacheMetricsService: CacheMetricsService,
+    private val circuitBreaker: RpcCircuitBreaker
 ) {
 
     private val logger = LoggerFactory.getLogger(HealthController::class.java)
@@ -168,6 +170,41 @@ class HealthController(
 
         } catch (e: Exception) {
             logger.error("Cache metrics endpoint failed", e)
+            ResponseEntity.status(500).body(
+                mapOf(
+                    "error" to (e.message ?: "Unknown error"),
+                    "timestamp" to Instant.now().toString()
+                )
+            )
+        }
+    }
+
+    @GetMapping("/circuit")
+    @Operation(
+        summary = "Circuit Breaker Status",
+        description = "Returns the current status of RPC circuit breakers including failure counts and open/closed state."
+    )
+    @ApiResponse(
+        responseCode = "200",
+        description = "Circuit breaker status retrieved successfully",
+        content = [Content(schema = Schema(implementation = Map::class))]
+    )
+    fun circuitStatus(): ResponseEntity<Map<String, Any>> {
+        return try {
+            val circuitStatus = circuitBreaker.getCircuitStatus()
+            val currentLoad = circuitBreaker.getCurrentLoad()
+            
+            val response = mapOf(
+                "circuitBreaker" to mapOf(
+                    "currentLoad" to currentLoad,
+                    "circuits" to circuitStatus.ifEmpty { mapOf("info" to "No circuits registered yet") }
+                ),
+                "timestamp" to Instant.now().toString()
+            )
+            
+            ResponseEntity.ok(response)
+        } catch (e: Exception) {
+            logger.error("Circuit breaker status endpoint failed", e)
             ResponseEntity.status(500).body(
                 mapOf(
                     "error" to (e.message ?: "Unknown error"),

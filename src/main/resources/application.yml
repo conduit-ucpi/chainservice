@@ -14,6 +14,10 @@ blockchain:
   relayer:
     private-key: ${RELAYER_PRIVATE_KEY}
     wallet-address: ${RELAYER_WALLET_ADDRESS}
+  timeout:
+    connect-seconds: ${BLOCKCHAIN_CONNECT_TIMEOUT:30}
+    read-seconds: ${BLOCKCHAIN_READ_TIMEOUT:60}  
+    write-seconds: ${BLOCKCHAIN_WRITE_TIMEOUT:60}
   gas:
     price-multiplier: ${PRICE_MULTIPLIER:1.2}
     minimum-gas-price-wei: ${MIN_GAS_WEI:6}
