@@ -118,7 +118,6 @@ class ContractQueryService(
     override suspend fun getContractInfo(contractAddress: String): ContractInfo? {
         return try {
             val contractData = queryContractState(contractAddress)
-            val eventHistory = eventParsingService.parseContractEvents(contractAddress)
             
             val buyer = contractData["buyer"] as String
             val seller = contractData["seller"] as String
@@ -126,14 +125,9 @@ class ContractQueryService(
             val expiryTimestamp = contractData["expiryTimestamp"] as Long
             val description = contractData["description"] as String
             val funded = contractData["funded"] as Boolean
+            val createdAt = contractData["createdAt"] as Long
             
             val status = getContractStatus(contractAddress)
-            
-            val createdEvent = eventHistory.events.find { it.eventType.name == "CONTRACT_CREATED" }
-            val fundedEvent = eventHistory.events.find { it.eventType.name == "FUNDS_DEPOSITED" }
-            val disputedEvent = eventHistory.events.find { it.eventType.name == "DISPUTE_RAISED" }
-            val resolvedEvent = eventHistory.events.find { it.eventType.name == "DISPUTE_RESOLVED" }
-            val claimedEvent = eventHistory.events.find { it.eventType.name == "FUNDS_CLAIMED" }
 
             ContractInfo(
                 contractAddress = contractAddress,
@@ -144,11 +138,11 @@ class ContractQueryService(
                 description = description,
                 funded = funded,
                 status = status,
-                createdAt = createdEvent?.timestamp ?: Instant.EPOCH,
-                fundedAt = fundedEvent?.timestamp,
-                disputedAt = disputedEvent?.timestamp,
-                resolvedAt = resolvedEvent?.timestamp,
-                claimedAt = claimedEvent?.timestamp
+                createdAt = Instant.ofEpochSecond(createdAt),
+                fundedAt = null,
+                disputedAt = null,
+                resolvedAt = null,
+                claimedAt = null
             )
 
         } catch (e: Exception) {
@@ -198,7 +192,6 @@ class ContractQueryService(
     private suspend fun getContractInfo(contractAddress: String, participantAddress: String, userType: String? = null): ContractInfo? {
         return try {
             val contractData = queryContractState(contractAddress)
-            val eventHistory = eventParsingService.parseContractEvents(contractAddress)
             
             val buyer = contractData["buyer"] as String
             val seller = contractData["seller"] as String
@@ -206,18 +199,13 @@ class ContractQueryService(
             val expiryTimestamp = contractData["expiryTimestamp"] as Long
             val description = contractData["description"] as String
             val funded = contractData["funded"] as Boolean
+            val createdAt = contractData["createdAt"] as Long
             
             if (userType == "admin" || 
                 buyer.equals(participantAddress, ignoreCase = true) || 
                 seller.equals(participantAddress, ignoreCase = true)) {
                 
                 val status = getContractStatus(contractAddress)
-                
-                val createdEvent = eventHistory.events.find { it.eventType.name == "CONTRACT_CREATED" }
-                val fundedEvent = eventHistory.events.find { it.eventType.name == "FUNDS_DEPOSITED" }
-                val disputedEvent = eventHistory.events.find { it.eventType.name == "DISPUTE_RAISED" }
-                val resolvedEvent = eventHistory.events.find { it.eventType.name == "DISPUTE_RESOLVED" }
-                val claimedEvent = eventHistory.events.find { it.eventType.name == "FUNDS_CLAIMED" }
 
                 ContractInfo(
                     contractAddress = contractAddress,
@@ -228,11 +216,11 @@ class ContractQueryService(
                     description = description,
                     funded = funded,
                     status = status,
-                    createdAt = createdEvent?.timestamp ?: Instant.EPOCH,
-                    fundedAt = fundedEvent?.timestamp,
-                    disputedAt = disputedEvent?.timestamp,
-                    resolvedAt = resolvedEvent?.timestamp,
-                    claimedAt = claimedEvent?.timestamp
+                    createdAt = Instant.ofEpochSecond(createdAt),
+                    fundedAt = null,
+                    disputedAt = null,
+                    resolvedAt = null,
+                    claimedAt = null
                 )
             } else {
                 null
@@ -264,7 +252,8 @@ class ContractQueryService(
                 "funded" to contractInfo["funded"]!!,
                 "disputed" to contractInfo["disputed"]!!,
                 "resolved" to contractInfo["resolved"]!!,
-                "claimed" to contractInfo["claimed"]!!
+                "claimed" to contractInfo["claimed"]!!,
+                "createdAt" to contractInfo["createdAt"]!!
             )
 
         } catch (e: Exception) {
@@ -292,7 +281,9 @@ class ContractQueryService(
                     org.web3j.abi.TypeReference.create(Uint256::class.java),     // expiryTimestamp
                     org.web3j.abi.TypeReference.create(Utf8String::class.java),  // description
                     org.web3j.abi.TypeReference.create(org.web3j.abi.datatypes.generated.Uint8::class.java),   // currentState
-                    org.web3j.abi.TypeReference.create(Uint256::class.java)      // currentTimestamp
+                    org.web3j.abi.TypeReference.create(Uint256::class.java),     // currentTimestamp
+                    org.web3j.abi.TypeReference.create(Uint256::class.java),     // creatorFee
+                    org.web3j.abi.TypeReference.create(Uint256::class.java)      // createdAt
                 )
             )
             
@@ -331,7 +322,8 @@ class ContractQueryService(
                 "funded" to false,
                 "disputed" to false,
                 "resolved" to false,
-                "claimed" to false
+                "claimed" to false,
+                "createdAt" to 0L
             )
         }
     }
@@ -339,7 +331,7 @@ class ContractQueryService(
     private fun parseNewContractResult(result: List<org.web3j.abi.datatypes.Type<*>>): Map<String, Any> {
         return try {
             // Parse the new contract result
-            // getContractInfo returns: (address _buyer, address _seller, uint256 _amount, uint256 _expiryTimestamp, string _description, uint8 _currentState, uint256 _currentTimestamp)
+            // getContractInfo returns: (address _buyer, address _seller, uint256 _amount, uint256 _expiryTimestamp, string _description, uint8 _currentState, uint256 _currentTimestamp, uint256 _creatorFee, uint256 _createdAt)
             
             val buyer = (result[0] as Address).value
             val seller = (result[1] as Address).value
@@ -348,6 +340,8 @@ class ContractQueryService(
             val description = (result[4] as Utf8String).value
             val state = (result[5] as org.web3j.abi.datatypes.generated.Uint8).value.toInt()
             val currentTimestamp = (result[6] as Uint256).value.toLong()
+            val creatorFee = (result[7] as Uint256).value
+            val createdAt = (result[8] as Uint256).value.toLong()
             
             // Map state values: 0=unfunded, 1=funded, 2=disputed, 3=resolved, 4=claimed
             val funded = state >= 1
@@ -364,7 +358,9 @@ class ContractQueryService(
                 "funded" to funded,
                 "disputed" to disputed,
                 "resolved" to resolved,
-                "claimed" to claimed
+                "claimed" to claimed,
+                "creatorFee" to creatorFee,
+                "createdAt" to createdAt
             )
             
         } catch (e: Exception) {
@@ -378,7 +374,8 @@ class ContractQueryService(
                 "funded" to false,
                 "disputed" to false,
                 "resolved" to false,
-                "claimed" to false
+                "claimed" to false,
+                "createdAt" to 0L
             )
         }
     }
@@ -407,13 +404,9 @@ class ContractQueryService(
             logger.info("Level 1: Batching contract state queries...")
             val contractStates = batchQueryContractStates(contractAddresses)
             
-            // LEVEL 2: Batch transaction/event data queries 
-            logger.info("Level 2: Batching transaction data queries...")
-            val eventData = batchQueryEventData(contractAddresses)
-            
-            // LEVEL 3: Assemble final results
-            logger.info("Level 3: Assembling final results...")
-            val results = assembleContractInfoResults(contractAddresses, contractStates, eventData)
+            // LEVEL 2: Assemble final results (no event data needed)
+            logger.info("Level 2: Assembling final results...")
+            val results = assembleContractInfoResults(contractAddresses, contractStates)
             
             val endTime = System.currentTimeMillis()
             val duration = endTime - startTime
@@ -487,56 +480,23 @@ class ContractQueryService(
         return@coroutineScope results
     }
     
-    /**
-     * LEVEL 2: Batch query event/transaction data
-     * Uses efficient event filtering and batched block lookups
-     */
-    private suspend fun batchQueryEventData(contractAddresses: List<String>): Map<String, ContractEventHistory> = coroutineScope {
-        logger.debug("Batching event data queries for ${contractAddresses.size} contracts")
-        val results = mutableMapOf<String, ContractEventHistory>()
-        
-        try {
-            // Use parallel event parsing for each contract
-            val eventQueries = contractAddresses.map { contractAddress ->
-                async {
-                    try {
-                        contractAddress to eventParsingService.parseContractEvents(contractAddress)
-                    } catch (e: Exception) {
-                        logger.debug("Failed to parse events for $contractAddress: ${e.message}")
-                        contractAddress to ContractEventHistory(contractAddress, emptyList())
-                    }
-                }
-            }
-            
-            val eventResults = eventQueries.awaitAll()
-            results.putAll(eventResults)
-            
-            logger.debug("Event data batch completed: ${results.size} results")
-            
-        } catch (e: Exception) {
-            logger.warn("Batch event data query failed, using empty results", e)
-        }
-        
-        return@coroutineScope results
-    }
+    // LEVEL 2: Event data batch method removed - no longer needed since createdAt comes from contract directly
     
     /**
-     * LEVEL 3: Assemble final ContractInfoResult objects
-     * Combines contract state and event data into the expected format
+     * LEVEL 2: Assemble final ContractInfoResult objects
+     * Uses only contract state data since createdAt is now available directly
      */
     private suspend fun assembleContractInfoResults(
         contractAddresses: List<String>,
-        contractStates: Map<String, Map<String, Any>>,
-        eventData: Map<String, ContractEventHistory>
+        contractStates: Map<String, Map<String, Any>>
     ): Map<String, ContractInfoResult> {
         logger.debug("Assembling ${contractAddresses.size} contract info results")
         
         return contractAddresses.associateWith { contractAddress ->
             try {
                 val contractData = contractStates[contractAddress]
-                val eventHistory = eventData[contractAddress]
                 
-                if (contractData == null || eventHistory == null) {
+                if (contractData == null) {
                     ContractInfoResult(
                         success = false,
                         contractInfo = null,
@@ -549,16 +509,10 @@ class ContractQueryService(
                     val expiryTimestamp = contractData["expiryTimestamp"] as Long
                     val description = contractData["description"] as String
                     val funded = contractData["funded"] as Boolean
+                    val createdAt = contractData["createdAt"] as Long
                     
                     // Calculate status from contract data
                     val status = calculateContractStatus(contractData)
-                    
-                    // Extract event timestamps
-                    val createdEvent = eventHistory.events.find { it.eventType.name == "CONTRACT_CREATED" }
-                    val fundedEvent = eventHistory.events.find { it.eventType.name == "FUNDS_DEPOSITED" }
-                    val disputedEvent = eventHistory.events.find { it.eventType.name == "DISPUTE_RAISED" }
-                    val resolvedEvent = eventHistory.events.find { it.eventType.name == "DISPUTE_RESOLVED" }
-                    val claimedEvent = eventHistory.events.find { it.eventType.name == "FUNDS_CLAIMED" }
                     
                     val contractInfo = ContractInfo(
                         contractAddress = contractAddress,
@@ -569,11 +523,11 @@ class ContractQueryService(
                         description = description,
                         funded = funded,
                         status = status,
-                        createdAt = createdEvent?.timestamp ?: Instant.EPOCH,
-                        fundedAt = fundedEvent?.timestamp,
-                        disputedAt = disputedEvent?.timestamp,
-                        resolvedAt = resolvedEvent?.timestamp,
-                        claimedAt = claimedEvent?.timestamp
+                        createdAt = Instant.ofEpochSecond(createdAt),
+                        fundedAt = null,
+                        disputedAt = null,
+                        resolvedAt = null,
+                        claimedAt = null
                     )
                     
                     ContractInfoResult(

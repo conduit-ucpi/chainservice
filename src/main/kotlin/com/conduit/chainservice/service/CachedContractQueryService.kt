@@ -266,12 +266,8 @@ class CachedContractQueryService(
             // Calculate status from contract data
             val status = calculateContractStatus(contractState)
             
-            // Extract event timestamps
-            val createdEvent = transactionData.events.find { it.eventType.name == "CONTRACT_CREATED" }
-            val fundedEvent = transactionData.events.find { it.eventType.name == "FUNDS_DEPOSITED" }
-            val disputedEvent = transactionData.events.find { it.eventType.name == "DISPUTE_RAISED" }
-            val resolvedEvent = transactionData.events.find { it.eventType.name == "DISPUTE_RESOLVED" }
-            val claimedEvent = transactionData.events.find { it.eventType.name == "FUNDS_CLAIMED" }
+            // Get createdAt directly from contract state
+            val createdAt = contractState["createdAt"] as? Long ?: 0L
             
             ContractInfo(
                 contractAddress = contractAddress,
@@ -282,11 +278,11 @@ class CachedContractQueryService(
                 description = description,
                 funded = funded,
                 status = status,
-                createdAt = createdEvent?.timestamp ?: Instant.now(),
-                fundedAt = fundedEvent?.timestamp,
-                disputedAt = disputedEvent?.timestamp,
-                resolvedAt = resolvedEvent?.timestamp,
-                claimedAt = claimedEvent?.timestamp
+                createdAt = Instant.ofEpochSecond(createdAt),
+                fundedAt = null,
+                disputedAt = null,
+                resolvedAt = null,
+                claimedAt = null
             )
         } catch (e: Exception) {
             logger.debug("Failed to assemble contract info from cache for $contractAddress", e)
