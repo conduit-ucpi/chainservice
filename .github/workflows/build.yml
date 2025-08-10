@@ -1,11 +1,14 @@
 name: Build and Deploy Spring Boot
 on:
   push:
-    branches: [ "build-production", "build-test" ]
+    branches: [ "build-test" ]
+    tags:
+      - 'v*'
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    environment: ${{ startsWith(github.ref, 'refs/tags/') && 'production' || 'test' }}
     permissions:
       contents: read
       packages: write
@@ -58,7 +61,7 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
-    environment: ${{ github.ref_name == 'build-production' && 'production' || 'test' }}
+    environment: ${{ startsWith(github.ref, 'refs/tags/') && 'production' || 'test' }}
     
     steps:
       - name: Lowercase the repo name
