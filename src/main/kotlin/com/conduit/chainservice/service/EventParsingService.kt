@@ -22,6 +22,9 @@ import java.math.BigInteger
 import java.net.SocketTimeoutException
 import java.time.Instant
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 
 @Service
 class EventParsingService(
@@ -31,6 +34,9 @@ class EventParsingService(
 ) {
 
     private val logger = LoggerFactory.getLogger(EventParsingService::class.java)
+    
+    // Cache for block timestamps to avoid repeated queries
+    private val blockTimestampCache = mutableMapOf<BigInteger, Long>()
 
     private suspend fun <T> retryWithBackoff(
         operation: String,
@@ -135,20 +141,55 @@ class EventParsingService(
         )
     )
 
-    suspend fun parseContractEvents(contractAddress: String): ContractEventHistory {
-        return retryWithBackoff("parseContractEvents($contractAddress)") {
+    suspend fun parseContractEvents(contractAddress: String): ContractEventHistory = coroutineScope {
+        retryWithBackoff("parseContractEvents($contractAddress)") {
             logger.debug("Parsing events for contract: $contractAddress")
 
-            val filter = EthFilter(
-                DefaultBlockParameterName.EARLIEST,
-                DefaultBlockParameterName.LATEST,
-                contractAddress
-            )
+            // Optimization: Only search recent blocks (last 10,000 blocks)
+            // This covers approximately 5.5 hours on Avalanche (2s block time)
+            // Most contracts should have all their events within this range
+            val currentBlock = web3j.ethBlockNumber().send().blockNumber
+            val searchDepth = BigInteger.valueOf(10000)
+            val fromBlock = if (currentBlock > searchDepth) {
+                currentBlock.subtract(searchDepth)
+            } else {
+                BigInteger.ZERO
+            }
 
-            val logs = web3j.ethGetLogs(filter).send().logs ?: emptyList()
+            // Query in parallel chunks to speed up the process
+            val chunkSize = BigInteger.valueOf(2000)
+            val chunks = mutableListOf<Pair<BigInteger, BigInteger>>()
+            
+            var chunkStart = fromBlock
+            while (chunkStart <= currentBlock) {
+                val chunkEnd = minOf(chunkStart.add(chunkSize.subtract(BigInteger.ONE)), currentBlock)
+                chunks.add(chunkStart to chunkEnd)
+                chunkStart = chunkEnd.add(BigInteger.ONE)
+            }
 
-            val events = logs.mapNotNull { log ->
-                parseLogToEvent(log as Log)
+            // Process chunks in parallel
+            val chunkJobs = chunks.map { (start, end) ->
+                async {
+                    try {
+                        val filter = EthFilter(
+                            org.web3j.protocol.core.DefaultBlockParameter.valueOf(start),
+                            org.web3j.protocol.core.DefaultBlockParameter.valueOf(end),
+                            contractAddress
+                        )
+                        
+                        val logs = web3j.ethGetLogs(filter).send().logs
+                        logs?.map { it as Log } ?: emptyList()
+                    } catch (e: Exception) {
+                        logger.debug("Failed to fetch logs for chunk $start-$end: ${e.message}")
+                        emptyList<Log>()
+                    }
+                }
+            }
+
+            val allLogs = chunkJobs.awaitAll().flatten()
+
+            val events = allLogs.mapNotNull { log ->
+                parseLogToEvent(log)
             }.sortedBy { it.timestamp }
 
             ContractEventHistory(contractAddress, events)
@@ -476,14 +517,15 @@ class EventParsingService(
             val amount = (nonIndexedValues[0] as Uint256).value
             val expiryTimestamp = (nonIndexedValues[1] as Uint256).value
 
-            val blockInfo = web3j.ethGetBlockByNumber(
-                org.web3j.protocol.core.DefaultBlockParameter.valueOf(log.blockNumber.toString()),
-                false
-            ).send()
-
-            val timestamp = Instant.ofEpochSecond(
+            val timestampSeconds = blockTimestampCache.getOrPut(log.blockNumber) {
+                val blockInfo = web3j.ethGetBlockByNumber(
+                    org.web3j.protocol.core.DefaultBlockParameter.valueOf(log.blockNumber.toString()),
+                    false
+                ).send()
                 blockInfo.block.timestamp.toLong()
-            )
+            }
+
+            val timestamp = Instant.ofEpochSecond(timestampSeconds)
 
             ContractEvent(
                 eventType = EventType.CONTRACT_CREATED,
@@ -514,14 +556,15 @@ class EventParsingService(
 
             val eventTimestamp = (nonIndexedValues[0] as Uint256).value
 
-            val blockInfo = web3j.ethGetBlockByNumber(
-                org.web3j.protocol.core.DefaultBlockParameter.valueOf(log.blockNumber.toString()),
-                false
-            ).send()
-
-            val timestamp = Instant.ofEpochSecond(
+            val timestampSeconds = blockTimestampCache.getOrPut(log.blockNumber) {
+                val blockInfo = web3j.ethGetBlockByNumber(
+                    org.web3j.protocol.core.DefaultBlockParameter.valueOf(log.blockNumber.toString()),
+                    false
+                ).send()
                 blockInfo.block.timestamp.toLong()
-            )
+            }
+
+            val timestamp = Instant.ofEpochSecond(timestampSeconds)
 
             ContractEvent(
                 eventType = EventType.DISPUTE_RAISED,
@@ -549,14 +592,15 @@ class EventParsingService(
             val recipient = (nonIndexedValues[0] as Address).value
             val eventTimestamp = (nonIndexedValues[1] as Uint256).value
 
-            val blockInfo = web3j.ethGetBlockByNumber(
-                org.web3j.protocol.core.DefaultBlockParameter.valueOf(log.blockNumber.toString()),
-                false
-            ).send()
-
-            val timestamp = Instant.ofEpochSecond(
+            val timestampSeconds = blockTimestampCache.getOrPut(log.blockNumber) {
+                val blockInfo = web3j.ethGetBlockByNumber(
+                    org.web3j.protocol.core.DefaultBlockParameter.valueOf(log.blockNumber.toString()),
+                    false
+                ).send()
                 blockInfo.block.timestamp.toLong()
-            )
+            }
+
+            val timestamp = Instant.ofEpochSecond(timestampSeconds)
 
             ContractEvent(
                 eventType = EventType.DISPUTE_RESOLVED,
@@ -586,14 +630,15 @@ class EventParsingService(
             val amount = (nonIndexedValues[1] as Uint256).value
             val eventTimestamp = (nonIndexedValues[2] as Uint256).value
 
-            val blockInfo = web3j.ethGetBlockByNumber(
-                org.web3j.protocol.core.DefaultBlockParameter.valueOf(log.blockNumber.toString()),
-                false
-            ).send()
-
-            val timestamp = Instant.ofEpochSecond(
+            val timestampSeconds = blockTimestampCache.getOrPut(log.blockNumber) {
+                val blockInfo = web3j.ethGetBlockByNumber(
+                    org.web3j.protocol.core.DefaultBlockParameter.valueOf(log.blockNumber.toString()),
+                    false
+                ).send()
                 blockInfo.block.timestamp.toLong()
-            )
+            }
+
+            val timestamp = Instant.ofEpochSecond(timestampSeconds)
 
             ContractEvent(
                 eventType = EventType.FUNDS_DEPOSITED,
@@ -624,14 +669,15 @@ class EventParsingService(
             val amount = (nonIndexedValues[1] as Uint256).value
             val eventTimestamp = (nonIndexedValues[2] as Uint256).value
 
-            val blockInfo = web3j.ethGetBlockByNumber(
-                org.web3j.protocol.core.DefaultBlockParameter.valueOf(log.blockNumber.toString()),
-                false
-            ).send()
-
-            val timestamp = Instant.ofEpochSecond(
+            val timestampSeconds = blockTimestampCache.getOrPut(log.blockNumber) {
+                val blockInfo = web3j.ethGetBlockByNumber(
+                    org.web3j.protocol.core.DefaultBlockParameter.valueOf(log.blockNumber.toString()),
+                    false
+                ).send()
                 blockInfo.block.timestamp.toLong()
-            )
+            }
+
+            val timestamp = Instant.ofEpochSecond(timestampSeconds)
 
             ContractEvent(
                 eventType = EventType.FUNDS_CLAIMED,
