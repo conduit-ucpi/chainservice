@@ -21,7 +21,7 @@ blockchain:
   gas:
     price-multiplier: ${PRICE_MULTIPLIER:1.2}
     minimum-gas-price-wei: ${MIN_GAS_WEI:6}
-    max-gas-cost-limit: ${MAX_GAS_LIMIT:1} #set ridiculously low so any non-specified function call will fail
+    max-gas-limit: ${MAX_GAS_LIMIT:1} #set ridiculously low so any non-specified function call will fail
     max-gas-cost-wei: ${MAX_GAS_COST_WEI:1} #same
     multiplier: ${GAS_MULTIPLIER:1.11}
 
