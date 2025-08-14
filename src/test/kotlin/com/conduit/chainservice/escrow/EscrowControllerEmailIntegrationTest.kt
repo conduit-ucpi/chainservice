@@ -118,7 +118,7 @@ class EscrowControllerEmailIntegrationTest {
             ))
         }
 
-        whenever(emailServiceClient.sendDisputeRaised(any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
+        whenever(emailServiceClient.sendDisputeRaised(any(), any(), any(), any(), any(), any(), any(), any(), any(), anyOrNull(), anyOrNull(), any()))
             .thenReturn(Mono.just(SendEmailResponse(true, "msg-123", "Email sent successfully")))
 
         // Act & Assert
@@ -130,7 +130,7 @@ class EscrowControllerEmailIntegrationTest {
 
         // Verify email service was called twice (buyer and seller)
         verify(emailServiceClient, times(2)).sendDisputeRaised(
-            any(), any(), any(), any(), any(), any(), any(), any(), any(), any()
+            any(), any(), any(), any(), any(), any(), any(), any(), any(), anyOrNull(), anyOrNull(), any()
         )
     }
 
@@ -158,7 +158,7 @@ class EscrowControllerEmailIntegrationTest {
 
         // Verify email service was never called
         verify(emailServiceClient, never()).sendDisputeRaised(
-            any(), any(), any(), any(), any(), any(), any(), any(), any(), any()
+            any(), any(), any(), any(), any(), any(), any(), any(), any(), anyOrNull(), anyOrNull(), any()
         )
         
         // Verify transaction service was never called due to validation failure
@@ -197,7 +197,7 @@ class EscrowControllerEmailIntegrationTest {
 
         // Verify email service was never called
         verify(emailServiceClient, never()).sendDisputeRaised(
-            any(), any(), any(), any(), any(), any(), any(), any(), any(), any()
+            any(), any(), any(), any(), any(), any(), any(), any(), any(), anyOrNull(), anyOrNull(), any()
         )
     }
 

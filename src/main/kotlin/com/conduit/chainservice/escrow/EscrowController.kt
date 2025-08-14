@@ -145,7 +145,7 @@ class EscrowController(
             content = [Content(
                 examples = [ExampleObject(
                     name = "Raise Dispute Example",
-                    value = """{"contractAddress": "0x1234567890abcdef1234567890abcdef12345678", "userWalletAddress": "0x9876543210fedcba9876543210fedcba98765432", "signedTransaction": "0xf86c8082520894...", "productName": "Sample Product", "buyerEmail": "buyer@example.com", "sellerEmail": "seller@example.com", "contractDescription": "Product purchase", "amount": "100.00", "currency": "USDC", "payoutDateTime": "2024-12-31T23:59:59Z", "link": "https://app.conduit.com/contract/0x1234567890abcdef1234567890abcdef12345678"}"""
+                    value = """{"contractAddress": "0x1234567890abcdef1234567890abcdef12345678", "userWalletAddress": "0x9876543210fedcba9876543210fedcba98765432", "signedTransaction": "0xf86c8082520894...", "productName": "Sample Product", "buyerEmail": "buyer@example.com", "sellerEmail": "seller@example.com", "contractDescription": "Product purchase", "amount": "1500000", "currency": "microUSDC", "payoutDateTime": "2024-01-15T10:30:00.000Z", "serviceLink": "https://service.link", "reason": "The product was not delivered as described", "suggestedSplit": 50, "databaseId": "507f1f77bcf86cd799439011"}"""
                 )]
             )]
         )
@@ -167,6 +167,26 @@ class EscrowController(
 
             if (result.success) {
                 logger.info("Dispute raised successfully: ${result.transactionHash}")
+                
+                // Update contract service with dispute information if databaseId is provided
+                if (request.databaseId != null) {
+                    try {
+                        runBlocking {
+                            contractServiceClient.updateContractWithDispute(
+                                contractId = request.databaseId,
+                                reason = request.reason,
+                                suggestedSplit = request.suggestedSplit,
+                                request = httpRequest
+                            ).block()
+                        }
+                        logger.info("Contract service updated with dispute information for contract ID: ${request.databaseId}")
+                    } catch (e: Exception) {
+                        // Log the error but don't fail the dispute response since the blockchain transaction succeeded
+                        logger.error("Failed to update contract service with dispute information for contract ID: ${request.databaseId}", e)
+                    }
+                } else {
+                    logger.info("No databaseId provided in dispute request, skipping contract service update")
+                }
                 
                 // Send dispute raised email notifications if all required fields are provided
                 logger.info("Checking if email notification can be sent. Field values: buyerEmail=${request.buyerEmail}, sellerEmail=${request.sellerEmail}, amount=${request.amount}, payoutDateTime=${request.payoutDateTime}, contractDescription=${request.contractDescription}, productName=${request.productName}, currency=${request.currency}")
@@ -205,6 +225,8 @@ class EscrowController(
                                 payoutDateTime = validatedPayoutDateTime,
                                 productName = validatedProductName,
                                 link = validatedLink,
+                                reason = request.reason,
+                                suggestedSplit = request.suggestedSplit,
                                 httpRequest = httpRequest
                             ).block()
                             
@@ -219,6 +241,8 @@ class EscrowController(
                                 payoutDateTime = validatedPayoutDateTime,
                                 productName = validatedProductName,
                                 link = validatedLink,
+                                reason = request.reason,
+                                suggestedSplit = request.suggestedSplit,
                                 httpRequest = httpRequest
                             ).block()
                         }

@@ -194,4 +194,58 @@ class ContractServiceClient(
                 }
             }
     }
+
+    fun updateContractWithDispute(
+        contractId: String,
+        reason: String?,
+        suggestedSplit: Int?,
+        request: HttpServletRequest
+    ): Mono<Map<String, Any>> {
+        if (!enabled) {
+            logger.info("Contract service integration disabled, skipping dispute update")
+            return Mono.just(mapOf("status" to "skipped"))
+        }
+
+        val updateRequest = mutableMapOf<String, Any>()
+        reason?.let { updateRequest["reason"] = it }
+        suggestedSplit?.let { updateRequest["suggestedSplit"] = it }
+
+        logger.info("Updating contract $contractId with dispute information: reason=${reason?.take(50)}, suggestedSplit=$suggestedSplit")
+
+        return webClient.patch()
+            .uri("/api/contracts/$contractId/dispute")
+            .headers { headers ->
+                // Forward authentication headers
+                request.getHeader(HttpHeaders.AUTHORIZATION)?.let {
+                    headers.set(HttpHeaders.AUTHORIZATION, it)
+                }
+                
+                // Forward cookies including AUTH-TOKEN and session
+                request.getHeader(HttpHeaders.COOKIE)?.let {
+                    headers.set(HttpHeaders.COOKIE, it)
+                }
+                
+                // Add any custom headers that might be needed
+                headers.set("X-Forwarded-For", request.remoteAddr)
+                headers.set("X-Original-URI", request.requestURI)
+            }
+            .bodyValue(updateRequest)
+            .retrieve()
+            .bodyToMono(object : org.springframework.core.ParameterizedTypeReference<Map<String, Any>>() {})
+            .doOnSuccess { response ->
+                logger.info("Successfully updated contract $contractId with dispute information")
+            }
+            .onErrorResume { error ->
+                when (error) {
+                    is WebClientResponseException -> {
+                        logger.error("Contract service returned error: ${error.statusCode} - ${error.responseBodyAsString}")
+                        Mono.error<Map<String, Any>>(error)
+                    }
+                    else -> {
+                        logger.error("Failed to update contract with dispute information", error)
+                        Mono.error<Map<String, Any>>(error)
+                    }
+                }
+            }
+    }
 }

@@ -30,7 +30,9 @@ data class DisputeRaisedRequest(
     val description: String,
     val sellerEmail: String,
     val payoutDateTime: String,
-    val productName: String
+    val productName: String,
+    val reason: String? = null,
+    val suggestedSplit: Int? = null
 )
 
 data class DisputeResolvedRequest(
@@ -161,6 +163,8 @@ class EmailServiceClient(
         payoutDateTime: String,
         productName: String,
         link: String,
+        reason: String? = null,
+        suggestedSplit: Int? = null,
         httpRequest: HttpServletRequest
     ): Mono<SendEmailResponse> {
         if (!enabled) {
@@ -181,7 +185,9 @@ class EmailServiceClient(
             description = contractDescription,
             sellerEmail = sellerEmail,
             payoutDateTime = payoutDateTime,
-            productName = productName
+            productName = productName,
+            reason = reason,
+            suggestedSplit = suggestedSplit
         )
 
         logger.info("Sending dispute raised notification email to: $recipientEmail")

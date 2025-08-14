@@ -45,7 +45,11 @@ data class RaiseDisputeRequest(
     val link: String? = null,
     
     @field:NotBlank(message = "Product name is required")
-    val productName: String
+    val productName: String,
+    
+    val reason: String? = null,
+    val suggestedSplit: Int? = null,
+    val databaseId: String? = null
 )
 
 data class ClaimFundsRequest(
