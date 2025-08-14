@@ -1,4 +1,5 @@
 name: Build and Deploy Spring Boot
+run-name: Deploy ${{ github.event.head_commit.message }}
 on:
   push:
     tags:
