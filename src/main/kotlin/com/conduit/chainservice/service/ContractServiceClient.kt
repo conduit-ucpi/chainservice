@@ -248,4 +248,73 @@ class ContractServiceClient(
                 }
             }
     }
+
+    fun getDisputeStatus(
+        contractId: String,
+        request: HttpServletRequest
+    ): Mono<DisputeStatusResponse> {
+        if (!enabled) {
+            logger.info("Contract service integration disabled, returning default dispute status")
+            return Mono.just(DisputeStatusResponse(
+                sellerLatestRefundEntry = null,
+                buyerLatestRefundEntry = null
+            ))
+        }
+
+        logger.info("Getting dispute status for contract $contractId from contract service")
+
+        return webClient.get()
+            .uri("/api/contracts/$contractId/dispute/status")
+            .headers { headers ->
+                // Forward authentication headers
+                request.getHeader(HttpHeaders.AUTHORIZATION)?.let {
+                    headers.set(HttpHeaders.AUTHORIZATION, it)
+                }
+                
+                // Forward cookies including AUTH-TOKEN and session
+                request.getHeader(HttpHeaders.COOKIE)?.let {
+                    headers.set(HttpHeaders.COOKIE, it)
+                }
+                
+                // Add any custom headers that might be needed
+                headers.set("X-Forwarded-For", request.remoteAddr)
+                headers.set("X-Original-URI", request.requestURI)
+            }
+            .retrieve()
+            .bodyToMono(DisputeStatusResponse::class.java)
+            .doOnSuccess { response ->
+                logger.info("Successfully retrieved dispute status for contract $contractId: seller=${response.sellerLatestRefundEntry}, buyer=${response.buyerLatestRefundEntry}")
+            }
+            .onErrorResume { error ->
+                when (error) {
+                    is WebClientResponseException -> {
+                        logger.error("Contract service returned error: ${error.statusCode} - ${error.responseBodyAsString}")
+                        // Return default response if dispute status endpoint fails
+                        Mono.just(DisputeStatusResponse(
+                            sellerLatestRefundEntry = null,
+                            buyerLatestRefundEntry = null
+                        ))
+                    }
+                    else -> {
+                        logger.error("Failed to get dispute status from contract service", error)
+                        // Return default response if request fails
+                        Mono.just(DisputeStatusResponse(
+                            sellerLatestRefundEntry = null,
+                            buyerLatestRefundEntry = null
+                        ))
+                    }
+                }
+            }
+    }
+
+    data class DisputeStatusResponse(
+        val sellerLatestRefundEntry: Int?,
+        val buyerLatestRefundEntry: Int?
+    ) {
+        fun hasMutualAgreement(): Boolean {
+            return sellerLatestRefundEntry != null && 
+                   buyerLatestRefundEntry != null && 
+                   sellerLatestRefundEntry == buyerLatestRefundEntry
+        }
+    }
 }

@@ -6,6 +6,7 @@ import com.conduit.chainservice.escrow.models.AdminResolveContractResponse
 import com.conduit.chainservice.escrow.models.ResolveDisputeRequest
 import com.conduit.chainservice.service.ContractQueryService
 import com.conduit.chainservice.service.CacheInvalidationService
+import com.conduit.chainservice.service.ContractServiceClient
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.media.Content
@@ -30,15 +31,16 @@ import org.springframework.web.bind.annotation.*
 class AdminController(
     private val escrowController: EscrowController,
     private val contractQueryService: ContractQueryService,
-    private val cacheInvalidationService: CacheInvalidationService
+    private val cacheInvalidationService: CacheInvalidationService,
+    private val contractServiceClient: ContractServiceClient
 ) {
 
     private val logger = LoggerFactory.getLogger(AdminController::class.java)
 
     @PostMapping("/contracts/{id}/resolve")
     @Operation(
-        summary = "Resolve Contract Dispute (Admin Only)",
-        description = "Resolves a disputed escrow contract by distributing funds according to specified percentages. This is an admin-only operation that requires proper authentication."
+        summary = "Resolve Contract Dispute",
+        description = "Resolves a disputed escrow contract by distributing funds according to specified percentages. This operation can be performed by admins, or by any authenticated user if both parties have mutually agreed on the same refund percentage."
     )
     @ApiResponses(value = [
         ApiResponse(
@@ -53,7 +55,7 @@ class AdminController(
         ),
         ApiResponse(
             responseCode = "403",
-            description = "Access denied - admin privileges required"
+            description = "Access denied - admin privileges required or mutual agreement not found"
         ),
         ApiResponse(
             responseCode = "404",
@@ -86,17 +88,27 @@ class AdminController(
         return try {
             logger.info("Admin resolve contract request received for contract ID: $id")
             
-            // Verify admin access
+            // Check if both parties have mutually agreed first
+            val disputeStatus = contractServiceClient.getDisputeStatus(id, httpServletRequest).block()
+            val hasMutualAgreement = disputeStatus?.hasMutualAgreement() ?: false
+            
+            // Verify admin access (unless there's mutual agreement)
             val userType = httpServletRequest.getAttribute("userType") as? String
-            if (userType != "admin") {
-                logger.warn("Non-admin user attempted to resolve contract: $id")
+            if (!hasMutualAgreement && userType != "admin") {
+                logger.warn("Non-admin user attempted to resolve contract without mutual agreement: $id")
                 return ResponseEntity.status(HttpStatus.FORBIDDEN).body(
                     AdminResolveContractResponse(
                         success = false,
                         transactionHash = null,
-                        error = "Access denied - admin privileges required"
+                        error = "Access denied - admin privileges required (no mutual agreement found)"
                     )
                 )
+            }
+            
+            if (hasMutualAgreement) {
+                logger.info("Contract $id has mutual agreement: both parties agreed to ${disputeStatus?.sellerLatestRefundEntry}% refund")
+            } else {
+                logger.info("Contract $id requires admin resolution (no mutual agreement)")
             }
 
             // Validate percentages early to provide consistent error messages

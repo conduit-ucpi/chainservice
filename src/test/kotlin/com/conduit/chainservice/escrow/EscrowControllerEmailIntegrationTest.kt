@@ -20,12 +20,12 @@ import org.junit.jupiter.api.Test
 import org.mockito.Mock
 import org.mockito.MockitoAnnotations
 import org.mockito.kotlin.*
+import reactor.core.publisher.Mono
 import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.*
 import org.springframework.test.web.servlet.setup.MockMvcBuilders
-import reactor.core.publisher.Mono
 
 /**
  * Integration tests for email notification functionality with conditional validation.
@@ -81,11 +81,19 @@ class EscrowControllerEmailIntegrationTest {
         chainIdField.isAccessible = true
         chainIdField.set(escrowController, "43113")
         
+        // Mock ContractServiceClient.getDisputeStatus to return no mutual agreement (admin access required)
+        whenever(contractServiceClient.getDisputeStatus(any(), any()))
+            .thenReturn(Mono.just(ContractServiceClient.DisputeStatusResponse(
+                sellerLatestRefundEntry = 25,
+                buyerLatestRefundEntry = 60
+            )))
+
         // Create AdminController with the escrowController
         adminController = AdminController(
             escrowController,
             contractQueryService,
-            cacheInvalidationService
+            cacheInvalidationService,
+            contractServiceClient
         )
 
         mockMvc = MockMvcBuilders.standaloneSetup(adminController, escrowController).build()
