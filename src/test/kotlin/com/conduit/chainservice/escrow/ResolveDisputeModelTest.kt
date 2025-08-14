@@ -64,7 +64,8 @@ class ResolveDisputeModelTest {
             productName = "Test Product",
             amount = "100.0",
             currency = "USDC",
-            payoutDateTime = "2024-12-31T23:59:59Z"
+            payoutDateTime = "2024-12-31T23:59:59Z",
+            chainAddress = "0x1234567890abcdef1234567890abcdef12345678"
         )
 
         assertEquals(75.5, request.buyerPercentage)

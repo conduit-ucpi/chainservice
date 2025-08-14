@@ -69,7 +69,7 @@ class AdminController(
     ])
     fun resolveContract(
         @Parameter(
-            description = "Contract ID from the contract service",
+            description = "Contract identifier (the actual chain address is provided in the request body)",
             example = "507f1f77bcf86cd799439011"
         )
         @PathVariable id: String,
@@ -78,7 +78,7 @@ class AdminController(
             content = [Content(
                 examples = [ExampleObject(
                     name = "Resolve Contract Example",
-                    value = """{"buyerPercentage": 60.0, "sellerPercentage": 40.0, "resolutionNote": "Admin resolution: buyer provided evidence of delivery issues", "buyerEmail": "buyer@example.com", "sellerEmail": "seller@example.com", "amount": "1000000", "currency": "USDC", "contractDescription": "Web development services", "payoutDateTime": "1722598500", "buyerActualAmount": "600000", "sellerActualAmount": "400000"}"""
+                    value = """{"buyerPercentage": 60.0, "sellerPercentage": 40.0, "resolutionNote": "Admin resolution: buyer provided evidence of delivery issues", "buyerEmail": "buyer@example.com", "sellerEmail": "seller@example.com", "amount": "1000000", "currency": "USDC", "contractDescription": "Web development services", "productName": "Web development services", "chainAddress": "0x1234567890abcdef1234567890abcdef12345678", "payoutDateTime": "1722598500", "buyerActualAmount": "600000", "sellerActualAmount": "400000"}"""
                 )]
             )]
         )
@@ -135,19 +135,16 @@ class AdminController(
                 )
             }
 
-            // Get contract address from contract service using contract ID
-            // For now, assume the ID is actually the contract address
-            // TODO: Integrate with contract service to lookup contract address by ID
-            val contractAddress = if (id.startsWith("0x") && id.length == 42) {
-                id
-            } else {
-                // This would need to call the contract service to get the address
-                logger.error("Contract ID to address lookup not implemented: $id")
+            // Use the chain address provided in the request body
+            val contractAddress = request.chainAddress
+            
+            // Validate the chain address format
+            if (!contractAddress.matches(Regex("^0x[a-fA-F0-9]{40}$"))) {
                 return ResponseEntity.badRequest().body(
                     AdminResolveContractResponse(
                         success = false,
                         transactionHash = null,
-                        error = "Contract address lookup not implemented - please provide contract address directly"
+                        error = "Invalid chain address format"
                     )
                 )
             }

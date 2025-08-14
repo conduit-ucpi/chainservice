@@ -304,6 +304,7 @@ class EscrowControllerEmailIntegrationTest {
             payoutDateTime = "2024-12-31T23:59:59Z",
             contractDescription = "Test escrow contract",
             productName = "Test Product",
+            chainAddress = contractAddress,
             sellerActualAmount = "40.00 USDC",
             buyerActualAmount = "60.00 USDC"
         )
@@ -352,6 +353,7 @@ class EscrowControllerEmailIntegrationTest {
             payoutDateTime = "2024-12-31T23:59:59Z",
             contractDescription = "Test escrow contract",
             productName = "Test Product",
+            chainAddress = contractAddress,
             sellerActualAmount = "40.00 USDC",
             buyerActualAmount = "60.00 USDC",
             link = customLink
@@ -399,7 +401,8 @@ class EscrowControllerEmailIntegrationTest {
             currency = "USDC",
             payoutDateTime = "2024-12-31T23:59:59Z",
             contractDescription = "Test escrow contract",
-            productName = "Test Product"
+            productName = "Test Product",
+            chainAddress = contractAddress
             // sellerActualAmount and buyerActualAmount are missing (nulls)
         )
 

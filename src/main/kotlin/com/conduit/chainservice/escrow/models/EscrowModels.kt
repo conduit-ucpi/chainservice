@@ -199,6 +199,9 @@ data class AdminResolveContractRequest(
     @field:NotBlank(message = "Payout date time is required")
     val payoutDateTime: String,
     
+    @field:NotBlank(message = "Chain address is required")
+    val chainAddress: String,
+    
     val sellerActualAmount: String? = null,
     val buyerActualAmount: String? = null,
     val link: String? = null
