@@ -48,7 +48,7 @@ data class RaiseDisputeRequest(
     val productName: String,
     
     val reason: String? = null,
-    val suggestedSplit: Int? = null,
+    val refundPercent: Int? = null,
     val databaseId: String? = null
 )
 

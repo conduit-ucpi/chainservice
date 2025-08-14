@@ -145,7 +145,7 @@ class EscrowController(
             content = [Content(
                 examples = [ExampleObject(
                     name = "Raise Dispute Example",
-                    value = """{"contractAddress": "0x1234567890abcdef1234567890abcdef12345678", "userWalletAddress": "0x9876543210fedcba9876543210fedcba98765432", "signedTransaction": "0xf86c8082520894...", "productName": "Sample Product", "buyerEmail": "buyer@example.com", "sellerEmail": "seller@example.com", "contractDescription": "Product purchase", "amount": "1500000", "currency": "microUSDC", "payoutDateTime": "2024-01-15T10:30:00.000Z", "serviceLink": "https://service.link", "reason": "The product was not delivered as described", "suggestedSplit": 50, "databaseId": "507f1f77bcf86cd799439011"}"""
+                    value = """{"contractAddress": "0x1234567890abcdef1234567890abcdef12345678", "userWalletAddress": "0x9876543210fedcba9876543210fedcba98765432", "signedTransaction": "0xf86c8082520894...", "productName": "Sample Product", "buyerEmail": "buyer@example.com", "sellerEmail": "seller@example.com", "contractDescription": "Product purchase", "amount": "1500000", "currency": "microUSDC", "payoutDateTime": "2024-01-15T10:30:00.000Z", "serviceLink": "https://service.link", "reason": "The product was not delivered as described", "refundPercent": 50, "databaseId": "507f1f77bcf86cd799439011"}"""
                 )]
             )]
         )
@@ -175,7 +175,7 @@ class EscrowController(
                             contractServiceClient.updateContractWithDispute(
                                 contractId = request.databaseId,
                                 reason = request.reason,
-                                suggestedSplit = request.suggestedSplit,
+                                refundPercent = request.refundPercent,
                                 request = httpRequest
                             ).block()
                         }
@@ -226,7 +226,7 @@ class EscrowController(
                                 productName = validatedProductName,
                                 link = validatedLink,
                                 reason = request.reason,
-                                suggestedSplit = request.suggestedSplit,
+                                refundPercent = request.refundPercent,
                                 httpRequest = httpRequest
                             ).block()
                             
@@ -242,7 +242,7 @@ class EscrowController(
                                 productName = validatedProductName,
                                 link = validatedLink,
                                 reason = request.reason,
-                                suggestedSplit = request.suggestedSplit,
+                                refundPercent = request.refundPercent,
                                 httpRequest = httpRequest
                             ).block()
                         }

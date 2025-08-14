@@ -198,7 +198,7 @@ class ContractServiceClient(
     fun updateContractWithDispute(
         contractId: String,
         reason: String?,
-        suggestedSplit: Int?,
+        refundPercent: Int?,
         request: HttpServletRequest
     ): Mono<Map<String, Any>> {
         if (!enabled) {
@@ -208,9 +208,9 @@ class ContractServiceClient(
 
         val updateRequest = mutableMapOf<String, Any>()
         reason?.let { updateRequest["reason"] = it }
-        suggestedSplit?.let { updateRequest["suggestedSplit"] = it }
+        refundPercent?.let { updateRequest["refundPercent"] = it }
 
-        logger.info("Updating contract $contractId with dispute information: reason=${reason?.take(50)}, suggestedSplit=$suggestedSplit")
+        logger.info("Updating contract $contractId with dispute information: reason=${reason?.take(50)}, refundPercent=$refundPercent")
 
         return webClient.patch()
             .uri("/api/contracts/$contractId/dispute")
