@@ -871,6 +871,108 @@ class EscrowController(
         }
     }
 
+    @PostMapping("/transfer-usdc")
+    @Operation(
+        summary = "Transfer USDC",
+        description = "Transfers USDC tokens to another address by relaying a user-signed transaction. The service provides gas money and forwards the user-signed transaction. The transaction must be a standard ERC20 transfer call signed by the user's wallet."
+    )
+    @ApiResponses(value = [
+        ApiResponse(
+            responseCode = "200",
+            description = "USDC transfer successful",
+            content = [Content(schema = Schema(implementation = TransferUSDCResponse::class))]
+        ),
+        ApiResponse(
+            responseCode = "400",
+            description = "Invalid request or transaction failed",
+            content = [Content(schema = Schema(implementation = TransferUSDCResponse::class))]
+        ),
+        ApiResponse(
+            responseCode = "401",
+            description = "Authentication failed",
+            content = [Content(schema = Schema(implementation = TransferUSDCResponse::class))]
+        ),
+        ApiResponse(
+            responseCode = "500",
+            description = "Internal server error",
+            content = [Content(schema = Schema(implementation = TransferUSDCResponse::class))]
+        )
+    ])
+    fun transferUSDC(
+        @Valid @RequestBody
+        @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            content = [Content(
+                examples = [ExampleObject(
+                    name = "Transfer USDC Example",
+                    value = """{"recipientAddress": "0x1234567890abcdef1234567890abcdef12345678", "amount": "100.50", "userWalletAddress": "0x9876543210fedcba9876543210fedcba98765432", "signedTransaction": "0xf86c8082520894..."}"""
+                )]
+            )]
+        )
+        request: TransferUSDCRequest,
+        httpRequest: HttpServletRequest
+    ): ResponseEntity<TransferUSDCResponse> {
+        return try {
+            logger.info("Transfer USDC request received from ${request.userWalletAddress} to ${request.recipientAddress}, amount: ${request.amount} USDC")
+            
+            // Validate that the authenticated user matches the wallet address
+            val authenticatedUserWallet = httpRequest.getAttribute("userWallet") as? String
+            val userType = httpRequest.getAttribute("userType") as? String
+            
+            if (authenticatedUserWallet == null) {
+                logger.error("No authenticated user wallet found in request")
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
+                    TransferUSDCResponse(
+                        success = false,
+                        transactionHash = null,
+                        message = "Authentication required",
+                        error = "No authenticated user wallet found"
+                    )
+                )
+            }
+            
+            if (!authenticatedUserWallet.equals(request.userWalletAddress, ignoreCase = true)) {
+                logger.error("User wallet mismatch - authenticated: $authenticatedUserWallet, requested: ${request.userWalletAddress}")
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
+                    TransferUSDCResponse(
+                        success = false,
+                        transactionHash = null,
+                        message = "Authentication failed",
+                        error = "User wallet address does not match authenticated user"
+                    )
+                )
+            }
+            
+            val result = runBlocking {
+                escrowTransactionService.transferUSDCWithGasTransfer(request.userWalletAddress, request.signedTransaction)
+            }
+
+            val response = TransferUSDCResponse(
+                success = result.success,
+                transactionHash = result.transactionHash,
+                message = if (result.success) "USDC transfer successful" else "USDC transfer failed",
+                error = if (!result.success) result.error else null
+            )
+
+            if (result.success) {
+                logger.info("USDC transferred successfully: ${result.transactionHash}")
+                ResponseEntity.ok(response)
+            } else {
+                logger.error("USDC transfer failed: ${result.error}")
+                ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response)
+            }
+
+        } catch (e: Exception) {
+            logger.error("Error in transfer USDC endpoint", e)
+            val response = TransferUSDCResponse(
+                success = false,
+                transactionHash = null,
+                message = "Internal server error",
+                error = e.message ?: "Unknown error occurred"
+            )
+            ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response)
+        }
+    }
+
     @PostMapping("/approve-usdc")
     @Operation(
         summary = "Approve USDC Spending",

@@ -120,6 +120,20 @@ data class ApproveUSDCRequest(
     val signedTransaction: String
 )
 
+data class TransferUSDCRequest(
+    @field:NotBlank(message = "Recipient address is required")
+    val recipientAddress: String,
+    
+    @field:NotBlank(message = "Amount is required")
+    val amount: String,
+    
+    @field:NotBlank(message = "User wallet address is required")
+    val userWalletAddress: String,
+    
+    @field:NotBlank(message = "Signed transaction is required")
+    val signedTransaction: String
+)
+
 // Response models
 data class CreateContractResponse(
     val success: Boolean,
@@ -155,6 +169,13 @@ data class ResolveDisputeResponse(
 data class ApproveUSDCResponse(
     val success: Boolean,
     val transactionHash: String?,
+    val error: String? = null
+)
+
+data class TransferUSDCResponse(
+    val success: Boolean,
+    val transactionHash: String?,
+    val message: String,
     val error: String? = null
 )
 

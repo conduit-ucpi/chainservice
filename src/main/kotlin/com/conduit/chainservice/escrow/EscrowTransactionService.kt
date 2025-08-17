@@ -460,6 +460,20 @@ class EscrowTransactionService(
         return result
     }
 
+    suspend fun transferUSDCWithGasTransfer(userWalletAddress: String, signedTransactionHex: String): TransactionResult {
+        val result = blockchainRelayService.processTransactionWithGasTransfer(
+            userWalletAddress,
+            signedTransactionHex,
+            "transferUSDC",
+            BigInteger.valueOf((limitApproveUsdc * gasMultiplier).toLong()) // Using same gas limit as approve since it's a similar ERC20 operation
+        )
+        
+        // For transferUSDC, we're transferring tokens between wallets
+        // This doesn't affect escrow contract state, so no cache invalidation needed
+        
+        return result
+    }
+
 
     private fun parseContractAddressFromReceipt(receipt: TransactionReceipt): String? {
         return try {
