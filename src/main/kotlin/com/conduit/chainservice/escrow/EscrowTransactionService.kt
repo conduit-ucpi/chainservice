@@ -42,6 +42,15 @@ class EscrowTransactionService(
 
     private val logger = LoggerFactory.getLogger(EscrowTransactionService::class.java)
 
+    init {
+        logger.debug("EscrowTransactionService initialized with gas settings:")
+        logger.debug("  - limitDispute: $limitDispute")
+        logger.debug("  - limitClaim: $limitClaim")
+        logger.debug("  - limitDeposit: $limitDeposit")
+        logger.debug("  - limitApproveUsdc: $limitApproveUsdc")
+        logger.debug("  - gasMultiplier: $gasMultiplier")
+    }
+
     suspend fun createContract(
         buyer: String,
         seller: String,
@@ -77,6 +86,7 @@ class EscrowTransactionService(
 
             val gasPrice = gasProvider.getGasPrice("createContract")
             val gasLimit = gasProvider.getGasLimit("createContract")
+            logger.debug("createContract gas settings: gasPrice=$gasPrice, gasLimit=$gasLimit, totalGasCost=${gasPrice.multiply(gasLimit)}")
 
             // Build function call data for createEscrowContract with creator fee
             val function = Function(
@@ -377,11 +387,14 @@ class EscrowTransactionService(
 
     // Delegate gas transfer operations to generic service with cache invalidation
     suspend fun raiseDisputeWithGasTransfer(userWalletAddress: String, signedTransactionHex: String): TransactionResult {
+        val gasLimit = BigInteger.valueOf((limitDispute * gasMultiplier).toLong())
+        logger.debug("raiseDispute gas calculation: baseLimit=$limitDispute, multiplier=$gasMultiplier, finalLimit=$gasLimit")
+        
         val result = blockchainRelayService.processTransactionWithGasTransfer(
             userWalletAddress, 
             signedTransactionHex, 
             "raiseDispute",
-            BigInteger.valueOf((limitDispute * gasMultiplier).toLong())
+            gasLimit
         )
         
         // Invalidate cache on successful transaction - use contract address from result
@@ -400,11 +413,14 @@ class EscrowTransactionService(
     }
 
     suspend fun claimFundsWithGasTransfer(userWalletAddress: String, signedTransactionHex: String): TransactionResult {
+        val gasLimit = BigInteger.valueOf((limitClaim * gasMultiplier).toLong())
+        logger.debug("claimFunds gas calculation: baseLimit=$limitClaim, multiplier=$gasMultiplier, finalLimit=$gasLimit")
+        
         val result = blockchainRelayService.processTransactionWithGasTransfer(
             userWalletAddress, 
             signedTransactionHex, 
             "claimFunds",
-            BigInteger.valueOf((limitClaim * gasMultiplier).toLong())
+            gasLimit
         )
         
         // Invalidate cache on successful transaction - use contract address from result
@@ -423,11 +439,14 @@ class EscrowTransactionService(
     }
 
     suspend fun depositFundsWithGasTransfer(userWalletAddress: String, signedTransactionHex: String): TransactionResult {
+        val gasLimit = BigInteger.valueOf((limitDeposit * gasMultiplier).toLong())
+        logger.debug("depositFunds gas calculation: baseLimit=$limitDeposit, multiplier=$gasMultiplier, finalLimit=$gasLimit")
+        
         val result = blockchainRelayService.processTransactionWithGasTransfer(
             userWalletAddress, 
             signedTransactionHex, 
             "depositFunds",
-            BigInteger.valueOf((limitDeposit * gasMultiplier).toLong())
+            gasLimit
         )
         
         // Invalidate cache on successful transaction - use contract address from result
@@ -446,11 +465,14 @@ class EscrowTransactionService(
     }
 
     suspend fun approveUSDCWithGasTransfer(userWalletAddress: String, signedTransactionHex: String): TransactionResult {
+        val gasLimit = BigInteger.valueOf((limitApproveUsdc * gasMultiplier).toLong())
+        logger.debug("approveUSDC gas calculation: baseLimit=$limitApproveUsdc, multiplier=$gasMultiplier, finalLimit=$gasLimit")
+        
         val result = blockchainRelayService.processTransactionWithGasTransfer(
             userWalletAddress, 
             signedTransactionHex, 
             "approveUSDC",
-            BigInteger.valueOf((limitApproveUsdc * gasMultiplier).toLong())
+            gasLimit
         )
         
         // For approveUSDC, we're approving the USDC contract to spend tokens on behalf of the escrow contract
@@ -461,11 +483,14 @@ class EscrowTransactionService(
     }
 
     suspend fun transferUSDCWithGasTransfer(userWalletAddress: String, signedTransactionHex: String): TransactionResult {
+        val gasLimit = BigInteger.valueOf((limitApproveUsdc * gasMultiplier).toLong()) // Using same gas limit as approve since it's a similar ERC20 operation
+        logger.debug("transferUSDC gas calculation: baseLimit=$limitApproveUsdc, multiplier=$gasMultiplier, finalLimit=$gasLimit")
+        
         val result = blockchainRelayService.processTransactionWithGasTransfer(
             userWalletAddress,
             signedTransactionHex,
             "transferUSDC",
-            BigInteger.valueOf((limitApproveUsdc * gasMultiplier).toLong()) // Using same gas limit as approve since it's a similar ERC20 operation
+            gasLimit
         )
         
         // For transferUSDC, we're transferring tokens between wallets

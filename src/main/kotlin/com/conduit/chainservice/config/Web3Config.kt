@@ -23,6 +23,13 @@ class Web3Config(
 ) {
 
     private val logger = LoggerFactory.getLogger(Web3Config::class.java)
+    
+    init {
+        logger.debug("Web3Config initialized with gas price settings:")
+        logger.debug("  - gasPriceMultiplier: $gasPriceMultiplier")
+        logger.debug("  - minimumGasPriceWei: $minimumGasPriceWei")
+        logger.debug("  - gasLimits: $gasLimitsConfig")
+    }
 
     // Configuration validation is now handled by UtilityAutoConfiguration
 
@@ -45,7 +52,9 @@ class Web3Config(
                     
                     // Enforce minimum gas price
                     val minimumPrice = BigInteger.valueOf(minimumGasPriceWei)
-                    maxOf(multipliedPrice, minimumPrice)
+                    val finalPrice = maxOf(multipliedPrice, minimumPrice)
+                    logger.debug("Gas price calculation for $contractFunc: networkPrice=$networkGasPrice, priceMultiplier=$gasPriceMultiplier, multipliedPrice=$multipliedPrice, minimumPrice=$minimumPrice, finalPrice=$finalPrice")
+                    finalPrice
                 } catch (e: Exception) {
                     logger.warn("Failed to fetch gas price from network, using minimum: ${e.message}")
                     BigInteger.valueOf(minimumGasPriceWei)
