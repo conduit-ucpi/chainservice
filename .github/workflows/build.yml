@@ -77,49 +77,65 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H ${{ vars.VM_IP }} >> ~/.ssh/known_hosts
           
+          # Create deployment script in memory
+          cat > /tmp/deploy_commands.sh << 'DEPLOY_SCRIPT'
+          #!/bin/bash
+          set -e
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+          docker pull ghcr.io/${{ env.REPO_LOWER }}:${{ env.GIT_SHA }}
+          docker stop ${{ vars.SERVICE_NAME }} || true
+          docker rm ${{ vars.SERVICE_NAME }} || true
+          
+          # Build docker run command with conditional environment variables
+          DOCKER_CMD="docker run -d --name ${{ vars.SERVICE_NAME }} --network ${{ vars.DOCKER_NETWORK }} --restart unless-stopped"
+          
+          # Required variables (always pass these)
+          DOCKER_CMD="$DOCKER_CMD -e USER_SERVICE_URL=${{ vars.USER_SERVICE_URL }}"
+          DOCKER_CMD="$DOCKER_CMD -e CONTRACT_FACTORY_ADDRESS=${{ vars.CONTRACT_FACTORY_ADDRESS }}"
+          DOCKER_CMD="$DOCKER_CMD -e CONTRACT_SERVICE_URL=${{ vars.CONTRACT_SERVICE_URL }}"
+          DOCKER_CMD="$DOCKER_CMD -e USDC_CONTRACT_ADDRESS=${{ vars.USDC_CONTRACT_ADDRESS }}"
+          DOCKER_CMD="$DOCKER_CMD -e RPC_URL=${{ vars.RPC_URL }}"
+          DOCKER_CMD="$DOCKER_CMD -e RELAYER_WALLET_ADDRESS=${{ vars.RELAYER_WALLET_ADDRESS }}"
+          DOCKER_CMD="$DOCKER_CMD -e RELAYER_PRIVATE_KEY=${{ secrets.RELAYER_PRIVATE_KEY }}"
+          DOCKER_CMD="$DOCKER_CMD -e CREATOR_FEE_USDC_X_1M=${{ vars.CREATOR_FEE_USDC_X_1M }}"
+          DOCKER_CMD="$DOCKER_CMD -e MIN_GAS_WEI=${{ vars.MIN_GAS_WEI }}"
+          DOCKER_CMD="$DOCKER_CMD -e EMAIL_SERVICE_URL=${{ vars.EMAIL_SERVICE_URL }}"
+          DOCKER_CMD="$DOCKER_CMD -e SERVICE_LINK=${{ vars.SERVICE_LINK }}"
+          
+          # Optional variables (only pass if defined)
+          [ -n "${{ vars.COOKIE_DOMAIN }}" ] && DOCKER_CMD="$DOCKER_CMD -e COOKIE_DOMAIN=${{ vars.COOKIE_DOMAIN }}"
+          [ -n "${{ vars.LOG_LEVEL }}" ] && DOCKER_CMD="$DOCKER_CMD -e LOG_LEVEL=${{ vars.LOG_LEVEL }}"
+          [ -n "${{ vars.SERVER_PORT }}" ] && DOCKER_CMD="$DOCKER_CMD -e SERVER_PORT=${{ vars.SERVER_PORT }}"
+          [ -n "${{ vars.CHAIN_ID }}" ] && DOCKER_CMD="$DOCKER_CMD -e CHAIN_ID=${{ vars.CHAIN_ID }}"
+          [ -n "${{ vars.PRICE_MULTIPLIER }}" ] && DOCKER_CMD="$DOCKER_CMD -e PRICE_MULTIPLIER=${{ vars.PRICE_MULTIPLIER }}"
+          [ -n "${{ vars.MAX_GAS_LIMIT }}" ] && DOCKER_CMD="$DOCKER_CMD -e MAX_GAS_LIMIT=${{ vars.MAX_GAS_LIMIT }}"
+          [ -n "${{ vars.MAX_GAS_COST_WEI }}" ] && DOCKER_CMD="$DOCKER_CMD -e MAX_GAS_COST_WEI=${{ vars.MAX_GAS_COST_WEI }}"
+          [ -n "${{ vars.GAS_MULTIPLIER }}" ] && DOCKER_CMD="$DOCKER_CMD -e GAS_MULTIPLIER=${{ vars.GAS_MULTIPLIER }}"
+          [ -n "${{ vars.GAS_LIMIT_CREATE_CONTRACT }}" ] && DOCKER_CMD="$DOCKER_CMD -e GAS_LIMIT_CREATE_CONTRACT=${{ vars.GAS_LIMIT_CREATE_CONTRACT }}"
+          [ -n "${{ vars.GAS_LIMIT_DEPOSIT }}" ] && DOCKER_CMD="$DOCKER_CMD -e GAS_LIMIT_DEPOSIT=${{ vars.GAS_LIMIT_DEPOSIT }}"
+          [ -n "${{ vars.GAS_LIMIT_DISPUTE }}" ] && DOCKER_CMD="$DOCKER_CMD -e GAS_LIMIT_DISPUTE=${{ vars.GAS_LIMIT_DISPUTE }}"
+          [ -n "${{ vars.GAS_LIMIT_CLAIM }}" ] && DOCKER_CMD="$DOCKER_CMD -e GAS_LIMIT_CLAIM=${{ vars.GAS_LIMIT_CLAIM }}"
+          [ -n "${{ vars.GAS_LIMIT_RESOLVE }}" ] && DOCKER_CMD="$DOCKER_CMD -e GAS_LIMIT_RESOLVE=${{ vars.GAS_LIMIT_RESOLVE }}"
+          [ -n "${{ vars.GAS_LIMIT_APPROVE_USDC }}" ] && DOCKER_CMD="$DOCKER_CMD -e GAS_LIMIT_APPROVE_USDC=${{ vars.GAS_LIMIT_APPROVE_USDC }}"
+          [ -n "${{ vars.AUTH_ENABLED }}" ] && DOCKER_CMD="$DOCKER_CMD -e AUTH_ENABLED=${{ vars.AUTH_ENABLED }}"
+          [ -n "${{ vars.CONTRACT_SERVICE_ENABLED }}" ] && DOCKER_CMD="$DOCKER_CMD -e CONTRACT_SERVICE_ENABLED=${{ vars.CONTRACT_SERVICE_ENABLED }}"
+          [ -n "${{ vars.EMAIL_SERVICE_ENABLED }}" ] && DOCKER_CMD="$DOCKER_CMD -e EMAIL_SERVICE_ENABLED=${{ vars.EMAIL_SERVICE_ENABLED }}"
+          
+          # Add the image name and execute
+          DOCKER_CMD="$DOCKER_CMD ghcr.io/${{ env.REPO_LOWER }}:${{ env.GIT_SHA }}"
+          eval $DOCKER_CMD
+          DEPLOY_SCRIPT
+          
+          chmod +x /tmp/deploy_commands.sh
+          
+          # Transfer script to remote server's memory-only filesystem and execute
+          scp -i ~/.ssh/deploy_key /tmp/deploy_commands.sh gituser@${{ vars.VM_IP }}:/dev/shm/deploy_commands.sh
+          
           ssh -i ~/.ssh/deploy_key -l gituser ${{ vars.VM_IP }} -vv '
-            set -e
-            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-            docker pull ghcr.io/${{ env.REPO_LOWER }}:${{ env.GIT_SHA }}
-            docker stop ${{ vars.SERVICE_NAME }} || true
-            docker rm ${{ vars.SERVICE_NAME }} || true
-            
-            # Build docker run command with conditional environment variables
-            DOCKER_CMD="docker run -d --name ${{ vars.SERVICE_NAME }} --network ${{ vars.DOCKER_NETWORK }} --restart unless-stopped"
-            
-            # Required variables (always pass these)
-            DOCKER_CMD="$DOCKER_CMD -e USER_SERVICE_URL=${{ vars.USER_SERVICE_URL }}"
-            DOCKER_CMD="$DOCKER_CMD -e CONTRACT_FACTORY_ADDRESS=${{ vars.CONTRACT_FACTORY_ADDRESS }}"
-            DOCKER_CMD="$DOCKER_CMD -e CONTRACT_SERVICE_URL=${{ vars.CONTRACT_SERVICE_URL }}"
-            DOCKER_CMD="$DOCKER_CMD -e USDC_CONTRACT_ADDRESS=${{ vars.USDC_CONTRACT_ADDRESS }}"
-            DOCKER_CMD="$DOCKER_CMD -e RPC_URL=${{ vars.RPC_URL }}"
-            DOCKER_CMD="$DOCKER_CMD -e RELAYER_WALLET_ADDRESS=${{ vars.RELAYER_WALLET_ADDRESS }}"
-            DOCKER_CMD="$DOCKER_CMD -e RELAYER_PRIVATE_KEY=${{ secrets.RELAYER_PRIVATE_KEY }}"
-            DOCKER_CMD="$DOCKER_CMD -e CREATOR_FEE_USDC_X_1M=${{ vars.CREATOR_FEE_USDC_X_1M }}"
-            DOCKER_CMD="$DOCKER_CMD -e MIN_GAS_WEI=${{ vars.MIN_GAS_WEI }}"
-            DOCKER_CMD="$DOCKER_CMD -e EMAIL_SERVICE_URL=${{ vars.EMAIL_SERVICE_URL }}"
-            DOCKER_CMD="$DOCKER_CMD -e SERVICE_LINK=${{ vars.SERVICE_LINK }}"
-            
-            # Optional variables (only pass if defined)
-            [ -n "${{ vars.COOKIE_DOMAIN }}" ] && DOCKER_CMD="$DOCKER_CMD -e COOKIE_DOMAIN=${{ vars.COOKIE_DOMAIN }}"
-            [ -n "${{ vars.LOG_LEVEL }}" ] && DOCKER_CMD="$DOCKER_CMD -e LOG_LEVEL=${{ vars.LOG_LEVEL }}"
-            [ -n "${{ vars.SERVER_PORT }}" ] && DOCKER_CMD="$DOCKER_CMD -e SERVER_PORT=${{ vars.SERVER_PORT }}"
-            [ -n "${{ vars.CHAIN_ID }}" ] && DOCKER_CMD="$DOCKER_CMD -e CHAIN_ID=${{ vars.CHAIN_ID }}"
-            [ -n "${{ vars.PRICE_MULTIPLIER }}" ] && DOCKER_CMD="$DOCKER_CMD -e PRICE_MULTIPLIER=${{ vars.PRICE_MULTIPLIER }}"
-            [ -n "${{ vars.MAX_GAS_LIMIT }}" ] && DOCKER_CMD="$DOCKER_CMD -e MAX_GAS_LIMIT=${{ vars.MAX_GAS_LIMIT }}"
-            [ -n "${{ vars.MAX_GAS_COST_WEI }}" ] && DOCKER_CMD="$DOCKER_CMD -e MAX_GAS_COST_WEI=${{ vars.MAX_GAS_COST_WEI }}"
-            [ -n "${{ vars.GAS_MULTIPLIER }}" ] && DOCKER_CMD="$DOCKER_CMD -e GAS_MULTIPLIER=${{ vars.GAS_MULTIPLIER }}"
-            [ -n "${{ vars.GAS_LIMIT_CREATE_CONTRACT }}" ] && DOCKER_CMD="$DOCKER_CMD -e GAS_LIMIT_CREATE_CONTRACT=${{ vars.GAS_LIMIT_CREATE_CONTRACT }}"
-            [ -n "${{ vars.GAS_LIMIT_DEPOSIT }}" ] && DOCKER_CMD="$DOCKER_CMD -e GAS_LIMIT_DEPOSIT=${{ vars.GAS_LIMIT_DEPOSIT }}"
-            [ -n "${{ vars.GAS_LIMIT_DISPUTE }}" ] && DOCKER_CMD="$DOCKER_CMD -e GAS_LIMIT_DISPUTE=${{ vars.GAS_LIMIT_DISPUTE }}"
-            [ -n "${{ vars.GAS_LIMIT_CLAIM }}" ] && DOCKER_CMD="$DOCKER_CMD -e GAS_LIMIT_CLAIM=${{ vars.GAS_LIMIT_CLAIM }}"
-            [ -n "${{ vars.GAS_LIMIT_RESOLVE }}" ] && DOCKER_CMD="$DOCKER_CMD -e GAS_LIMIT_RESOLVE=${{ vars.GAS_LIMIT_RESOLVE }}"
-            [ -n "${{ vars.GAS_LIMIT_APPROVE_USDC }}" ] && DOCKER_CMD="$DOCKER_CMD -e GAS_LIMIT_APPROVE_USDC=${{ vars.GAS_LIMIT_APPROVE_USDC }}"
-            [ -n "${{ vars.AUTH_ENABLED }}" ] && DOCKER_CMD="$DOCKER_CMD -e AUTH_ENABLED=${{ vars.AUTH_ENABLED }}"
-            [ -n "${{ vars.CONTRACT_SERVICE_ENABLED }}" ] && DOCKER_CMD="$DOCKER_CMD -e CONTRACT_SERVICE_ENABLED=${{ vars.CONTRACT_SERVICE_ENABLED }}"
-            [ -n "${{ vars.EMAIL_SERVICE_ENABLED }}" ] && DOCKER_CMD="$DOCKER_CMD -e EMAIL_SERVICE_ENABLED=${{ vars.EMAIL_SERVICE_ENABLED }}"
-            
-            # Add the image name and execute
-            DOCKER_CMD="$DOCKER_CMD ghcr.io/${{ env.REPO_LOWER }}:${{ env.GIT_SHA }}"
-            eval $DOCKER_CMD
+            chmod +x /dev/shm/deploy_commands.sh
+            /dev/shm/deploy_commands.sh
+            rm -f /dev/shm/deploy_commands.sh
           '
+          
+          # Clean up local temporary file
+          rm -f /tmp/deploy_commands.sh
