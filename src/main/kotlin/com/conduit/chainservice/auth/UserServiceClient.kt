@@ -35,9 +35,16 @@ class UserServiceClient(
 
     fun validateToken(authToken: String, httpOnlyToken: String?): Mono<TokenValidationResponse> {
         return try {
+            // Ensure Authorization header has proper Bearer prefix
+            val authHeader = if (authToken.startsWith("Bearer ")) {
+                authToken
+            } else {
+                "Bearer $authToken"
+            }
+            
             val request = webClient.get()
                 .uri("/api/user/identity")
-                .header("Authorization", authToken)
+                .header("Authorization", authHeader)
                 
             // Add http-only token as header if provided
             val requestWithCookie = if (httpOnlyToken != null) {

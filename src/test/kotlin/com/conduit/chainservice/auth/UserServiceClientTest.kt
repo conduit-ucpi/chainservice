@@ -226,6 +226,66 @@ class UserServiceClientTest {
     }
 
     @Test
+    fun `validateToken - adds Bearer prefix when token lacks it`() {
+        val plainToken = "test-token-without-bearer"
+        val userIdentityResponse = UserServiceClient.UserIdentityResponse(
+            userId = testUserId,
+            email = testEmail,
+            walletAddress = testWalletAddress,
+            userType = "regular"
+        )
+
+        val mockResponse = MockResponse()
+            .setResponseCode(200)
+            .setBody(objectMapper.writeValueAsString(userIdentityResponse))
+            .addHeader("Content-Type", "application/json")
+
+        mockWebServer.enqueue(mockResponse)
+
+        val result = userServiceClient.validateToken(plainToken, null)
+
+        StepVerifier.create(result)
+            .expectNextMatches { response ->
+                response.valid &&
+                response.userId == testUserId
+            }
+            .verifyComplete()
+
+        val recordedRequest = mockWebServer.takeRequest()
+        assertEquals("Bearer $plainToken", recordedRequest.getHeader("Authorization"))
+    }
+
+    @Test
+    fun `validateToken - preserves Bearer prefix when already present`() {
+        val bearerToken = "Bearer existing-token"
+        val userIdentityResponse = UserServiceClient.UserIdentityResponse(
+            userId = testUserId,
+            email = testEmail,
+            walletAddress = testWalletAddress,
+            userType = "regular"
+        )
+
+        val mockResponse = MockResponse()
+            .setResponseCode(200)
+            .setBody(objectMapper.writeValueAsString(userIdentityResponse))
+            .addHeader("Content-Type", "application/json")
+
+        mockWebServer.enqueue(mockResponse)
+
+        val result = userServiceClient.validateToken(bearerToken, null)
+
+        StepVerifier.create(result)
+            .expectNextMatches { response ->
+                response.valid &&
+                response.userId == testUserId
+            }
+            .verifyComplete()
+
+        val recordedRequest = mockWebServer.takeRequest()
+        assertEquals(bearerToken, recordedRequest.getHeader("Authorization"))
+    }
+
+    @Test
     fun `isAuthEnabled - returns auth properties enabled value`() {
         whenever(authProperties.enabled).thenReturn(true)
         assertTrue(userServiceClient.isAuthEnabled())
