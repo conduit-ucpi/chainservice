@@ -3,6 +3,8 @@ package com.conduit.chainservice.config
 import com.utility.chainservice.AuthenticationProvider
 import com.utility.chainservice.HttpAuthenticationProvider
 import com.utility.chainservice.BlockchainProperties
+import org.springframework.beans.factory.annotation.Qualifier
+import org.springframework.boot.context.properties.ConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 
@@ -13,9 +15,11 @@ class UtilityServiceConfiguration(
 ) {
 
     @Bean
+    @Qualifier("rpcUrl")
     fun rpcUrl(): String = blockchainProperties.rpcUrl
 
     @Bean
+    @Qualifier("relayerPrivateKey")
     fun relayerPrivateKey(): String = blockchainProperties.relayer.privateKey
 
     @Bean
@@ -33,9 +37,11 @@ class UtilityServiceConfiguration(
 
     // Additional escrow-specific properties
     @Bean
+    @Qualifier("usdcContractAddress")
     fun usdcContractAddress(): String = escrowProperties.usdcContractAddress
 
     @Bean
+    @Qualifier("contractFactoryAddress")
     fun contractFactoryAddress(): String = escrowProperties.contractFactoryAddress
 
     @Bean
