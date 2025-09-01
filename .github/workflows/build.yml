@@ -121,6 +121,7 @@ jobs:
           [ -n "${{ vars.AUTH_ENABLED }}" ] && DOCKER_CMD="$DOCKER_CMD -e AUTH_ENABLED=${{ vars.AUTH_ENABLED }}"
           [ -n "${{ vars.CONTRACT_SERVICE_ENABLED }}" ] && DOCKER_CMD="$DOCKER_CMD -e CONTRACT_SERVICE_ENABLED=${{ vars.CONTRACT_SERVICE_ENABLED }}"
           [ -n "${{ vars.EMAIL_SERVICE_ENABLED }}" ] && DOCKER_CMD="$DOCKER_CMD -e EMAIL_SERVICE_ENABLED=${{ vars.EMAIL_SERVICE_ENABLED }}"
+          [ -n "${{ vars.MAX_GAS_PRICE_MULTIPLIER }}" ] && DOCKER_CMD="$DOCKER_CMD -e MAX_GAS_PRICE_MULTIPLIER=${{ vars.MAX_GAS_PRICE_MULTIPLIER }}"
           
           # Add the image name and execute
           DOCKER_CMD="$DOCKER_CMD ghcr.io/${{ env.REPO_LOWER }}:${{ env.GIT_SHA }}"
