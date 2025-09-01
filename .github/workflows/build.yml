@@ -101,6 +101,7 @@ jobs:
           DOCKER_CMD="$DOCKER_CMD -e MIN_GAS_WEI=${{ vars.MIN_GAS_WEI }}"
           DOCKER_CMD="$DOCKER_CMD -e EMAIL_SERVICE_URL=${{ vars.EMAIL_SERVICE_URL }}"
           DOCKER_CMD="$DOCKER_CMD -e SERVICE_LINK=${{ vars.SERVICE_LINK }}"
+          DOCKER_CMD="$DOCKER_CMD -e GAS_PAYER_CONTRACT_ADDRESS=${{ vars.GAS_PAYER_CONTRACT_ADDRESS }}"
           
           # Optional variables (only pass if defined)
           [ -n "${{ vars.COOKIE_DOMAIN }}" ] && DOCKER_CMD="$DOCKER_CMD -e COOKIE_DOMAIN=${{ vars.COOKIE_DOMAIN }}"
