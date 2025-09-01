@@ -10,6 +10,8 @@ import org.springframework.context.annotation.Configuration
 
 @Configuration
 class UtilityServiceConfiguration(
+    // WARNING: NEVER log blockchainProperties directly - it contains sensitive privateKey!
+    // Use ConfigurationLogger for safe logging of configuration values
     private val blockchainProperties: BlockchainProperties,
     private val escrowProperties: EscrowProperties
 ) {
