@@ -14,6 +14,7 @@ blockchain:
   relayer:
     private-key: ${RELAYER_PRIVATE_KEY}
     wallet-address: ${RELAYER_WALLET_ADDRESS}
+    gas-payer-contract-address: ${GAS_PAYER_CONTRACT_ADDRESS}
   timeout:
     connect-seconds: ${BLOCKCHAIN_CONNECT_TIMEOUT:30}
     read-seconds: ${BLOCKCHAIN_READ_TIMEOUT:60}  
