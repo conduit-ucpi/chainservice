@@ -46,4 +46,9 @@ class UtilityServiceConfiguration(
 
     @Bean
     fun creatorFee(): java.math.BigInteger = escrowProperties.creatorFee
+
+    // Security configuration path for SecurityConfigurationService
+    @Bean
+    @Qualifier("securityConfigPath")
+    fun securityConfigPath(): String = "./config/security-config.json"
 }
