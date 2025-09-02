@@ -89,6 +89,11 @@ jobs:
           # Build docker run command with conditional environment variables
           DOCKER_CMD="docker run -d --name ${{ vars.SERVICE_NAME }} --network ${{ vars.DOCKER_NETWORK }} --restart unless-stopped"
           
+          # Mount security config file from host if it exists
+          if [ -f /home/gituser/chainservice/security-config.json ]; then
+            DOCKER_CMD="$DOCKER_CMD -v /home/gituser/chainservice/security-config.json:/app/config/security-config.json:ro"
+          fi
+          
           # Required variables (always pass these)
           DOCKER_CMD="$DOCKER_CMD -e USER_SERVICE_URL=${{ vars.USER_SERVICE_URL }}"
           DOCKER_CMD="$DOCKER_CMD -e CONTRACT_FACTORY_ADDRESS=${{ vars.CONTRACT_FACTORY_ADDRESS }}"
