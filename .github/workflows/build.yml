@@ -86,51 +86,63 @@ jobs:
           docker stop ${{ vars.SERVICE_NAME }} || true
           docker rm ${{ vars.SERVICE_NAME }} || true
           
-          # Build docker run command with conditional environment variables
-          DOCKER_CMD="docker run -d --name ${{ vars.SERVICE_NAME }} --network ${{ vars.DOCKER_NETWORK }} --restart unless-stopped"
+          # Create docker run script
+          cat > /tmp/docker_run.sh << 'EOF'
+          #!/bin/bash
+          set -e
           
-          # Mount security config file from host if it exists
-          if [ -f /home/gituser/chainservice/security-config.json ]; then
-            DOCKER_CMD="$DOCKER_CMD -v /home/gituser/chainservice/security-config.json:/app/config/security-config.json:ro"
-          fi
+          # Base docker run command
+          docker run -d \
+            --name ${{ vars.SERVICE_NAME }} \
+            --network ${{ vars.DOCKER_NETWORK }} \
+            --restart unless-stopped \
+          EOF
           
-          # Required variables (always pass these)
-          DOCKER_CMD="$DOCKER_CMD -e USER_SERVICE_URL=${{ vars.USER_SERVICE_URL }}"
-          DOCKER_CMD="$DOCKER_CMD -e CONTRACT_FACTORY_ADDRESS=${{ vars.CONTRACT_FACTORY_ADDRESS }}"
-          DOCKER_CMD="$DOCKER_CMD -e CONTRACT_SERVICE_URL=${{ vars.CONTRACT_SERVICE_URL }}"
-          DOCKER_CMD="$DOCKER_CMD -e USDC_CONTRACT_ADDRESS=${{ vars.USDC_CONTRACT_ADDRESS }}"
-          DOCKER_CMD="$DOCKER_CMD -e RPC_URL=${{ vars.RPC_URL }}"
-          DOCKER_CMD="$DOCKER_CMD -e RELAYER_WALLET_ADDRESS=${{ vars.RELAYER_WALLET_ADDRESS }}"
-          DOCKER_CMD="$DOCKER_CMD -e RELAYER_PRIVATE_KEY=${{ secrets.RELAYER_PRIVATE_KEY }}"
-          DOCKER_CMD="$DOCKER_CMD -e CREATOR_FEE_USDC_X_1M=${{ vars.CREATOR_FEE_USDC_X_1M }}"
-          DOCKER_CMD="$DOCKER_CMD -e MIN_GAS_WEI=${{ vars.MIN_GAS_WEI }}"
-          DOCKER_CMD="$DOCKER_CMD -e EMAIL_SERVICE_URL=${{ vars.EMAIL_SERVICE_URL }}"
-          DOCKER_CMD="$DOCKER_CMD -e SERVICE_LINK=${{ vars.SERVICE_LINK }}"
-          DOCKER_CMD="$DOCKER_CMD -e GAS_PAYER_CONTRACT_ADDRESS=${{ vars.GAS_PAYER_CONTRACT_ADDRESS }}"
+          # Add volume mount if security config exists
+          echo '  $([ -f /home/gituser/chainservice/security-config.json ] && echo "-v /home/gituser/chainservice/security-config.json:/app/config/security-config.json:ro") \' >> /tmp/docker_run.sh
           
-          # Optional variables (only pass if defined)
-          [ -n "${{ vars.COOKIE_DOMAIN }}" ] && DOCKER_CMD="$DOCKER_CMD -e COOKIE_DOMAIN=${{ vars.COOKIE_DOMAIN }}"
-          [ -n "${{ vars.LOG_LEVEL }}" ] && DOCKER_CMD="$DOCKER_CMD -e LOG_LEVEL=${{ vars.LOG_LEVEL }}"
-          [ -n "${{ vars.SERVER_PORT }}" ] && DOCKER_CMD="$DOCKER_CMD -e SERVER_PORT=${{ vars.SERVER_PORT }}"
-          [ -n "${{ vars.CHAIN_ID }}" ] && DOCKER_CMD="$DOCKER_CMD -e CHAIN_ID=${{ vars.CHAIN_ID }}"
-          [ -n "${{ vars.PRICE_MULTIPLIER }}" ] && DOCKER_CMD="$DOCKER_CMD -e PRICE_MULTIPLIER=${{ vars.PRICE_MULTIPLIER }}"
-          [ -n "${{ vars.MAX_GAS_LIMIT }}" ] && DOCKER_CMD="$DOCKER_CMD -e MAX_GAS_LIMIT=${{ vars.MAX_GAS_LIMIT }}"
-          [ -n "${{ vars.MAX_GAS_COST_WEI }}" ] && DOCKER_CMD="$DOCKER_CMD -e MAX_GAS_COST_WEI=${{ vars.MAX_GAS_COST_WEI }}"
-          [ -n "${{ vars.GAS_MULTIPLIER }}" ] && DOCKER_CMD="$DOCKER_CMD -e GAS_MULTIPLIER=${{ vars.GAS_MULTIPLIER }}"
-          [ -n "${{ vars.GAS_LIMIT_CREATE_CONTRACT }}" ] && DOCKER_CMD="$DOCKER_CMD -e GAS_LIMIT_CREATE_CONTRACT=${{ vars.GAS_LIMIT_CREATE_CONTRACT }}"
-          [ -n "${{ vars.GAS_LIMIT_DEPOSIT }}" ] && DOCKER_CMD="$DOCKER_CMD -e GAS_LIMIT_DEPOSIT=${{ vars.GAS_LIMIT_DEPOSIT }}"
-          [ -n "${{ vars.GAS_LIMIT_DISPUTE }}" ] && DOCKER_CMD="$DOCKER_CMD -e GAS_LIMIT_DISPUTE=${{ vars.GAS_LIMIT_DISPUTE }}"
-          [ -n "${{ vars.GAS_LIMIT_CLAIM }}" ] && DOCKER_CMD="$DOCKER_CMD -e GAS_LIMIT_CLAIM=${{ vars.GAS_LIMIT_CLAIM }}"
-          [ -n "${{ vars.GAS_LIMIT_RESOLVE }}" ] && DOCKER_CMD="$DOCKER_CMD -e GAS_LIMIT_RESOLVE=${{ vars.GAS_LIMIT_RESOLVE }}"
-          [ -n "${{ vars.GAS_LIMIT_APPROVE_USDC }}" ] && DOCKER_CMD="$DOCKER_CMD -e GAS_LIMIT_APPROVE_USDC=${{ vars.GAS_LIMIT_APPROVE_USDC }}"
-          [ -n "${{ vars.AUTH_ENABLED }}" ] && DOCKER_CMD="$DOCKER_CMD -e AUTH_ENABLED=${{ vars.AUTH_ENABLED }}"
-          [ -n "${{ vars.CONTRACT_SERVICE_ENABLED }}" ] && DOCKER_CMD="$DOCKER_CMD -e CONTRACT_SERVICE_ENABLED=${{ vars.CONTRACT_SERVICE_ENABLED }}"
-          [ -n "${{ vars.EMAIL_SERVICE_ENABLED }}" ] && DOCKER_CMD="$DOCKER_CMD -e EMAIL_SERVICE_ENABLED=${{ vars.EMAIL_SERVICE_ENABLED }}"
-          [ -n "${{ vars.MAX_GAS_PRICE_MULTIPLIER }}" ] && DOCKER_CMD="$DOCKER_CMD -e MAX_GAS_PRICE_MULTIPLIER=${{ vars.MAX_GAS_PRICE_MULTIPLIER }}"
+          # Add required environment variables
+          cat >> /tmp/docker_run.sh << 'EOF'
+            -e USER_SERVICE_URL=${{ vars.USER_SERVICE_URL }} \
+            -e CONTRACT_FACTORY_ADDRESS=${{ vars.CONTRACT_FACTORY_ADDRESS }} \
+            -e CONTRACT_SERVICE_URL=${{ vars.CONTRACT_SERVICE_URL }} \
+            -e USDC_CONTRACT_ADDRESS=${{ vars.USDC_CONTRACT_ADDRESS }} \
+            -e RPC_URL=${{ vars.RPC_URL }} \
+            -e RELAYER_WALLET_ADDRESS=${{ vars.RELAYER_WALLET_ADDRESS }} \
+            -e RELAYER_PRIVATE_KEY=${{ secrets.RELAYER_PRIVATE_KEY }} \
+            -e CREATOR_FEE_USDC_X_1M=${{ vars.CREATOR_FEE_USDC_X_1M }} \
+            -e MIN_GAS_WEI=${{ vars.MIN_GAS_WEI }} \
+            -e EMAIL_SERVICE_URL=${{ vars.EMAIL_SERVICE_URL }} \
+            -e SERVICE_LINK=${{ vars.SERVICE_LINK }} \
+            -e GAS_PAYER_CONTRACT_ADDRESS=${{ vars.GAS_PAYER_CONTRACT_ADDRESS }} \
+          EOF
           
-          # Add the image name and execute
-          DOCKER_CMD="$DOCKER_CMD ghcr.io/${{ env.REPO_LOWER }}:${{ env.GIT_SHA }}"
-          eval $DOCKER_CMD
+          # Add optional environment variables only if they are defined
+          [ -n "${{ vars.COOKIE_DOMAIN }}" ] && echo '  -e COOKIE_DOMAIN=${{ vars.COOKIE_DOMAIN }} \' >> /tmp/docker_run.sh
+          [ -n "${{ vars.LOG_LEVEL }}" ] && echo '  -e LOG_LEVEL=${{ vars.LOG_LEVEL }} \' >> /tmp/docker_run.sh
+          [ -n "${{ vars.SERVER_PORT }}" ] && echo '  -e SERVER_PORT=${{ vars.SERVER_PORT }} \' >> /tmp/docker_run.sh
+          [ -n "${{ vars.CHAIN_ID }}" ] && echo '  -e CHAIN_ID=${{ vars.CHAIN_ID }} \' >> /tmp/docker_run.sh
+          [ -n "${{ vars.PRICE_MULTIPLIER }}" ] && echo '  -e PRICE_MULTIPLIER=${{ vars.PRICE_MULTIPLIER }} \' >> /tmp/docker_run.sh
+          [ -n "${{ vars.MAX_GAS_LIMIT }}" ] && echo '  -e MAX_GAS_LIMIT=${{ vars.MAX_GAS_LIMIT }} \' >> /tmp/docker_run.sh
+          [ -n "${{ vars.MAX_GAS_COST_WEI }}" ] && echo '  -e MAX_GAS_COST_WEI=${{ vars.MAX_GAS_COST_WEI }} \' >> /tmp/docker_run.sh
+          [ -n "${{ vars.GAS_MULTIPLIER }}" ] && echo '  -e GAS_MULTIPLIER=${{ vars.GAS_MULTIPLIER }} \' >> /tmp/docker_run.sh
+          [ -n "${{ vars.GAS_LIMIT_CREATE_CONTRACT }}" ] && echo '  -e GAS_LIMIT_CREATE_CONTRACT=${{ vars.GAS_LIMIT_CREATE_CONTRACT }} \' >> /tmp/docker_run.sh
+          [ -n "${{ vars.GAS_LIMIT_DEPOSIT }}" ] && echo '  -e GAS_LIMIT_DEPOSIT=${{ vars.GAS_LIMIT_DEPOSIT }} \' >> /tmp/docker_run.sh
+          [ -n "${{ vars.GAS_LIMIT_DISPUTE }}" ] && echo '  -e GAS_LIMIT_DISPUTE=${{ vars.GAS_LIMIT_DISPUTE }} \' >> /tmp/docker_run.sh
+          [ -n "${{ vars.GAS_LIMIT_CLAIM }}" ] && echo '  -e GAS_LIMIT_CLAIM=${{ vars.GAS_LIMIT_CLAIM }} \' >> /tmp/docker_run.sh
+          [ -n "${{ vars.GAS_LIMIT_RESOLVE }}" ] && echo '  -e GAS_LIMIT_RESOLVE=${{ vars.GAS_LIMIT_RESOLVE }} \' >> /tmp/docker_run.sh
+          [ -n "${{ vars.GAS_LIMIT_APPROVE_USDC }}" ] && echo '  -e GAS_LIMIT_APPROVE_USDC=${{ vars.GAS_LIMIT_APPROVE_USDC }} \' >> /tmp/docker_run.sh
+          [ -n "${{ vars.AUTH_ENABLED }}" ] && echo '  -e AUTH_ENABLED=${{ vars.AUTH_ENABLED }} \' >> /tmp/docker_run.sh
+          [ -n "${{ vars.CONTRACT_SERVICE_ENABLED }}" ] && echo '  -e CONTRACT_SERVICE_ENABLED=${{ vars.CONTRACT_SERVICE_ENABLED }} \' >> /tmp/docker_run.sh
+          [ -n "${{ vars.EMAIL_SERVICE_ENABLED }}" ] && echo '  -e EMAIL_SERVICE_ENABLED=${{ vars.EMAIL_SERVICE_ENABLED }} \' >> /tmp/docker_run.sh
+          [ -n "${{ vars.MAX_GAS_PRICE_MULTIPLIER }}" ] && echo '  -e MAX_GAS_PRICE_MULTIPLIER=${{ vars.MAX_GAS_PRICE_MULTIPLIER }} \' >> /tmp/docker_run.sh
+          
+          # Add the image name (last line, no backslash)
+          echo '  ghcr.io/${{ env.REPO_LOWER }}:${{ env.GIT_SHA }}' >> /tmp/docker_run.sh
+          
+          # Execute the script
+          chmod +x /tmp/docker_run.sh
+          /tmp/docker_run.sh
           DEPLOY_SCRIPT
           
           chmod +x /tmp/deploy_commands.sh
