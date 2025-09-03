@@ -1,0 +1,23 @@
+{
+  "apiKeys" : [ {
+    "key" : "api_key_7f3a8c2d9b1e6f4a6c8e9d2b5a7f1c3e9a4b6d9e2f5a8c7b1e4d6f9a2c5e8b1f4a7c",
+    "name" : "Example Client",
+    "allowedIps" : [ "172.18.0.3", "webapp-prod", "contractservice-prod" ],
+    "enabled" : true,
+    "description" : "Example API key - replace with real keys",
+    "walletConfig": {
+          "privateKey": "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+          "address": "0xAbC123..."
+        },
+    "createdAt" : "2025-09-01T11:52:17.440603988Z"
+  }  ],
+  "globalIpWhitelist" : [ "127.0.0.1", "::1" ],
+  "settings" : {
+    "requireApiKey" : true,
+    "enforceIpWhitelist" : true,
+    "logFailedAttempts" : true,
+    "rateLimitEnabled" : false,
+    "rateLimitRequestsPerMinute" : 60
+  },
+  "lastModified" : "2025-09-01T11:52:17.442340248Z"
+}

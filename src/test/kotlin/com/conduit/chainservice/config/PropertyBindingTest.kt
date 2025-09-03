@@ -23,7 +23,6 @@ class PropertyBindingTest {
         val properties = mapOf(
             "blockchain.rpcUrl" to "https://api.avax-test.network/ext/bc/C/rpc",
             "blockchain.chainId" to "43113",
-            "blockchain.relayer.privateKey" to "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef12",
             "blockchain.relayer.walletAddress" to "0x1234567890123456789012345678901234567890",
             "blockchain.gas.priceMultiplier" to "1.7",
             "blockchain.gas.minimumGasPriceWei" to "6"
@@ -36,7 +35,6 @@ class PropertyBindingTest {
         
         assertEquals("https://api.avax-test.network/ext/bc/C/rpc", blockchainProps.rpcUrl)
         assertEquals(43113L, blockchainProps.chainId)
-        assertEquals("0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef12", blockchainProps.relayer.privateKey)
         assertEquals("0x1234567890123456789012345678901234567890", blockchainProps.relayer.walletAddress)
         assertEquals(1.7, blockchainProps.gas.priceMultiplier)
         assertEquals(6L, blockchainProps.gas.minimumGasPriceWei)
@@ -64,7 +62,6 @@ class PropertyBindingTest {
         val kebabCaseProperties = mapOf(
             "blockchain.rpc-url" to "https://api.avax-test.network/ext/bc/C/rpc",
             "blockchain.chain-id" to "43113",
-            "blockchain.relayer.private-key" to "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef12",
             "blockchain.relayer.wallet-address" to "0x1234567890123456789012345678901234567890",
             "blockchain.gas.price-multiplier" to "1.7",
             "blockchain.gas.minimum-gas-price-wei" to "6"
@@ -78,7 +75,6 @@ class PropertyBindingTest {
         // Spring Boot should automatically convert kebab-case to camelCase
         assertEquals("https://api.avax-test.network/ext/bc/C/rpc", blockchainProps.rpcUrl)
         assertEquals(43113L, blockchainProps.chainId)
-        assertEquals("0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef12", blockchainProps.relayer.privateKey)
         assertEquals("0x1234567890123456789012345678901234567890", blockchainProps.relayer.walletAddress)
         assertEquals(1.7, blockchainProps.gas.priceMultiplier)
         assertEquals(6L, blockchainProps.gas.minimumGasPriceWei)
@@ -90,7 +86,6 @@ class PropertyBindingTest {
         val expectedYamlProperties = setOf(
             "blockchain.rpcUrl",
             "blockchain.chainId", 
-            "blockchain.relayer.privateKey",
             "blockchain.relayer.walletAddress",
             "blockchain.gas.priceMultiplier",
             "blockchain.gas.minimumGasPriceWei",

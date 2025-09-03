@@ -20,9 +20,7 @@ class UtilityServiceConfiguration(
     @Qualifier("rpcUrl")
     fun rpcUrl(): String = blockchainProperties.rpcUrl
 
-    @Bean
-    @Qualifier("relayerPrivateKey")
-    fun relayerPrivateKey(): String = blockchainProperties.relayer.privateKey
+    // Private key is now managed via JSON config file - not exposed as a bean
 
     @Bean
     fun gasPriceMultiplier(): Double = blockchainProperties.gas.priceMultiplier

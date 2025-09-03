@@ -14,6 +14,8 @@ blockchain:
   relayer:
     wallet-address: ${RELAYER_WALLET_ADDRESS}
     gas-payer-contract-address: ${GAS_PAYER_CONTRACT_ADDRESS}
+    config-file-path: ${RELAY_CONFIG_PATH:./config/relay-config.json}
+    use-config-file: true
   timeout:
     connect-seconds: ${BLOCKCHAIN_CONNECT_TIMEOUT:30}
     read-seconds: ${BLOCKCHAIN_READ_TIMEOUT:60}  

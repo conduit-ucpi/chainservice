@@ -28,7 +28,6 @@ class ConfigurationIntegrationTest {
                 // Blockchain properties (kebab-case matching production application.yml)
                 "blockchain.rpc-url=https://api.avax-test.network/ext/bc/C/rpc",
                 "blockchain.chain-id=43113",
-                "blockchain.relayer.private-key=0x1234567890123456789012345678901234567890123456789012345678901234",
                 "blockchain.relayer.wallet-address=0x1234567890123456789012345678901234567890",
                 "blockchain.gas.price-multiplier=1.7",
                 "blockchain.gas.minimum-gas-price-wei=6",
@@ -59,7 +58,6 @@ class ConfigurationIntegrationTest {
                     // Verify blockchain properties
                     assertEquals("https://api.avax-test.network/ext/bc/C/rpc", blockchainProps.rpcUrl)
                     assertEquals(43113L, blockchainProps.chainId)
-                    assertEquals("0x1234567890123456789012345678901234567890123456789012345678901234", blockchainProps.relayer.privateKey)
                     assertEquals("0x1234567890123456789012345678901234567890", blockchainProps.relayer.walletAddress)
                     assertEquals(1.7, blockchainProps.gas.priceMultiplier)
                     assertEquals(6L, blockchainProps.gas.minimumGasPriceWei)
