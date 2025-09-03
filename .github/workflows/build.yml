@@ -115,7 +115,7 @@ jobs:
             -e EMAIL_SERVICE_URL=${{ vars.EMAIL_SERVICE_URL }} \
             -e SERVICE_LINK=${{ vars.SERVICE_LINK }} \
             -e GAS_PAYER_CONTRACT_ADDRESS=${{ vars.GAS_PAYER_CONTRACT_ADDRESS }} \
-            -e RELAY_CONFIG_PATH=/app/config/relay-config.json \
+            -e SECURITY_CONFIG_PATH=/app/config/security-config.json \
           EOF
           
           # Add optional environment variables only if they are defined
