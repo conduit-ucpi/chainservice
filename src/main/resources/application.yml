@@ -12,7 +12,6 @@ blockchain:
   rpc-url: ${RPC_URL}
   chain-id: ${CHAIN_ID:43113}
   relayer:
-    private-key: ${RELAYER_PRIVATE_KEY}
     wallet-address: ${RELAYER_WALLET_ADDRESS}
     gas-payer-contract-address: ${GAS_PAYER_CONTRACT_ADDRESS}
   timeout:
@@ -47,6 +46,10 @@ auth:
 security:
   config-path: ${SECURITY_CONFIG_PATH:./config/security-config.json}
   enabled: ${SECURITY_ENABLED:true}
+
+# Blockchain relay configuration file path (for private key and other sensitive data)
+relay:
+  config-path: ${RELAY_CONFIG_PATH:./config/relay-config.json}
 
 contract-service:
   url: ${CONTRACT_SERVICE_URL:http://localhost:8080}

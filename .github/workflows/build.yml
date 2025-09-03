@@ -98,8 +98,9 @@ jobs:
             --restart unless-stopped \
           EOF
           
-          # Add volume mount if security config exists
+          # Add volume mounts if config files exist
           echo '  $([ -f /home/gituser/chainservice/security-config.json ] && echo "-v /home/gituser/chainservice/security-config.json:/app/config/security-config.json:ro") \' >> /tmp/docker_run.sh
+          echo '  $([ -f /home/gituser/chainservice/relay-config.json ] && echo "-v /home/gituser/chainservice/relay-config.json:/app/config/relay-config.json:ro") \' >> /tmp/docker_run.sh
           
           # Add required environment variables
           cat >> /tmp/docker_run.sh << 'EOF'
@@ -109,7 +110,6 @@ jobs:
             -e USDC_CONTRACT_ADDRESS=${{ vars.USDC_CONTRACT_ADDRESS }} \
             -e RPC_URL=${{ vars.RPC_URL }} \
             -e RELAYER_WALLET_ADDRESS=${{ vars.RELAYER_WALLET_ADDRESS }} \
-            -e RELAYER_PRIVATE_KEY=${{ secrets.RELAYER_PRIVATE_KEY }} \
             -e CREATOR_FEE_USDC_X_1M=${{ vars.CREATOR_FEE_USDC_X_1M }} \
             -e MIN_GAS_WEI=${{ vars.MIN_GAS_WEI }} \
             -e EMAIL_SERVICE_URL=${{ vars.EMAIL_SERVICE_URL }} \
