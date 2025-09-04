@@ -14,8 +14,8 @@ blockchain:
   relayer:
     wallet-address: ${RELAYER_WALLET_ADDRESS}
     gas-payer-contract-address: ${GAS_PAYER_CONTRACT_ADDRESS}
-    config-file-path: ${SECURITY_CONFIG_PATH:./config/security-config.json}
-    use-config-file: true
+    private-key: ${RELAYER_PRIVATE_KEY}
+    use-config-file: false
   timeout:
     connect-seconds: ${BLOCKCHAIN_CONNECT_TIMEOUT:30}
     read-seconds: ${BLOCKCHAIN_READ_TIMEOUT:60}  
@@ -46,7 +46,6 @@ auth:
   enabled: ${AUTH_ENABLED:true}
 
 security:
-  config-path: ${SECURITY_CONFIG_PATH:./config/security-config.json}
   enabled: ${SECURITY_ENABLED:true}
 
 contract-service:

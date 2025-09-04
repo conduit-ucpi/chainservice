@@ -98,9 +98,7 @@ jobs:
             --restart unless-stopped \
           EOF
           
-          # Add volume mounts if config files exist
-          echo '  $([ -f /home/gituser/chainservice/security-config.json ] && echo "-v /home/gituser/chainservice/security-config.json:/app/config/security-config.json:ro") \' >> /tmp/docker_run.sh
-          echo '  $([ -f /home/gituser/chainservice/relay-config.json ] && echo "-v /home/gituser/chainservice/relay-config.json:/app/config/relay-config.json:ro") \' >> /tmp/docker_run.sh
+          # Volume mounts removed - using environment variables instead
           
           # Add required environment variables
           cat >> /tmp/docker_run.sh << 'EOF'
@@ -117,7 +115,7 @@ jobs:
             -e GAS_PAYER_CONTRACT_ADDRESS=${{ vars.GAS_PAYER_CONTRACT_ADDRESS }} \
             -e GAS_PAYER_SERVICE=${{ vars.GAS_PAYER_SERVICE }} \
             -e GAS_PAYER_API_KEY=${{ secrets.GAS_PAYER_API_KEY }} \
-            -e SECURITY_CONFIG_PATH=/app/config/security-config.json \
+            -e RELAYER_PRIVATE_KEY=${{ secrets.RELAYER_PRIVATE_KEY }} \
           EOF
           
           # Add optional environment variables only if they are defined
