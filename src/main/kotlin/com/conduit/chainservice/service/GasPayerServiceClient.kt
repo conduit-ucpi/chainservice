@@ -6,6 +6,7 @@ import com.utility.chainservice.models.TransactionResult
 import kotlinx.coroutines.reactor.awaitSingle
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
+import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
 import org.springframework.stereotype.Service
 import org.springframework.web.reactive.function.client.WebClient
@@ -14,12 +15,18 @@ import java.math.BigInteger
 
 @Service
 class GasPayerServiceClient(
-    private val webClient: WebClient,
+    private val webClientBuilder: WebClient.Builder,
     @Value("\${gas-payer.service-url}") private val gasPayerServiceUrl: String,
-    @Value("\${gas-payer.enabled:true}") private val enabled: Boolean = true,
     @Value("\${gas-payer.api-key}") private val apiKey: String
 ) {
     private val logger = LoggerFactory.getLogger(GasPayerServiceClient::class.java)
+
+    private val webClient: WebClient by lazy {
+        webClientBuilder
+            .baseUrl(gasPayerServiceUrl)
+            .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+            .build()
+    }
 
     suspend fun processTransactionWithGasTransfer(
         userWalletAddress: String,
@@ -27,16 +34,6 @@ class GasPayerServiceClient(
         operationType: String,
         gasLimit: BigInteger
     ): TransactionResult {
-        if (!enabled) {
-            logger.warn("Gas payer service integration disabled, falling back to error response")
-            return TransactionResult(
-                success = false,
-                transactionHash = null,
-                contractAddress = null,
-                error = "Gas payer service integration disabled"
-            )
-        }
-        
         return try {
             logger.info("Processing transaction with gas transfer via gas-payer-service: operation=$operationType, user=$userWalletAddress")
             logger.debug("Gas limit parameter ignored (gas-payer-service calculates automatically): $gasLimit")
@@ -47,7 +44,7 @@ class GasPayerServiceClient(
             )
             
             val response = webClient.post()
-                .uri("$gasPayerServiceUrl/api/v1/signed-transaction")
+                .uri("/api/v1/signed-transaction")
                 .header("X-API-KEY", apiKey)
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(request)
@@ -110,7 +107,7 @@ class GasPayerServiceClient(
             )
             
             val response = webClient.post()
-                .uri("$gasPayerServiceUrl/api/v1/signed-transaction")
+                .uri("/api/v1/signed-transaction")
                 .header("X-API-KEY", apiKey)
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(request)
