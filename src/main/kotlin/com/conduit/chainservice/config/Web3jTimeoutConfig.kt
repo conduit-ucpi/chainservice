@@ -21,11 +21,11 @@ class Web3jTimeoutConfig {
     @Value("\${blockchain.timeout.connect-seconds:30}")
     private var connectTimeoutSeconds: Long = 30
 
-    @Value("\${blockchain.timeout.read-seconds:60}")
-    private var readTimeoutSeconds: Long = 60
+    @Value("\${blockchain.timeout.read-seconds:120}")
+    private var readTimeoutSeconds: Long = 120
 
-    @Value("\${blockchain.timeout.write-seconds:60}")
-    private var writeTimeoutSeconds: Long = 60
+    @Value("\${blockchain.timeout.write-seconds:120}")
+    private var writeTimeoutSeconds: Long = 120
 
     @Bean("web3j")
     @Primary
@@ -37,6 +37,8 @@ class Web3jTimeoutConfig {
             .readTimeout(readTimeoutSeconds, TimeUnit.SECONDS)
             .writeTimeout(writeTimeoutSeconds, TimeUnit.SECONDS)
             .retryOnConnectionFailure(true)
+            .followRedirects(true)
+            .followSslRedirects(true)
             .build()
 
         val httpService = HttpService(rpcUrl, httpClient)

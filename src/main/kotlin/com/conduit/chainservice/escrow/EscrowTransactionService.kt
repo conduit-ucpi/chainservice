@@ -40,6 +40,39 @@ class EscrowTransactionService(
 ) {
 
     private val logger = LoggerFactory.getLogger(EscrowTransactionService::class.java)
+    
+    /**
+     * Estimate gas for a transaction with a safety buffer
+     * Falls back to configured gas limit if estimation fails
+     */
+    private fun estimateGasWithBuffer(
+        from: String,
+        to: String,
+        functionData: String,
+        fallbackOperation: String
+    ): BigInteger {
+        return try {
+            val estimation = web3j.ethEstimateGas(
+                org.web3j.protocol.core.methods.request.Transaction.createFunctionCallTransaction(
+                    from,
+                    null, // nonce not needed for estimation
+                    null, // gas price not needed for estimation  
+                    null, // gas limit not needed for estimation
+                    to,
+                    BigInteger.ZERO,
+                    functionData
+                )
+            ).send().amountUsed
+            
+            // Add 20% buffer to the estimate for safety
+            val bufferedEstimate = estimation.multiply(BigInteger.valueOf(120)).divide(BigInteger.valueOf(100))
+            logger.info("Gas estimation for $fallbackOperation: estimated=$estimation, with buffer=$bufferedEstimate")
+            bufferedEstimate
+        } catch (e: Exception) {
+            logger.warn("Failed to estimate gas for $fallbackOperation, falling back to configured limit: ${e.message}")
+            gasProvider.getGasLimit(fallbackOperation)
+        }
+    }
 
     // Helper method to wait for transaction receipt since gas-payer-service doesn't provide this
     suspend fun waitForTransactionReceipt(transactionHash: String): TransactionReceipt? {
@@ -108,8 +141,6 @@ class EscrowTransactionService(
             ).send().transactionCount
 
             val gasPrice = gasProvider.getGasPrice("createContract")
-            val gasLimit = gasProvider.getGasLimit("createContract")
-            logger.debug("createContract gas settings: gasPrice=$gasPrice, gasLimit=$gasLimit, totalGasCost=${gasPrice.multiply(gasLimit)}")
 
             // Build function call data for createEscrowContract with creator fee
             val function = Function(
@@ -126,6 +157,16 @@ class EscrowTransactionService(
             )
 
             val functionData = FunctionEncoder.encode(function)
+            
+            // Estimate gas for the contract creation transaction
+            val gasLimit = estimateGasWithBuffer(
+                relayerCredentials.address,
+                contractFactoryAddress,
+                functionData,
+                "createContract"
+            )
+            
+            logger.debug("createContract gas settings: gasPrice=$gasPrice, gasLimit=$gasLimit, totalGasCost=${gasPrice.multiply(gasLimit)}")
 
             val rawTransaction = RawTransaction.createTransaction(
                 nonce,
@@ -229,7 +270,6 @@ class EscrowTransactionService(
             ).send().transactionCount
 
             val gasPrice = gasProvider.getGasPrice("resolveDispute")
-            val gasLimit = gasProvider.getGasLimit("resolveDispute")
 
             val function = Function(
                 "resolveDispute",
@@ -238,6 +278,14 @@ class EscrowTransactionService(
             )
 
             val functionData = FunctionEncoder.encode(function)
+            
+            // Estimate gas for the resolve dispute transaction
+            val gasLimit = estimateGasWithBuffer(
+                relayerCredentials.address,
+                contractAddress,
+                functionData,
+                "resolveDispute"
+            )
 
             val rawTransaction = RawTransaction.createTransaction(
                 nonce,
@@ -336,7 +384,6 @@ class EscrowTransactionService(
             ).send().transactionCount
 
             val gasPrice = gasProvider.getGasPrice("resolveDispute")
-            val gasLimit = gasProvider.getGasLimit("resolveDispute")
 
             // Convert percentages to integers (smart contract expects uint256)
             val buyerPercentageInt = buyerPercentage.toBigDecimal().toBigInteger()
@@ -352,6 +399,14 @@ class EscrowTransactionService(
             )
 
             val functionData = FunctionEncoder.encode(function)
+            
+            // Estimate gas for the resolve dispute transaction
+            val gasLimit = estimateGasWithBuffer(
+                relayerCredentials.address,
+                contractAddress,
+                functionData,
+                "resolveDispute"
+            )
 
             val rawTransaction = RawTransaction.createTransaction(
                 nonce,

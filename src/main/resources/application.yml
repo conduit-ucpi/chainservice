@@ -33,7 +33,7 @@ escrow:
   contract-factory-address: ${CONTRACT_FACTORY_ADDRESS}
   creator-fee: ${CREATOR_FEE_USDC_X_1M}
   # gas limits calculated from foundry
-  limit-create-contract: ${GAS_LIMIT_CREATE_CONTRACT:273000} 
+  limit-create-contract: ${GAS_LIMIT_CREATE_CONTRACT:400000} 
   limit-deposit: ${GAS_LIMIT_DEPOSIT:131055}
   limit-dispute: ${GAS_LIMIT_DISPUTE:8800}
   limit-claim: ${GAS_LIMIT_CLAIM:40800}
