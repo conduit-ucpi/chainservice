@@ -27,7 +27,7 @@ class Web3jTimeoutConfig {
     @Value("\${blockchain.timeout.write-seconds:60}")
     private var writeTimeoutSeconds: Long = 60
 
-    @Bean
+    @Bean("web3j")
     @Primary
     fun web3jWithTimeout(): Web3j {
         logger.info("Configuring Web3j with enhanced timeouts: connect=${connectTimeoutSeconds}s, read=${readTimeoutSeconds}s, write=${writeTimeoutSeconds}s")

@@ -31,12 +31,7 @@ class Web3Config(
         logger.debug("  - escrow gas limits: ${escrowProperties}")
     }
 
-    @Bean
-    @Primary
-    fun web3j(): Web3j {
-        logger.info("Creating Web3j instance for RPC URL: ${blockchainProperties.rpcUrl}")
-        return Web3j.build(HttpService(blockchainProperties.rpcUrl))
-    }
+    // Web3j bean is provided by Web3jTimeoutConfig with better timeout configuration
 
     @Bean
     @Primary
