@@ -14,7 +14,7 @@ import java.math.BigInteger
 
 @Service
 class TransactionRelayService(
-    private val blockchainRelayService: com.utility.chainservice.BlockchainRelayService,
+    private val gasPayerServiceClient: com.conduit.chainservice.service.GasPayerServiceClient,
     private val escrowTransactionService: com.conduit.chainservice.escrow.EscrowTransactionService,
     private val web3j: Web3j,
     private val relayerCredentials: Credentials,
@@ -26,14 +26,8 @@ class TransactionRelayService(
     private val logger = LoggerFactory.getLogger(TransactionRelayService::class.java)
 
     suspend fun relayTransaction(signedTransactionHex: String): TransactionResult {
-        // Delegate to generic blockchain relay service
-        val genericResult = blockchainRelayService.relayTransaction(signedTransactionHex)
-        // Convert to legacy TransactionResult format
-        return TransactionResult(
-            success = genericResult.success,
-            transactionHash = genericResult.transactionHash,
-            error = genericResult.error
-        )
+        // Delegate to gas payer service client
+        return gasPayerServiceClient.relayTransaction(signedTransactionHex)
     }
 
     suspend fun createContract(
@@ -66,8 +60,8 @@ class TransactionRelayService(
     }
 
     suspend fun waitForTransactionReceipt(transactionHash: String): TransactionReceipt? {
-        // Delegate to generic blockchain relay service
-        return blockchainRelayService.waitForTransactionReceipt(transactionHash)
+        // Delegate to escrow transaction service since gas-payer-service doesn't provide this
+        return escrowTransactionService.waitForTransactionReceipt(transactionHash)
     }
 
     suspend fun raiseDispute(contractAddress: String): TransactionResult {
@@ -110,8 +104,19 @@ class TransactionRelayService(
             "resolveDispute" to "resolveDispute"
         )
 
-        // Delegate to generic blockchain relay service
-        return blockchainRelayService.getOperationGasCosts(operations)
+        // Keep existing gas cost calculation for now
+        return operations.map { (operationName, _) ->
+            val gasLimit = gasProvider.getGasLimit(operationName)
+            val gasPriceWei = gasProvider.getGasPrice(operationName)
+            val totalCostWei = gasPriceWei.multiply(gasLimit)
+            OperationGasCost(
+                operationName,
+                gasLimit.toLong(),
+                gasPriceWei,
+                totalCostWei,
+                "0.000" // Simplified formatting for now
+            )
+        }
     }
 
     // Gas transfer methods - delegate to escrow transaction service

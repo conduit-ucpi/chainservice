@@ -3,7 +3,6 @@ package com.conduit.chainservice.escrow
 import com.conduit.chainservice.escrow.models.ContractStatus
 import com.conduit.chainservice.service.StateAwareCacheInvalidationService
 import com.conduit.chainservice.config.StateAwareCacheConfig
-import com.utility.chainservice.BlockchainRelayService
 import com.utility.chainservice.models.TransactionResult
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.BeforeEach
@@ -25,7 +24,7 @@ import org.junit.jupiter.api.Assertions.assertEquals
 class StateAwareCacheInvalidationDepositFundsTest {
 
     @Mock
-    private lateinit var blockchainRelayService: BlockchainRelayService
+    private lateinit var gasPayerServiceClient: com.conduit.chainservice.service.GasPayerServiceClient
 
     @Mock
     private lateinit var cacheManager: CacheManager
@@ -85,7 +84,7 @@ class StateAwareCacheInvalidationDepositFundsTest {
         
         cacheInvalidationService = StateAwareCacheInvalidationService(cacheManager, stateAwareCacheConfig)
         escrowTransactionService = EscrowTransactionService(
-            blockchainRelayService,
+            gasPayerServiceClient,
             cacheInvalidationService,
             web3j,
             relayerCredentials,
@@ -113,7 +112,7 @@ class StateAwareCacheInvalidationDepositFundsTest {
             error = null
         )
 
-        whenever(blockchainRelayService.processTransactionWithGasTransfer(any(), any(), any(), any())).thenReturn(successResult)
+        whenever(gasPayerServiceClient.processTransactionWithGasTransfer(any(), any(), any(), any())).thenReturn(successResult)
 
         // When: Deposit funds is called
         val result = escrowTransactionService.depositFundsWithGasTransfer(
@@ -127,7 +126,7 @@ class StateAwareCacheInvalidationDepositFundsTest {
         assertEquals(contractAddress, result.contractAddress)
 
         // Cache operations would have been called
-        verify(blockchainRelayService, times(1)).processTransactionWithGasTransfer(any(), any(), any(), any())
+        verify(gasPayerServiceClient, times(1)).processTransactionWithGasTransfer(any(), any(), any(), any())
     }
 
     @Test
@@ -141,7 +140,7 @@ class StateAwareCacheInvalidationDepositFundsTest {
             error = null
         )
 
-        whenever(blockchainRelayService.processTransactionWithGasTransfer(any(), any(), any(), any())).thenReturn(successResult)
+        whenever(gasPayerServiceClient.processTransactionWithGasTransfer(any(), any(), any(), any())).thenReturn(successResult)
 
         // When: Deposit funds is called
         val result = escrowTransactionService.depositFundsWithGasTransfer(
@@ -154,7 +153,7 @@ class StateAwareCacheInvalidationDepositFundsTest {
         assertEquals(transactionHash, result.transactionHash)
         assertEquals(contractAddress, result.contractAddress)
         
-        verify(blockchainRelayService, times(1)).processTransactionWithGasTransfer(any(), any(), any(), any())
+        verify(gasPayerServiceClient, times(1)).processTransactionWithGasTransfer(any(), any(), any(), any())
     }
 
     @Test
@@ -168,7 +167,7 @@ class StateAwareCacheInvalidationDepositFundsTest {
             error = "Transaction failed"
         )
 
-        whenever(blockchainRelayService.processTransactionWithGasTransfer(any(), any(), any(), any())).thenReturn(failedResult)
+        whenever(gasPayerServiceClient.processTransactionWithGasTransfer(any(), any(), any(), any())).thenReturn(failedResult)
 
         // When: Deposit funds is called and fails
         val result = escrowTransactionService.depositFundsWithGasTransfer(
@@ -181,7 +180,7 @@ class StateAwareCacheInvalidationDepositFundsTest {
         assertEquals(null, result.transactionHash)
         assertEquals(null, result.contractAddress)
 
-        verify(blockchainRelayService, times(1)).processTransactionWithGasTransfer(any(), any(), any(), any())
+        verify(gasPayerServiceClient, times(1)).processTransactionWithGasTransfer(any(), any(), any(), any())
     }
 
     @Test
@@ -195,7 +194,7 @@ class StateAwareCacheInvalidationDepositFundsTest {
             error = null
         )
 
-        whenever(blockchainRelayService.processTransactionWithGasTransfer(any(), any(), any(), any())).thenReturn(resultWithoutAddress)
+        whenever(gasPayerServiceClient.processTransactionWithGasTransfer(any(), any(), any(), any())).thenReturn(resultWithoutAddress)
 
         // When: Deposit funds is called
         val result = escrowTransactionService.depositFundsWithGasTransfer(
@@ -208,7 +207,7 @@ class StateAwareCacheInvalidationDepositFundsTest {
         assertEquals(transactionHash, result.transactionHash)
         assertEquals(null, result.contractAddress)
 
-        verify(blockchainRelayService, times(1)).processTransactionWithGasTransfer(any(), any(), any(), any())
+        verify(gasPayerServiceClient, times(1)).processTransactionWithGasTransfer(any(), any(), any(), any())
     }
 
     @Test

@@ -24,7 +24,7 @@ import java.math.BigInteger
 
 @Service
 class EscrowTransactionService(
-    private val blockchainRelayService: BlockchainRelayService,
+    private val gasPayerServiceClient: com.conduit.chainservice.service.GasPayerServiceClient,
     private val cacheInvalidationService: StateAwareCacheInvalidationService,
     private val web3j: Web3j,
     private val relayerCredentials: Credentials,
@@ -41,6 +41,30 @@ class EscrowTransactionService(
 ) {
 
     private val logger = LoggerFactory.getLogger(EscrowTransactionService::class.java)
+
+    // Helper method to wait for transaction receipt since gas-payer-service doesn't provide this
+    suspend fun waitForTransactionReceipt(transactionHash: String): TransactionReceipt? {
+        return try {
+            // Simple polling implementation - could be improved with exponential backoff
+            var attempts = 0
+            val maxAttempts = 60 // 60 attempts with 2 second delays = 2 minutes max wait
+            
+            while (attempts < maxAttempts) {
+                val receipt = web3j.ethGetTransactionReceipt(transactionHash).send()
+                if (receipt.result != null) {
+                    return receipt.result
+                }
+                kotlinx.coroutines.delay(2000) // Wait 2 seconds
+                attempts++
+            }
+            
+            logger.warn("Transaction receipt not found after $maxAttempts attempts for hash: $transactionHash")
+            null
+        } catch (e: Exception) {
+            logger.error("Error waiting for transaction receipt: $transactionHash", e)
+            null
+        }
+    }
 
     init {
         logger.debug("EscrowTransactionService initialized with gas settings:")
@@ -119,24 +143,29 @@ class EscrowTransactionService(
                 relayerCredentials
             )
 
-            val transactionHash = web3j.ethSendRawTransaction(
-                Numeric.toHexString(signedTransaction)
-            ).send()
+            // Send the signed transaction to gas-payer-service
+            val signedTransactionHex = Numeric.toHexString(signedTransaction)
+            val gasPayerResult = gasPayerServiceClient.processTransactionWithGasTransfer(
+                relayerCredentials.address, // Use relayer address as userWalletAddress since we're paying our own gas
+                signedTransactionHex,
+                "createContract",
+                gasLimit
+            )
 
-            if (transactionHash.hasError()) {
-                logger.error("Contract creation failed: ${transactionHash.error.message}")
+            if (!gasPayerResult.success) {
+                logger.error("Contract creation failed via gas-payer-service: ${gasPayerResult.error}")
                 return ContractCreationResult(
                     success = false,
-                    transactionHash = null,
+                    transactionHash = gasPayerResult.transactionHash,
                     contractAddress = null,
-                    error = transactionHash.error.message
+                    error = gasPayerResult.error
                 )
             }
 
-            val txHash = transactionHash.transactionHash
-            logger.info("Contract creation transaction sent: $txHash")
+            val txHash = gasPayerResult.transactionHash!!
+            logger.info("Contract creation transaction sent via gas-payer-service: $txHash")
 
-            val receipt = blockchainRelayService.waitForTransactionReceipt(txHash)
+            val receipt = waitForTransactionReceipt(txHash)
             if (receipt?.isStatusOK == true) {
                 logger.info("Transaction receipt received successfully, status: ${receipt.status}")
                 logger.debug("Receipt logs count: ${receipt.logs.size}")
@@ -226,23 +255,28 @@ class EscrowTransactionService(
                 relayerCredentials
             )
 
-            val transactionHash = web3j.ethSendRawTransaction(
-                Numeric.toHexString(signedTransaction)
-            ).send()
+            // Send the signed transaction to gas-payer-service
+            val signedTransactionHex = Numeric.toHexString(signedTransaction)
+            val gasPayerResult = gasPayerServiceClient.processTransactionWithGasTransfer(
+                relayerCredentials.address, // Use relayer address as userWalletAddress since we're paying our own gas
+                signedTransactionHex,
+                "resolveDispute",
+                gasLimit
+            )
 
-            if (transactionHash.hasError()) {
-                logger.error("Dispute resolution failed: ${transactionHash.error.message}")
+            if (!gasPayerResult.success) {
+                logger.error("Dispute resolution failed via gas-payer-service: ${gasPayerResult.error}")
                 return TransactionResult(
                     success = false,
-                    transactionHash = null,
-                    error = transactionHash.error.message
+                    transactionHash = gasPayerResult.transactionHash,
+                    error = gasPayerResult.error
                 )
             }
 
-            val txHash = transactionHash.transactionHash
-            logger.info("Dispute resolution transaction sent: $txHash")
+            val txHash = gasPayerResult.transactionHash!!
+            logger.info("Dispute resolution transaction sent via gas-payer-service: $txHash")
 
-            val receipt = blockchainRelayService.waitForTransactionReceipt(txHash)
+            val receipt = waitForTransactionReceipt(txHash)
             if (receipt?.isStatusOK == true) {
                 logger.info("Dispute resolved successfully")
                 
@@ -335,23 +369,28 @@ class EscrowTransactionService(
                 relayerCredentials
             )
 
-            val transactionHash = web3j.ethSendRawTransaction(
-                Numeric.toHexString(signedTransaction)
-            ).send()
+            // Send the signed transaction to gas-payer-service
+            val signedTransactionHex = Numeric.toHexString(signedTransaction)
+            val gasPayerResult = gasPayerServiceClient.processTransactionWithGasTransfer(
+                relayerCredentials.address, // Use relayer address as userWalletAddress since we're paying our own gas
+                signedTransactionHex,
+                "resolveDisputeWithPercentages",
+                gasLimit
+            )
 
-            if (transactionHash.hasError()) {
-                logger.error("Percentage-based dispute resolution failed: ${transactionHash.error.message}")
+            if (!gasPayerResult.success) {
+                logger.error("Percentage-based dispute resolution failed via gas-payer-service: ${gasPayerResult.error}")
                 return TransactionResult(
                     success = false,
-                    transactionHash = null,
-                    error = transactionHash.error.message
+                    transactionHash = gasPayerResult.transactionHash,
+                    error = gasPayerResult.error
                 )
             }
 
-            val txHash = transactionHash.transactionHash
-            logger.info("Percentage-based dispute resolution transaction sent: $txHash")
+            val txHash = gasPayerResult.transactionHash!!
+            logger.info("Percentage-based dispute resolution transaction sent via gas-payer-service: $txHash")
 
-            val receipt = blockchainRelayService.waitForTransactionReceipt(txHash)
+            val receipt = waitForTransactionReceipt(txHash)
             if (receipt?.isStatusOK == true) {
                 logger.info("Dispute resolved successfully with percentages")
                 
@@ -390,7 +429,7 @@ class EscrowTransactionService(
         val gasLimit = BigInteger.valueOf((limitDispute * gasMultiplier).toLong())
         logger.debug("raiseDispute gas calculation: baseLimit=$limitDispute, multiplier=$gasMultiplier, finalLimit=$gasLimit")
         
-        val result = blockchainRelayService.processTransactionWithGasTransfer(
+        val result = gasPayerServiceClient.processTransactionWithGasTransfer(
             userWalletAddress, 
             signedTransactionHex, 
             "raiseDispute",
@@ -416,7 +455,7 @@ class EscrowTransactionService(
         val gasLimit = BigInteger.valueOf((limitClaim * gasMultiplier).toLong())
         logger.debug("claimFunds gas calculation: baseLimit=$limitClaim, multiplier=$gasMultiplier, finalLimit=$gasLimit")
         
-        val result = blockchainRelayService.processTransactionWithGasTransfer(
+        val result = gasPayerServiceClient.processTransactionWithGasTransfer(
             userWalletAddress, 
             signedTransactionHex, 
             "claimFunds",
@@ -442,7 +481,7 @@ class EscrowTransactionService(
         val gasLimit = BigInteger.valueOf((limitDeposit * gasMultiplier).toLong())
         logger.debug("depositFunds gas calculation: baseLimit=$limitDeposit, multiplier=$gasMultiplier, finalLimit=$gasLimit")
         
-        val result = blockchainRelayService.processTransactionWithGasTransfer(
+        val result = gasPayerServiceClient.processTransactionWithGasTransfer(
             userWalletAddress, 
             signedTransactionHex, 
             "depositFunds",
@@ -468,7 +507,7 @@ class EscrowTransactionService(
         val gasLimit = BigInteger.valueOf((limitApproveUsdc * gasMultiplier).toLong())
         logger.debug("approveUSDC gas calculation: baseLimit=$limitApproveUsdc, multiplier=$gasMultiplier, finalLimit=$gasLimit")
         
-        val result = blockchainRelayService.processTransactionWithGasTransfer(
+        val result = gasPayerServiceClient.processTransactionWithGasTransfer(
             userWalletAddress, 
             signedTransactionHex, 
             "approveUSDC",
@@ -486,7 +525,7 @@ class EscrowTransactionService(
         val gasLimit = BigInteger.valueOf((limitApproveUsdc * gasMultiplier).toLong()) // Using same gas limit as approve since it's a similar ERC20 operation
         logger.debug("transferUSDC gas calculation: baseLimit=$limitApproveUsdc, multiplier=$gasMultiplier, finalLimit=$gasLimit")
         
-        val result = blockchainRelayService.processTransactionWithGasTransfer(
+        val result = gasPayerServiceClient.processTransactionWithGasTransfer(
             userWalletAddress,
             signedTransactionHex,
             "transferUSDC",
