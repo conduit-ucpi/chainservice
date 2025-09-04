@@ -13,7 +13,6 @@ blockchain:
   chain-id: ${CHAIN_ID:43113}
   relayer:
     wallet-address: ${RELAYER_WALLET_ADDRESS}
-    gas-payer-contract-address: ${GAS_PAYER_CONTRACT_ADDRESS}
     private-key: ${RELAYER_PRIVATE_KEY}
     use-config-file: false
   timeout:

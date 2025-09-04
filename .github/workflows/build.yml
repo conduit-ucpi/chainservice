@@ -112,7 +112,6 @@ jobs:
             -e MIN_GAS_WEI=${{ vars.MIN_GAS_WEI }} \
             -e EMAIL_SERVICE_URL=${{ vars.EMAIL_SERVICE_URL }} \
             -e SERVICE_LINK=${{ vars.SERVICE_LINK }} \
-            -e GAS_PAYER_CONTRACT_ADDRESS=${{ vars.GAS_PAYER_CONTRACT_ADDRESS }} \
             -e GAS_PAYER_SERVICE=${{ vars.GAS_PAYER_SERVICE }} \
             -e GAS_PAYER_API_KEY=${{ secrets.GAS_PAYER_API_KEY }} \
             -e RELAYER_PRIVATE_KEY=${{ secrets.RELAYER_PRIVATE_KEY }} \
