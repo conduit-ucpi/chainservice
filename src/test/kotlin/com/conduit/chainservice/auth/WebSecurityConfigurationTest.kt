@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Assertions.*
 import org.mockito.kotlin.*
 
 @ExtendWith(MockitoExtension::class)
-class SecurityConfigTest {
+class WebSecurityConfigurationTest {
 
     @Mock
     private lateinit var authenticationFilter: AuthenticationFilter
@@ -19,17 +19,17 @@ class SecurityConfigTest {
     @Mock
     private lateinit var httpSecurity: HttpSecurity
 
-    private lateinit var securityConfig: SecurityConfig
+    private lateinit var securityConfig: WebSecurityConfiguration
 
     @BeforeEach
     fun setUp() {
-        securityConfig = SecurityConfig(authenticationFilter)
+        securityConfig = WebSecurityConfiguration(authenticationFilter)
     }
 
     @Test
-    fun `SecurityConfig can be instantiated with authentication filter`() {
+    fun `WebSecurityConfiguration can be instantiated with authentication filter`() {
         // Given & When
-        val config = SecurityConfig(authenticationFilter)
+        val config = WebSecurityConfiguration(authenticationFilter)
 
         // Then
         assertNotNull(config)
@@ -58,7 +58,7 @@ class SecurityConfigTest {
         val mockFilter = mock<AuthenticationFilter>()
         
         // When
-        val config = SecurityConfig(mockFilter)
+        val config = WebSecurityConfiguration(mockFilter)
         
         // Then
         assertNotNull(config)
