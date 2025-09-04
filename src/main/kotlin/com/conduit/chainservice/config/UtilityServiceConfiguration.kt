@@ -3,6 +3,7 @@ package com.conduit.chainservice.config
 import com.utility.chainservice.AuthenticationProvider
 import com.utility.chainservice.HttpAuthenticationProvider
 import com.utility.chainservice.BlockchainProperties
+import com.utility.chainservice.AuthProperties
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.boot.context.properties.ConfigurationProperties
 import org.springframework.context.annotation.Bean
@@ -13,7 +14,8 @@ class UtilityServiceConfiguration(
     // WARNING: NEVER log blockchainProperties directly - it contains sensitive privateKey!
     // Use ConfigurationLogger for safe logging of configuration values
     private val blockchainProperties: BlockchainProperties,
-    private val escrowProperties: EscrowProperties
+    private val escrowProperties: EscrowProperties,
+    private val authProperties: AuthProperties
 ) {
 
     @Bean
@@ -51,4 +53,11 @@ class UtilityServiceConfiguration(
     @Bean
     @Qualifier("securityConfigPath")
     fun securityConfigPath(): String = "./config/security-config.json"
+
+    // Configure HTTP-based authentication instead of API key authentication
+    @Bean
+    fun authenticationProvider(): AuthenticationProvider = HttpAuthenticationProvider(
+        userServiceUrl = authProperties.userServiceUrl,
+        enabled = authProperties.enabled
+    )
 }
