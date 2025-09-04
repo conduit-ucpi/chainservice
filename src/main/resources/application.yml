@@ -45,9 +45,6 @@ auth:
   user-service-url: ${USER_SERVICE_URL:https://api.conduit-ucpi.com/userservice}
   enabled: ${AUTH_ENABLED:true}
 
-security:
-  enabled: ${SECURITY_ENABLED:true}
-
 contract-service:
   url: ${CONTRACT_SERVICE_URL:http://localhost:8080}
   enabled: ${CONTRACT_SERVICE_ENABLED:true}

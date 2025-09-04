@@ -116,7 +116,6 @@ jobs:
             -e GAS_PAYER_SERVICE=${{ vars.GAS_PAYER_SERVICE }} \
             -e GAS_PAYER_API_KEY=${{ secrets.GAS_PAYER_API_KEY }} \
             -e RELAYER_PRIVATE_KEY=${{ secrets.RELAYER_PRIVATE_KEY }} \
-            -e SECURITY_ENABLED=false \
           EOF
           
           # Add optional environment variables only if they are defined
