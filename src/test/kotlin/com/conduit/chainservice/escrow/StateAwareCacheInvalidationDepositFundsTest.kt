@@ -3,7 +3,7 @@ package com.conduit.chainservice.escrow
 import com.conduit.chainservice.escrow.models.ContractStatus
 import com.conduit.chainservice.service.StateAwareCacheInvalidationService
 import com.conduit.chainservice.config.StateAwareCacheConfig
-import com.utility.chainservice.models.TransactionResult
+import com.conduit.chainservice.model.TransactionResult
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -23,37 +23,26 @@ import org.junit.jupiter.api.Assertions.assertEquals
 @DisplayName("State-Aware Cache Invalidation for Deposit Funds")
 class StateAwareCacheInvalidationDepositFundsTest {
 
-    @Mock
     private lateinit var gasPayerServiceClient: com.conduit.chainservice.service.GasPayerServiceClient
 
-    @Mock
     private lateinit var cacheManager: CacheManager
 
-    @Mock
     private lateinit var stateAwareCacheConfig: StateAwareCacheConfig
 
-    @Mock
     private lateinit var web3j: Web3j
 
-    @Mock
     private lateinit var relayerCredentials: Credentials
 
-    @Mock
     private lateinit var gasProvider: ContractGasProvider
 
-    @Mock
     private lateinit var escrowProperties: EscrowProperties
 
-    @Mock
     private lateinit var mutableInfoCache: Cache
 
-    @Mock
     private lateinit var mutableStateCache: Cache
 
-    @Mock
     private lateinit var immutableInfoCache: Cache
 
-    @Mock
     private lateinit var immutableStateCache: Cache
 
     private lateinit var cacheInvalidationService: StateAwareCacheInvalidationService

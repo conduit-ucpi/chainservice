@@ -6,7 +6,8 @@ import com.conduit.chainservice.escrow.validation.EmailFieldValidator
 import com.conduit.chainservice.service.ContractQueryServiceInterface
 import com.conduit.chainservice.service.ContractServiceClient
 import com.conduit.chainservice.service.EmailServiceClient
-import com.utility.chainservice.models.OperationGasCost
+import com.conduit.chainservice.model.OperationGasCost
+import com.conduit.chainservice.model.TransactionResult
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.media.Content
@@ -34,7 +35,6 @@ class EscrowController(
     private val escrowTransactionService: EscrowTransactionService,
     private val contractQueryService: ContractQueryServiceInterface,
     private val contractServiceClient: ContractServiceClient,
-    private val escrowServicePlugin: EscrowServicePlugin,
     private val emailServiceClient: EmailServiceClient,
     private val escrowProperties: EscrowProperties
 ) {
@@ -524,7 +524,7 @@ class EscrowController(
                     val sellerPct = request.sellerPercentage!!
                     
                     if (buyerPct < 0 || sellerPct < 0) {
-                        return@runBlocking com.utility.chainservice.models.TransactionResult(
+                        return@runBlocking TransactionResult(
                             success = false,
                             transactionHash = null,
                             error = "Percentages cannot be negative"
@@ -532,7 +532,7 @@ class EscrowController(
                     }
                     
                     if (Math.abs(buyerPct + sellerPct - 100.0) > 0.01) {
-                        return@runBlocking com.utility.chainservice.models.TransactionResult(
+                        return@runBlocking TransactionResult(
                             success = false,
                             transactionHash = null,
                             error = "Percentages must sum to 100"
@@ -550,7 +550,7 @@ class EscrowController(
                     logger.warn("Using deprecated single recipient resolution")
                     escrowTransactionService.resolveDispute(request.contractAddress, request.recipientAddress!!)
                 } else {
-                    com.utility.chainservice.models.TransactionResult(
+                    TransactionResult(
                         success = false,
                         transactionHash = null,
                         error = "Either provide buyerPercentage+sellerPercentage or recipientAddress (deprecated)"
@@ -847,8 +847,13 @@ class EscrowController(
         return try {
             logger.info("Gas costs request received")
             
-            val operationCosts = escrowServicePlugin.getRelayService().getOperationGasCosts(
-                escrowServicePlugin.getGasOperations()
+            val operationCosts = listOf(
+                OperationGasCost("createContract", escrowProperties.limitCreateContract.toBigInteger(), 0.toBigInteger(), 0.toBigInteger()),
+                OperationGasCost("approveUSDC", escrowProperties.limitApproveUsdc.toBigInteger(), 0.toBigInteger(), 0.toBigInteger()),
+                OperationGasCost("depositFunds", escrowProperties.limitDeposit.toBigInteger(), 0.toBigInteger(), 0.toBigInteger()),
+                OperationGasCost("raiseDispute", escrowProperties.limitDispute.toBigInteger(), 0.toBigInteger(), 0.toBigInteger()),
+                OperationGasCost("claimFunds", escrowProperties.limitClaim.toBigInteger(), 0.toBigInteger(), 0.toBigInteger()),
+                OperationGasCost("resolveDispute", escrowProperties.limitResolve.toBigInteger(), 0.toBigInteger(), 0.toBigInteger())
             )
             val response = GasCostsResponse(
                 operations = operationCosts,

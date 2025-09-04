@@ -2,8 +2,8 @@ package com.conduit.chainservice.service
 
 import com.conduit.chainservice.config.EscrowProperties
 import com.conduit.chainservice.escrow.models.ContractCreationResult
-import com.utility.chainservice.models.OperationGasCost
-import com.utility.chainservice.models.TransactionResult
+import com.conduit.chainservice.model.OperationGasCost
+import com.conduit.chainservice.model.TransactionResult
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.web3j.crypto.Credentials
@@ -111,10 +111,9 @@ class TransactionRelayService(
             val totalCostWei = gasPriceWei.multiply(gasLimit)
             OperationGasCost(
                 operationName,
-                gasLimit.toLong(),
+                gasLimit,
                 gasPriceWei,
-                totalCostWei,
-                "0.000" // Simplified formatting for now
+                totalCostWei
             )
         }
     }

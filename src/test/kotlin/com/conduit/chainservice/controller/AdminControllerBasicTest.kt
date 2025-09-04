@@ -27,16 +27,12 @@ class AdminControllerBasicTest {
 
     private lateinit var mockMvc: MockMvc
     
-    @Mock
     private lateinit var escrowController: EscrowController
     
-    @Mock
     private lateinit var contractQueryService: ContractQueryService
     
-    @Mock
     private lateinit var cacheInvalidationService: CacheInvalidationService
     
-    @Mock
     private lateinit var contractServiceClient: ContractServiceClient
     
     private lateinit var adminController: AdminController

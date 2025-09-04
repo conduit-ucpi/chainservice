@@ -1,4 +1,4 @@
-package com.utility.chainservice
+package com.conduit.chainservice.config
 
 import org.springframework.boot.context.properties.ConfigurationProperties
 

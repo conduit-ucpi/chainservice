@@ -1,11 +1,10 @@
 package com.conduit.chainservice.escrow
 
 import org.springframework.beans.factory.annotation.Value
-import com.utility.chainservice.BlockchainProperties
+import com.conduit.chainservice.config.BlockchainProperties
 import com.conduit.chainservice.escrow.models.ContractCreationResult
 import com.conduit.chainservice.service.StateAwareCacheInvalidationService
-import com.utility.chainservice.BlockchainRelayService
-import com.utility.chainservice.models.TransactionResult
+import com.conduit.chainservice.model.TransactionResult
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.web3j.abi.FunctionEncoder

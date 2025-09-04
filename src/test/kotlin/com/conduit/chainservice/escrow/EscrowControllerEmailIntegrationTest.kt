@@ -12,7 +12,7 @@ import com.conduit.chainservice.service.EmailServiceClient
 import com.conduit.chainservice.service.SendEmailResponse
 import com.conduit.chainservice.service.CacheInvalidationService
 import com.fasterxml.jackson.databind.ObjectMapper
-import com.utility.chainservice.models.TransactionResult
+import com.conduit.chainservice.model.TransactionResult
 import jakarta.servlet.http.HttpServletRequest
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.BeforeEach
@@ -46,9 +46,6 @@ class EscrowControllerEmailIntegrationTest {
     private lateinit var contractServiceClient: ContractServiceClient
 
     @Mock
-    private lateinit var escrowServicePlugin: EscrowServicePlugin
-
-    @Mock
     private lateinit var emailServiceClient: EmailServiceClient
 
     @Mock
@@ -67,7 +64,6 @@ class EscrowControllerEmailIntegrationTest {
             escrowTransactionService,
             contractQueryService,
             contractServiceClient,
-            escrowServicePlugin,
             emailServiceClient,
             escrowProperties
         )
@@ -411,7 +407,7 @@ class EscrowControllerEmailIntegrationTest {
                 eq(contractAddress),
                 eq(60.0),
                 eq(40.0)
-            )).thenReturn(com.utility.chainservice.models.TransactionResult(
+            )).thenReturn(TransactionResult(
                 success = true,
                 transactionHash = "0xabc123...",
                 error = null

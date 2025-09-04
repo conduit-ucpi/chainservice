@@ -3,7 +3,7 @@ package com.conduit.chainservice.controller
 import com.conduit.chainservice.config.EscrowProperties
 import com.conduit.chainservice.service.CacheMetricsService
 import com.conduit.chainservice.service.RpcCircuitBreaker
-import com.utility.chainservice.BlockchainProperties
+import com.conduit.chainservice.config.BlockchainProperties
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.media.Content
 import io.swagger.v3.oas.annotations.media.Schema

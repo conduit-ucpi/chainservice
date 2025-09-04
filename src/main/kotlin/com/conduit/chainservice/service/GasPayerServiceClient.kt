@@ -2,7 +2,7 @@ package com.conduit.chainservice.service
 
 import com.conduit.chainservice.model.SignedTransactionRequest
 import com.conduit.chainservice.model.SignedTransactionResponse
-import com.utility.chainservice.models.TransactionResult
+import com.conduit.chainservice.model.TransactionResult
 import com.fasterxml.jackson.databind.ObjectMapper
 import kotlinx.coroutines.reactor.awaitSingle
 import org.slf4j.LoggerFactory

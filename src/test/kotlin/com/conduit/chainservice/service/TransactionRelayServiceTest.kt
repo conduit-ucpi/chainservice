@@ -112,7 +112,7 @@ class TransactionRelayServiceTest {
         
         // Then
         gasCosts.forEach { cost ->
-            assertEquals(gasLimit.toLong(), cost.gasLimit)
+            assertEquals(gasLimit, cost.gasLimit)
             assertEquals(gasPrice, cost.gasPriceWei)
             assertEquals(gasPrice.multiply(gasLimit), cost.totalCostWei)
             assertNotNull(cost.totalCostAvax)

@@ -30,9 +30,6 @@ class BatchContractInfoControllerSimpleTest {
     private lateinit var contractServiceClient: ContractServiceClient
 
     @Mock
-    private lateinit var escrowServicePlugin: EscrowServicePlugin
-
-    @Mock
     private lateinit var emailServiceClient: EmailServiceClient
 
     @Mock
@@ -58,7 +55,6 @@ class BatchContractInfoControllerSimpleTest {
             escrowTransactionService,
             contractQueryService,
             contractServiceClient,
-            escrowServicePlugin,
             emailServiceClient,
             escrowProperties
         )

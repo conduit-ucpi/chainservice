@@ -6,7 +6,7 @@ import com.conduit.chainservice.service.ContractServiceClient
 import com.conduit.chainservice.service.ContractQueryService
 import com.conduit.chainservice.service.EmailServiceClient
 import com.fasterxml.jackson.databind.ObjectMapper
-import com.utility.chainservice.models.TransactionResult
+import com.conduit.chainservice.model.TransactionResult
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -42,9 +42,6 @@ class DepositFundsErrorScenariosTest {
     private lateinit var contractServiceClient: ContractServiceClient
 
     @Mock
-    private lateinit var escrowServicePlugin: EscrowServicePlugin
-
-    @Mock
     private lateinit var emailServiceClient: EmailServiceClient
 
     @Mock
@@ -59,7 +56,6 @@ class DepositFundsErrorScenariosTest {
             escrowTransactionService,
             contractQueryService,
             contractServiceClient,
-            escrowServicePlugin,
             emailServiceClient,
             escrowProperties
         )

@@ -1,6 +1,5 @@
 package com.conduit.chainservice.config
 
-import com.utility.chainservice.BlockchainProperties
 import jakarta.annotation.PostConstruct
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
