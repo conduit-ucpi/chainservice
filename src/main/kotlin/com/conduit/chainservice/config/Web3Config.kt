@@ -16,28 +16,40 @@ import jakarta.annotation.PostConstruct
 
 
 @Configuration
+@EnableConfigurationProperties(BlockchainProperties::class, EscrowProperties::class)
 class Web3Config(
-    private val gasLimitsConfig: Map<String, Long>,
-    private val gasPriceMultiplier: Double,
-    private val minimumGasPriceWei: Long
+    private val blockchainProperties: BlockchainProperties,
+    private val escrowProperties: EscrowProperties
 ) {
 
     private val logger = LoggerFactory.getLogger(Web3Config::class.java)
     
     init {
         logger.debug("Web3Config initialized with gas price settings:")
-        logger.debug("  - gasPriceMultiplier: $gasPriceMultiplier")
-        logger.debug("  - minimumGasPriceWei: $minimumGasPriceWei")
-        logger.debug("  - gasLimits: $gasLimitsConfig")
+        logger.debug("  - gasPriceMultiplier: ${blockchainProperties.gas.priceMultiplier}")
+        logger.debug("  - minimumGasPriceWei: ${blockchainProperties.gas.minimumGasPriceWei}")
+        logger.debug("  - escrow gas limits: ${escrowProperties}")
     }
 
-    // Configuration validation is now handled by UtilityAutoConfiguration
+    @Bean
+    @Primary
+    fun web3j(): Web3j {
+        logger.info("Creating Web3j instance for RPC URL: ${blockchainProperties.rpcUrl}")
+        return Web3j.build(HttpService(blockchainProperties.rpcUrl))
+    }
 
-    // web3j bean is provided by blockchain-relay-utility
+    @Bean
+    @Primary
+    fun relayerCredentials(): Credentials {
+        logger.info("Creating relayer credentials for address: ${blockchainProperties.relayer.walletAddress}")
+        return Credentials.create(blockchainProperties.relayer.privateKey)
+    }
 
-    // relayerCredentials bean is provided by blockchain-relay-utility
-
-    // chainId bean is provided by blockchain-relay-utility
+    @Bean("chainId")
+    @Primary
+    fun chainId(): Long {
+        return blockchainProperties.chainId
+    }
 
     @Bean
     @Primary
@@ -47,17 +59,17 @@ class Web3Config(
                 return try {
                     val networkGasPrice = web3j.ethGasPrice().send().gasPrice
                     val multipliedPrice = networkGasPrice.multiply(
-                        BigInteger.valueOf((gasPriceMultiplier * 100).toLong())
+                        BigInteger.valueOf((blockchainProperties.gas.priceMultiplier * 100).toLong())
                     ).divide(BigInteger.valueOf(100))
                     
                     // Enforce minimum gas price
-                    val minimumPrice = BigInteger.valueOf(minimumGasPriceWei)
+                    val minimumPrice = BigInteger.valueOf(blockchainProperties.gas.minimumGasPriceWei)
                     val finalPrice = maxOf(multipliedPrice, minimumPrice)
-                    logger.debug("Gas price calculation for $contractFunc: networkPrice=$networkGasPrice, priceMultiplier=$gasPriceMultiplier, multipliedPrice=$multipliedPrice, minimumPrice=$minimumPrice, finalPrice=$finalPrice")
+                    logger.debug("Gas price calculation for $contractFunc: networkPrice=$networkGasPrice, priceMultiplier=${blockchainProperties.gas.priceMultiplier}, multipliedPrice=$multipliedPrice, minimumPrice=$minimumPrice, finalPrice=$finalPrice")
                     finalPrice
                 } catch (e: Exception) {
                     logger.warn("Failed to fetch gas price from network, using minimum: ${e.message}")
-                    BigInteger.valueOf(minimumGasPriceWei)
+                    BigInteger.valueOf(blockchainProperties.gas.minimumGasPriceWei)
                 }
             }
 
@@ -65,12 +77,12 @@ class Web3Config(
 
             override fun getGasLimit(contractFunc: String?): BigInteger {
                 return when (contractFunc) {
-                    "createContract" -> BigInteger.valueOf(gasLimitsConfig["createContract"] ?: 500000)
-                    "depositFunds" -> BigInteger.valueOf(gasLimitsConfig["depositFunds"] ?: 250000)
-                    "raiseDispute" -> BigInteger.valueOf(gasLimitsConfig["raiseDispute"] ?: 300000)
-                    "claimFunds" -> BigInteger.valueOf(gasLimitsConfig["claimFunds"] ?: 200000)
-                    "resolveDispute" -> BigInteger.valueOf(gasLimitsConfig["resolveDispute"] ?: 200000)
-                    "approveUSDC" -> BigInteger.valueOf(gasLimitsConfig["approveUSDC"] ?: 60000)
+                    "createContract" -> BigInteger.valueOf(escrowProperties.limitCreateContract)
+                    "depositFunds" -> BigInteger.valueOf(escrowProperties.limitDeposit)
+                    "raiseDispute" -> BigInteger.valueOf(escrowProperties.limitDispute)
+                    "claimFunds" -> BigInteger.valueOf(escrowProperties.limitClaim)
+                    "resolveDispute" -> BigInteger.valueOf(escrowProperties.limitResolve)
+                    "approveUSDC" -> BigInteger.valueOf(escrowProperties.limitApproveUsdc)
                     else -> DefaultGasProvider.GAS_LIMIT
                 }
             }
