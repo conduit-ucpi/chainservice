@@ -59,7 +59,7 @@ email-service:
 
 gas-payer:
   service-url: ${GAS_PAYER_SERVICE:http://localhost:8080}
-  api-key: ${GAS_PAYER_API_KEY}
+  api-key: ${GAS_PAYER_API_KEY:}
 
 app:
   service-link: ${SERVICE_LINK:http://localhost:3000}

@@ -3,6 +3,7 @@ package com.conduit.chainservice.service
 import com.conduit.chainservice.model.SignedTransactionRequest
 import com.conduit.chainservice.model.SignedTransactionResponse
 import com.utility.chainservice.models.TransactionResult
+import com.fasterxml.jackson.databind.ObjectMapper
 import kotlinx.coroutines.reactor.awaitSingle
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
@@ -16,12 +17,18 @@ import java.math.BigInteger
 @Service
 class GasPayerServiceClient(
     private val webClientBuilder: WebClient.Builder,
-    @Value("\${gas-payer.service-url}") private val gasPayerServiceUrl: String,
-    @Value("\${gas-payer.api-key}") private val apiKey: String
+    private val objectMapper: ObjectMapper
 ) {
     private val logger = LoggerFactory.getLogger(GasPayerServiceClient::class.java)
 
+    @Value("\${gas-payer.service-url}")
+    private lateinit var gasPayerServiceUrl: String
+
+    @Value("\${gas-payer.api-key:}")
+    private lateinit var apiKey: String
+
     private val webClient: WebClient by lazy {
+        logger.info("Creating WebClient for gas-payer-service at: $gasPayerServiceUrl")
         webClientBuilder
             .baseUrl(gasPayerServiceUrl)
             .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
@@ -34,6 +41,16 @@ class GasPayerServiceClient(
         operationType: String,
         gasLimit: BigInteger
     ): TransactionResult {
+        if (apiKey.isEmpty()) {
+            logger.error("GAS_PAYER_API_KEY is not configured - requests will fail")
+            return TransactionResult(
+                success = false,
+                transactionHash = null,
+                contractAddress = null,
+                error = "Gas payer API key not configured"
+            )
+        }
+        
         return try {
             logger.info("Processing transaction with gas transfer via gas-payer-service: operation=$operationType, user=$userWalletAddress")
             logger.debug("Gas limit parameter ignored (gas-payer-service calculates automatically): $gasLimit")
@@ -98,6 +115,16 @@ class GasPayerServiceClient(
         userWalletAddress: String,
         signedTransactionHex: String
     ): SignedTransactionResponse {
+        if (apiKey.isEmpty()) {
+            logger.error("GAS_PAYER_API_KEY is not configured - requests will fail")
+            return SignedTransactionResponse(
+                success = false,
+                transactionHash = null,
+                contractAddress = null,
+                error = "Gas payer API key not configured"
+            )
+        }
+        
         return try {
             logger.info("Sending signed transaction to gas-payer-service for wallet: $userWalletAddress")
             
