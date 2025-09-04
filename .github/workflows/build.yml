@@ -115,6 +115,8 @@ jobs:
             -e EMAIL_SERVICE_URL=${{ vars.EMAIL_SERVICE_URL }} \
             -e SERVICE_LINK=${{ vars.SERVICE_LINK }} \
             -e GAS_PAYER_CONTRACT_ADDRESS=${{ vars.GAS_PAYER_CONTRACT_ADDRESS }} \
+            -e GAS_PAYER_SERVICE=${{ vars.GAS_PAYER_SERVICE }} \
+            -e GAS_PAYER_API_KEY=${{ secrets.GAS_PAYER_API_KEY }} \
             -e SECURITY_CONFIG_PATH=/app/config/security-config.json \
           EOF
           
