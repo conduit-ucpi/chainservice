@@ -3,6 +3,8 @@ package com.conduit.chainservice.service
 import com.conduit.chainservice.model.SignedTransactionRequest
 import com.conduit.chainservice.model.SignedTransactionResponse
 import com.conduit.chainservice.model.TransactionResult
+import com.conduit.chainservice.escrow.models.FundWalletRequest
+import com.conduit.chainservice.escrow.models.FundWalletResponse
 import com.fasterxml.jackson.databind.ObjectMapper
 import kotlinx.coroutines.reactor.awaitSingle
 import org.slf4j.LoggerFactory
@@ -164,6 +166,60 @@ class GasPayerServiceClient(
                 transactionHash = null,
                 contractAddress = null,
                 error = "Failed to process transaction: ${e.message}"
+            )
+        }
+    }
+
+    suspend fun fundWallet(
+        walletAddress: String,
+        totalAmountNeededWei: BigInteger
+    ): FundWalletResponse {
+        if (apiKey.isEmpty()) {
+            logger.error("GAS_PAYER_API_KEY is not configured - requests will fail")
+            return FundWalletResponse(
+                success = false,
+                message = "Gas payer API key not configured",
+                error = "Gas payer API key not configured"
+            )
+        }
+        
+        return try {
+            logger.info("Requesting wallet funding from gas-payer-service: wallet=$walletAddress, amount=$totalAmountNeededWei wei")
+            
+            val request = FundWalletRequest(
+                walletAddress = walletAddress,
+                totalAmountNeededWei = totalAmountNeededWei
+            )
+            
+            val response = webClient.post()
+                .uri("/api/v1/fund-wallet")
+                .header("X-API-KEY", apiKey)
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(request)
+                .retrieve()
+                .bodyToMono(FundWalletResponse::class.java)
+                .awaitSingle()
+            
+            if (response.success) {
+                logger.info("Wallet funding request successful: ${response.message}")
+            } else {
+                logger.error("Wallet funding request failed: ${response.error}")
+            }
+            
+            response
+        } catch (e: WebClientResponseException) {
+            logger.error("Gas payer service returned error for fund-wallet: ${e.statusCode} - ${e.responseBodyAsString}", e)
+            FundWalletResponse(
+                success = false,
+                message = "Gas payer service error",
+                error = "Gas payer service error: ${e.message}"
+            )
+        } catch (e: Exception) {
+            logger.error("Failed to call gas payer service fund-wallet endpoint", e)
+            FundWalletResponse(
+                success = false,
+                message = "Failed to process wallet funding request",
+                error = "Failed to process wallet funding request: ${e.message}"
             )
         }
     }

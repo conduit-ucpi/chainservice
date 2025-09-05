@@ -5,6 +5,7 @@ import com.conduit.chainservice.escrow.models.DepositFundsRequest
 import com.conduit.chainservice.service.ContractServiceClient
 import com.conduit.chainservice.service.ContractQueryService
 import com.conduit.chainservice.service.EmailServiceClient
+import com.conduit.chainservice.service.GasPayerServiceClient
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.conduit.chainservice.model.TransactionResult
 import kotlinx.coroutines.runBlocking
@@ -45,6 +46,9 @@ class DepositFundsErrorScenariosTest {
     private lateinit var emailServiceClient: EmailServiceClient
 
     @Mock
+    private lateinit var gasPayerServiceClient: GasPayerServiceClient
+
+    @Mock
     private lateinit var escrowProperties: EscrowProperties
 
     private lateinit var escrowController: EscrowController
@@ -57,6 +61,7 @@ class DepositFundsErrorScenariosTest {
             contractQueryService,
             contractServiceClient,
             emailServiceClient,
+            gasPayerServiceClient,
             escrowProperties
         )
         

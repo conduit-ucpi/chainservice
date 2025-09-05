@@ -6,6 +6,7 @@ import com.conduit.chainservice.escrow.models.TransferUSDCResponse
 import com.conduit.chainservice.service.ContractServiceClient
 import com.conduit.chainservice.service.ContractQueryService
 import com.conduit.chainservice.service.EmailServiceClient
+import com.conduit.chainservice.service.GasPayerServiceClient
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.conduit.chainservice.model.TransactionResult
 import jakarta.servlet.http.HttpServletRequest
@@ -47,6 +48,9 @@ class EscrowControllerTransferUSDCTest {
     private lateinit var emailServiceClient: EmailServiceClient
 
     @Mock
+    private lateinit var gasPayerServiceClient: GasPayerServiceClient
+
+    @Mock
     private lateinit var escrowProperties: EscrowProperties
 
     private lateinit var escrowController: EscrowController
@@ -59,6 +63,7 @@ class EscrowControllerTransferUSDCTest {
             contractQueryService,
             contractServiceClient,
             emailServiceClient,
+            gasPayerServiceClient,
             escrowProperties
         )
         

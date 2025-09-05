@@ -6,6 +6,7 @@ import com.conduit.chainservice.escrow.validation.EmailFieldValidator
 import com.conduit.chainservice.service.ContractQueryServiceInterface
 import com.conduit.chainservice.service.ContractServiceClient
 import com.conduit.chainservice.service.EmailServiceClient
+import com.conduit.chainservice.service.GasPayerServiceClient
 import com.conduit.chainservice.model.OperationGasCost
 import com.conduit.chainservice.model.TransactionResult
 import io.swagger.v3.oas.annotations.Operation
@@ -36,6 +37,7 @@ class EscrowController(
     private val contractQueryService: ContractQueryServiceInterface,
     private val contractServiceClient: ContractServiceClient,
     private val emailServiceClient: EmailServiceClient,
+    private val gasPayerServiceClient: GasPayerServiceClient,
     private val escrowProperties: EscrowProperties
 ) {
 
@@ -971,6 +973,77 @@ class EscrowController(
             val response = TransferUSDCResponse(
                 success = false,
                 transactionHash = null,
+                message = "Internal server error",
+                error = e.message ?: "Unknown error occurred"
+            )
+            ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response)
+        }
+    }
+
+    @PostMapping("/fund-wallet")
+    @Operation(
+        summary = "Fund Wallet",
+        description = "Requests funding for a wallet address through the gas-payer service. The service determines the funding amount and method."
+    )
+    @ApiResponses(value = [
+        ApiResponse(
+            responseCode = "200",
+            description = "Wallet funding request processed",
+            content = [Content(schema = Schema(implementation = FundWalletResponse::class))]
+        ),
+        ApiResponse(
+            responseCode = "400",
+            description = "Invalid request",
+            content = [Content(schema = Schema(implementation = FundWalletResponse::class))]
+        ),
+        ApiResponse(
+            responseCode = "500",
+            description = "Internal server error",
+            content = [Content(schema = Schema(implementation = FundWalletResponse::class))]
+        )
+    ])
+    fun fundWallet(
+        @Valid @RequestBody
+        @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            content = [Content(
+                examples = [ExampleObject(
+                    name = "Fund Wallet Example",
+                    value = """{"walletAddress": "0x1234567890abcdef1234567890abcdef12345678", "totalAmountNeededWei": "1000000000000000000"}"""
+                )]
+            )]
+        )
+        request: FundWalletRequest
+    ): ResponseEntity<FundWalletResponse> {
+        return try {
+            logger.info("Fund wallet request received for wallet: ${request.walletAddress}, amount: ${request.totalAmountNeededWei} wei")
+            
+            // Validate wallet address format
+            if (!request.walletAddress.matches(Regex("^0x[a-fA-F0-9]{40}$"))) {
+                return ResponseEntity.badRequest().body(
+                    FundWalletResponse(
+                        success = false,
+                        message = "Invalid wallet address format",
+                        error = "Wallet address must be a 42 character hex string starting with 0x"
+                    )
+                )
+            }
+            
+            val result = runBlocking {
+                gasPayerServiceClient.fundWallet(request.walletAddress, request.totalAmountNeededWei)
+            }
+
+            if (result.success) {
+                logger.info("Wallet funding request successful: ${result.message}")
+                ResponseEntity.ok(result)
+            } else {
+                logger.error("Wallet funding request failed: ${result.error}")
+                ResponseEntity.status(HttpStatus.BAD_REQUEST).body(result)
+            }
+
+        } catch (e: Exception) {
+            logger.error("Error in fund wallet endpoint", e)
+            val response = FundWalletResponse(
+                success = false,
                 message = "Internal server error",
                 error = e.message ?: "Unknown error occurred"
             )

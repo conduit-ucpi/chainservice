@@ -4,6 +4,7 @@ import com.conduit.chainservice.escrow.EscrowController
 import com.conduit.chainservice.escrow.models.AdminResolveContractRequest
 import com.conduit.chainservice.service.ContractQueryService
 import com.conduit.chainservice.service.CacheInvalidationService
+import com.conduit.chainservice.service.StateAwareCacheInvalidationService
 import com.conduit.chainservice.service.ContractServiceClient
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.junit.jupiter.api.BeforeEach
@@ -33,6 +34,8 @@ class AdminControllerBasicTest {
     
     private lateinit var cacheInvalidationService: CacheInvalidationService
     
+    private lateinit var stateAwareCacheInvalidationService: StateAwareCacheInvalidationService
+    
     private lateinit var contractServiceClient: ContractServiceClient
     
     private lateinit var adminController: AdminController
@@ -41,7 +44,7 @@ class AdminControllerBasicTest {
     @BeforeEach
     fun setup() {
         MockitoAnnotations.openMocks(this)
-        adminController = AdminController(escrowController, contractQueryService, cacheInvalidationService, contractServiceClient)
+        adminController = AdminController(escrowController, contractQueryService, cacheInvalidationService, stateAwareCacheInvalidationService, contractServiceClient)
         mockMvc = MockMvcBuilders.standaloneSetup(adminController).build()
     }
 

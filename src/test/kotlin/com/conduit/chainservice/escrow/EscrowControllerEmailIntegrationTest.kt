@@ -9,8 +9,10 @@ import com.conduit.chainservice.controller.AdminController
 import com.conduit.chainservice.service.ContractQueryService
 import com.conduit.chainservice.service.ContractServiceClient
 import com.conduit.chainservice.service.EmailServiceClient
+import com.conduit.chainservice.service.GasPayerServiceClient
 import com.conduit.chainservice.service.SendEmailResponse
 import com.conduit.chainservice.service.CacheInvalidationService
+import com.conduit.chainservice.service.StateAwareCacheInvalidationService
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.conduit.chainservice.model.TransactionResult
 import jakarta.servlet.http.HttpServletRequest
@@ -49,10 +51,16 @@ class EscrowControllerEmailIntegrationTest {
     private lateinit var emailServiceClient: EmailServiceClient
 
     @Mock
+    private lateinit var gasPayerServiceClient: GasPayerServiceClient
+
+    @Mock
     private lateinit var escrowProperties: EscrowProperties
     
     @Mock
     private lateinit var cacheInvalidationService: CacheInvalidationService
+    
+    @Mock
+    private lateinit var stateAwareCacheInvalidationService: StateAwareCacheInvalidationService
 
     private lateinit var escrowController: EscrowController
     private lateinit var adminController: AdminController
@@ -65,6 +73,7 @@ class EscrowControllerEmailIntegrationTest {
             contractQueryService,
             contractServiceClient,
             emailServiceClient,
+            gasPayerServiceClient,
             escrowProperties
         )
 
@@ -89,6 +98,7 @@ class EscrowControllerEmailIntegrationTest {
             escrowController,
             contractQueryService,
             cacheInvalidationService,
+            stateAwareCacheInvalidationService,
             contractServiceClient
         )
 

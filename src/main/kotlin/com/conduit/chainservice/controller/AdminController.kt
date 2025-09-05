@@ -1,11 +1,10 @@
 package com.conduit.chainservice.controller
 
 import com.conduit.chainservice.escrow.EscrowController
-import com.conduit.chainservice.escrow.models.AdminResolveContractRequest
-import com.conduit.chainservice.escrow.models.AdminResolveContractResponse
-import com.conduit.chainservice.escrow.models.ResolveDisputeRequest
+import com.conduit.chainservice.escrow.models.*
 import com.conduit.chainservice.service.ContractQueryService
 import com.conduit.chainservice.service.CacheInvalidationService
+import com.conduit.chainservice.service.StateAwareCacheInvalidationService
 import com.conduit.chainservice.service.ContractServiceClient
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
@@ -32,6 +31,7 @@ class AdminController(
     private val escrowController: EscrowController,
     private val contractQueryService: ContractQueryService,
     private val cacheInvalidationService: CacheInvalidationService,
+    private val stateAwareCacheInvalidationService: StateAwareCacheInvalidationService,
     private val contractServiceClient: ContractServiceClient
 ) {
 
@@ -251,6 +251,351 @@ class AdminController(
             logger.error("Error analyzing cache effectiveness", e)
             ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
                 mapOf("error" to (e.message ?: "Failed to analyze cache effectiveness"))
+            )
+        }
+    }
+
+    @PostMapping("/cache/invalidate")
+    @Operation(
+        summary = "Force Cache Invalidation for Contract",
+        description = "Forces cache invalidation for a specific contract address. This removes all cached data for the contract across all cache levels, forcing fresh blockchain queries on next access. The intelligent invalidation system will skip immutable contracts that cannot change. Available to all authenticated users."
+    )
+    @ApiResponses(value = [
+        ApiResponse(
+            responseCode = "200",
+            description = "Cache invalidated successfully",
+            content = [Content(schema = Schema(implementation = InvalidateCacheResponse::class))]
+        ),
+        ApiResponse(
+            responseCode = "400",
+            description = "Invalid contract address format",
+            content = [Content(schema = Schema(implementation = InvalidateCacheResponse::class))]
+        ),
+        ApiResponse(
+            responseCode = "401",
+            description = "Authentication required"
+        ),
+        ApiResponse(
+            responseCode = "500",
+            description = "Internal server error",
+            content = [Content(schema = Schema(implementation = InvalidateCacheResponse::class))]
+        )
+    ])
+    fun invalidateContractCache(
+        @Valid @RequestBody
+        @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            content = [Content(
+                examples = [ExampleObject(
+                    name = "Invalidate Cache Example",
+                    value = """{"contractAddress": "0x1234567890abcdef1234567890abcdef12345678", "reason": "Force refresh after manual state change"}"""
+                )]
+            )]
+        )
+        request: InvalidateCacheRequest,
+        httpServletRequest: HttpServletRequest
+    ): ResponseEntity<InvalidateCacheResponse> {
+        return try {
+            // Just verify user is authenticated (any user can invalidate cache)
+            val userId = httpServletRequest.getAttribute("userId") as? String
+            val userType = httpServletRequest.getAttribute("userType") as? String
+            
+            if (userId == null) {
+                logger.warn("Unauthenticated user attempted to invalidate cache for contract: ${request.contractAddress}")
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
+                    InvalidateCacheResponse(
+                        success = false,
+                        message = "Authentication required",
+                        contractAddress = request.contractAddress,
+                        cachesInvalidated = emptyList(),
+                        error = "User must be authenticated"
+                    )
+                )
+            }
+            
+            logger.info("Cache invalidation request for contract: ${request.contractAddress}, user: $userId (type: $userType), reason: ${request.reason}")
+            
+            // Validate contract address format
+            if (!request.contractAddress.matches(Regex("^0x[a-fA-F0-9]{40}$"))) {
+                return ResponseEntity.badRequest().body(
+                    InvalidateCacheResponse(
+                        success = false,
+                        message = "Invalid contract address format",
+                        contractAddress = request.contractAddress,
+                        cachesInvalidated = emptyList(),
+                        error = "Contract address must be a 42 character hex string starting with 0x"
+                    )
+                )
+            }
+            
+            // Track which caches were invalidated
+            val invalidatedCaches = mutableListOf<String>()
+            
+            // Use state-aware invalidation (intelligent)
+            stateAwareCacheInvalidationService.invalidateContractCacheIntelligently(
+                contractAddress = request.contractAddress,
+                operationType = "admin_force_invalidation",
+                newStatus = null,
+                transactionHash = null
+            )
+            
+            // Track what was invalidated (this is approximate since the service doesn't return details)
+            invalidatedCaches.addAll(listOf(
+                "contractInfoMutable",
+                "contractStateMutable",
+                "transactionData"
+            ))
+            
+            // Also use legacy service for complete invalidation (belt and suspenders approach)
+            cacheInvalidationService.invalidateContractCache(
+                contractAddress = request.contractAddress,
+                operationType = "admin_force_invalidation_legacy",
+                transactionHash = null
+            )
+            
+            val response = InvalidateCacheResponse(
+                success = true,
+                message = "Cache invalidated successfully for contract ${request.contractAddress}",
+                contractAddress = request.contractAddress,
+                cachesInvalidated = invalidatedCaches,
+                error = null
+            )
+            
+            logger.info("Successfully invalidated cache for contract: ${request.contractAddress}, user: $userId, caches cleared: ${invalidatedCaches.joinToString()}")
+            ResponseEntity.ok(response)
+            
+        } catch (e: Exception) {
+            logger.error("Error invalidating cache for contract: ${request.contractAddress}", e)
+            ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
+                InvalidateCacheResponse(
+                    success = false,
+                    message = "Failed to invalidate cache",
+                    contractAddress = request.contractAddress,
+                    cachesInvalidated = emptyList(),
+                    error = e.message ?: "Internal server error"
+                )
+            )
+        }
+    }
+
+    @PostMapping("/cache/invalidate/batch")
+    @Operation(
+        summary = "Force Cache Invalidation for Multiple Contracts (Admin Only)",
+        description = "Forces cache invalidation for multiple contract addresses in a single operation. Useful for bulk cache refresh operations."
+    )
+    @ApiResponses(value = [
+        ApiResponse(
+            responseCode = "200",
+            description = "Batch cache invalidation completed",
+            content = [Content(schema = Schema(implementation = BatchInvalidateCacheResponse::class))]
+        ),
+        ApiResponse(
+            responseCode = "400",
+            description = "Invalid request",
+            content = [Content(schema = Schema(implementation = BatchInvalidateCacheResponse::class))]
+        ),
+        ApiResponse(
+            responseCode = "403",
+            description = "Access denied - admin privileges required"
+        ),
+        ApiResponse(
+            responseCode = "500",
+            description = "Internal server error",
+            content = [Content(schema = Schema(implementation = BatchInvalidateCacheResponse::class))]
+        )
+    ])
+    fun invalidateBatchContractCache(
+        @Valid @RequestBody
+        @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            content = [Content(
+                examples = [ExampleObject(
+                    name = "Batch Invalidate Cache Example",
+                    value = """{"contractAddresses": ["0x1234567890abcdef1234567890abcdef12345678", "0xabcdef1234567890abcdef1234567890abcdef12"], "reason": "Bulk refresh after system update"}"""
+                )]
+            )]
+        )
+        request: BatchInvalidateCacheRequest,
+        httpServletRequest: HttpServletRequest
+    ): ResponseEntity<BatchInvalidateCacheResponse> {
+        return try {
+            // Verify admin access
+            val userType = httpServletRequest.getAttribute("userType") as? String
+            if (userType != "admin") {
+                logger.warn("Non-admin user attempted batch cache invalidation")
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(
+                    BatchInvalidateCacheResponse(
+                        success = false,
+                        message = "Access denied - admin privileges required",
+                        totalRequested = request.contractAddresses.size,
+                        totalInvalidated = 0,
+                        failedAddresses = request.contractAddresses,
+                        error = "Admin access required"
+                    )
+                )
+            }
+            
+            logger.info("Admin batch cache invalidation request for ${request.contractAddresses.size} contracts, reason: ${request.reason}")
+            
+            // Validate all addresses first
+            val invalidAddresses = request.contractAddresses.filterNot { 
+                it.matches(Regex("^0x[a-fA-F0-9]{40}$")) 
+            }
+            
+            if (invalidAddresses.isNotEmpty()) {
+                return ResponseEntity.badRequest().body(
+                    BatchInvalidateCacheResponse(
+                        success = false,
+                        message = "Invalid contract address format in batch",
+                        totalRequested = request.contractAddresses.size,
+                        totalInvalidated = 0,
+                        failedAddresses = invalidAddresses,
+                        error = "Some addresses have invalid format: ${invalidAddresses.joinToString()}"
+                    )
+                )
+            }
+            
+            if (request.contractAddresses.isEmpty()) {
+                return ResponseEntity.badRequest().body(
+                    BatchInvalidateCacheResponse(
+                        success = false,
+                        message = "No contract addresses provided",
+                        totalRequested = 0,
+                        totalInvalidated = 0,
+                        failedAddresses = emptyList(),
+                        error = "Contract addresses list cannot be empty"
+                    )
+                )
+            }
+            
+            if (request.contractAddresses.size > 100) {
+                return ResponseEntity.badRequest().body(
+                    BatchInvalidateCacheResponse(
+                        success = false,
+                        message = "Too many contracts in batch",
+                        totalRequested = request.contractAddresses.size,
+                        totalInvalidated = 0,
+                        failedAddresses = request.contractAddresses,
+                        error = "Cannot invalidate more than 100 contracts at once"
+                    )
+                )
+            }
+            
+            val failedAddresses = mutableListOf<String>()
+            var successCount = 0
+            
+            // Process each contract
+            request.contractAddresses.forEach { contractAddress ->
+                try {
+                    // Use both services for complete invalidation
+                    stateAwareCacheInvalidationService.invalidateContractCacheIntelligently(
+                        contractAddress = contractAddress,
+                        operationType = "admin_batch_invalidation",
+                        newStatus = null,
+                        transactionHash = null
+                    )
+                    
+                    cacheInvalidationService.invalidateContractCache(
+                        contractAddress = contractAddress,
+                        operationType = "admin_batch_invalidation_legacy",
+                        transactionHash = null
+                    )
+                    
+                    successCount++
+                } catch (e: Exception) {
+                    logger.error("Failed to invalidate cache for contract $contractAddress in batch", e)
+                    failedAddresses.add(contractAddress)
+                }
+            }
+            
+            val response = BatchInvalidateCacheResponse(
+                success = failedAddresses.isEmpty(),
+                message = if (failedAddresses.isEmpty()) {
+                    "Successfully invalidated cache for all ${request.contractAddresses.size} contracts"
+                } else {
+                    "Partially completed: $successCount succeeded, ${failedAddresses.size} failed"
+                },
+                totalRequested = request.contractAddresses.size,
+                totalInvalidated = successCount,
+                failedAddresses = failedAddresses,
+                error = if (failedAddresses.isNotEmpty()) "Some contracts failed to invalidate" else null
+            )
+            
+            logger.info("Batch cache invalidation completed: $successCount/${request.contractAddresses.size} successful")
+            ResponseEntity.ok(response)
+            
+        } catch (e: Exception) {
+            logger.error("Error in batch cache invalidation", e)
+            ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
+                BatchInvalidateCacheResponse(
+                    success = false,
+                    message = "Failed to process batch invalidation",
+                    totalRequested = request.contractAddresses.size,
+                    totalInvalidated = 0,
+                    failedAddresses = request.contractAddresses,
+                    error = e.message ?: "Internal server error"
+                )
+            )
+        }
+    }
+
+    @DeleteMapping("/cache/all")
+    @Operation(
+        summary = "Clear All Contract Caches (Admin Only - Use with Caution)",
+        description = "Completely clears all contract-related caches. This is a destructive operation that will cause temporary performance degradation as all data must be re-fetched from the blockchain. Use only in emergency situations."
+    )
+    @ApiResponses(value = [
+        ApiResponse(
+            responseCode = "200",
+            description = "All caches cleared successfully"
+        ),
+        ApiResponse(
+            responseCode = "403",
+            description = "Access denied - admin privileges required"
+        ),
+        ApiResponse(
+            responseCode = "500",
+            description = "Internal server error"
+        )
+    ])
+    fun clearAllCaches(
+        @RequestParam(required = false) 
+        @Parameter(description = "Reason for clearing all caches")
+        reason: String?,
+        httpServletRequest: HttpServletRequest
+    ): ResponseEntity<Map<String, Any>> {
+        return try {
+            // Verify admin access
+            val userType = httpServletRequest.getAttribute("userType") as? String
+            if (userType != "admin") {
+                logger.warn("Non-admin user attempted to clear all caches")
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(
+                    mapOf("error" to "Access denied - admin privileges required")
+                )
+            }
+            
+            val clearReason = reason ?: "Admin requested full cache clear"
+            logger.warn("CLEARING ALL CACHES - Reason: $clearReason, Admin: ${httpServletRequest.getAttribute("userId")}")
+            
+            // Use legacy service to clear all caches
+            cacheInvalidationService.invalidateAllContractCache(clearReason)
+            
+            val response = mapOf(
+                "success" to true,
+                "message" to "All contract caches have been cleared",
+                "reason" to clearReason,
+                "warning" to "This may cause temporary performance degradation as data is re-fetched from blockchain",
+                "timestamp" to System.currentTimeMillis()
+            )
+            
+            logger.info("All caches cleared successfully by admin")
+            ResponseEntity.ok(response)
+            
+        } catch (e: Exception) {
+            logger.error("Error clearing all caches", e)
+            ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
+                mapOf(
+                    "success" to false,
+                    "error" to (e.message ?: "Failed to clear all caches")
+                )
             )
         }
     }

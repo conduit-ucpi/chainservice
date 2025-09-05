@@ -134,6 +134,14 @@ data class TransferUSDCRequest(
     val signedTransaction: String
 )
 
+data class FundWalletRequest(
+    @field:NotBlank(message = "Wallet address is required")
+    val walletAddress: String,
+    
+    @field:NotNull(message = "Total amount needed is required")
+    val totalAmountNeededWei: BigInteger
+)
+
 // Response models
 data class CreateContractResponse(
     val success: Boolean,
@@ -176,6 +184,44 @@ data class TransferUSDCResponse(
     val success: Boolean,
     val transactionHash: String?,
     val message: String,
+    val error: String? = null
+)
+
+data class FundWalletResponse(
+    val success: Boolean,
+    val message: String,
+    val error: String? = null
+)
+
+// Cache invalidation models
+data class InvalidateCacheRequest(
+    @field:NotBlank(message = "Contract address is required")
+    val contractAddress: String,
+    
+    val reason: String? = null
+)
+
+data class InvalidateCacheResponse(
+    val success: Boolean,
+    val message: String,
+    val contractAddress: String,
+    val cachesInvalidated: List<String>,
+    val error: String? = null
+)
+
+data class BatchInvalidateCacheRequest(
+    @field:NotNull(message = "Contract addresses are required")
+    val contractAddresses: List<String>,
+    
+    val reason: String? = null
+)
+
+data class BatchInvalidateCacheResponse(
+    val success: Boolean,
+    val message: String,
+    val totalRequested: Int,
+    val totalInvalidated: Int,
+    val failedAddresses: List<String>,
     val error: String? = null
 )
 
