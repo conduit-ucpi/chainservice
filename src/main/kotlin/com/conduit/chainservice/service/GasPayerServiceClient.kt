@@ -60,7 +60,7 @@ class GasPayerServiceClient(
             val request = SignedTransactionRequest(
                 userWalletAddress = userWalletAddress,
                 signedTransactionHex = signedTransactionHex,
-                operation = operationType
+                operationName = operationType
             )
             
             val response = webClient.post()
@@ -135,7 +135,7 @@ class GasPayerServiceClient(
             val request = SignedTransactionRequest(
                 userWalletAddress = userWalletAddress,
                 signedTransactionHex = signedTransactionHex,
-                operation = operation
+                operationName = operation
             )
             
             val response = webClient.post()

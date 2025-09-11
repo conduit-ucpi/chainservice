@@ -9,8 +9,8 @@ data class SignedTransactionRequest(
     @JsonProperty("signedTransactionHex")
     val signedTransactionHex: String,
     
-    @JsonProperty("operation")
-    val operation: String
+    @JsonProperty("operationName")
+    val operationName: String
 )
 
 data class SignedTransactionResponse(
