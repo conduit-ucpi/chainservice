@@ -116,7 +116,8 @@ class GasPayerServiceClient(
 
     suspend fun processSignedTransaction(
         userWalletAddress: String,
-        signedTransactionHex: String
+        signedTransactionHex: String,
+        operation: String
     ): SignedTransactionResponse {
         if (apiKey.isEmpty()) {
             logger.error("GAS_PAYER_API_KEY is not configured - requests will fail")
@@ -134,7 +135,7 @@ class GasPayerServiceClient(
             val request = SignedTransactionRequest(
                 userWalletAddress = userWalletAddress,
                 signedTransactionHex = signedTransactionHex,
-                operation = null // No operation type available in this method
+                operation = operation
             )
             
             val response = webClient.post()
