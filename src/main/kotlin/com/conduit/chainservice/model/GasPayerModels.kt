@@ -7,7 +7,10 @@ data class SignedTransactionRequest(
     val userWalletAddress: String,
     
     @JsonProperty("signedTransactionHex")
-    val signedTransactionHex: String
+    val signedTransactionHex: String,
+    
+    @JsonProperty("operation")
+    val operation: String? = null
 )
 
 data class SignedTransactionResponse(
