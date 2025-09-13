@@ -29,7 +29,8 @@ class WebSecurityConfiguration(
                         "/swagger-ui.html",
                         "/api-docs/**",
                         "/v3/api-docs/**",
-                        "/api/chain/claim-funds-as-gas-payer"
+                        "/api/chain/claim-funds-as-gas-payer",
+                        "/api/chain/contracts/batch-info"
                     ).permitAll()
                     // All API endpoints require authentication
                     .requestMatchers("/api/**").authenticated()
