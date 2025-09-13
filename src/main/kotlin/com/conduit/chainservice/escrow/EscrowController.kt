@@ -77,7 +77,7 @@ class EscrowController(
             content = [Content(
                 examples = [ExampleObject(
                     name = "Create Contract Example",
-                    value = """{"buyer": "0x1234567890abcdef1234567890abcdef12345678", "seller": "0x9876543210fedcba9876543210fedcba98765432", "amount": "1000000", "expiryTimestamp": 1735689600, "description": "Product delivery escrow"}"""  
+                    value = """{"tokenAddress": "0xA0b86a33E6441A9A0d7fc0C7F3C0A0D3E6A0b86a", "buyer": "0x1234567890abcdef1234567890abcdef12345678", "seller": "0x9876543210fedcba9876543210fedcba98765432", "amount": "1000000", "expiryTimestamp": 1735689600, "description": "Product delivery escrow"}"""  
                 )]
             )]
         )
@@ -89,6 +89,7 @@ class EscrowController(
             
             val result = runBlocking {
                 escrowTransactionService.createContract(
+                    request.tokenAddress,
                     request.buyer,
                     request.seller,
                     request.amount,

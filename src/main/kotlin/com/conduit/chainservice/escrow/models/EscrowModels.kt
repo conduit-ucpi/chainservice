@@ -3,15 +3,23 @@ package com.conduit.chainservice.escrow.models
 import com.conduit.chainservice.escrow.validation.ConditionalEmailFields
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.NotNull
+import jakarta.validation.constraints.Pattern
 import jakarta.validation.constraints.Positive
+import jakarta.validation.constraints.Size
 import java.math.BigInteger
 
 // Request models
 data class CreateContractRequest(
+    @field:NotBlank(message = "Token address is required")
+    @field:Pattern(regexp = "^0x[a-fA-F0-9]{40}$", message = "Invalid token address format")
+    val tokenAddress: String,
+    
     @field:NotBlank(message = "Buyer address is required")
+    @field:Pattern(regexp = "^0x[a-fA-F0-9]{40}$", message = "Invalid buyer address format")
     val buyer: String,
     
     @field:NotBlank(message = "Seller address is required")
+    @field:Pattern(regexp = "^0x[a-fA-F0-9]{40}$", message = "Invalid seller address format")
     val seller: String,
     
     @field:NotNull(message = "Amount is required")
@@ -22,6 +30,7 @@ data class CreateContractRequest(
     val expiryTimestamp: Long,
     
     @field:NotBlank(message = "Description is required")
+    @field:Size(max = 160, message = "Description must be 160 characters or less")
     val description: String
 )
 

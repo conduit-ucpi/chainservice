@@ -31,6 +31,7 @@ class TransactionRelayService(
     }
 
     suspend fun createContract(
+        tokenAddress: String,
         buyer: String,
         seller: String,
         amount: BigInteger,
@@ -38,7 +39,7 @@ class TransactionRelayService(
         description: String
     ): ContractCreationResult {
         // Delegate to escrow transaction service
-        val escrowResult = escrowTransactionService.createContract(buyer, seller, amount, expiryTimestamp, description)
+        val escrowResult = escrowTransactionService.createContract(tokenAddress, buyer, seller, amount, expiryTimestamp, description)
         // Convert to legacy ContractCreationResult format
         return ContractCreationResult(
             success = escrowResult.success,

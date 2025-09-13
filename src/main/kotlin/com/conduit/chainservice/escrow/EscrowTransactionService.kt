@@ -108,6 +108,7 @@ class EscrowTransactionService(
     }
 
     suspend fun createContract(
+        tokenAddress: String,
         buyer: String,
         seller: String,
         amount: BigInteger,
@@ -115,7 +116,7 @@ class EscrowTransactionService(
         description: String
     ): ContractCreationResult {
         return try {
-            logger.info("Creating escrow contract for buyer: $buyer, seller: $seller, amount: $amount")
+            logger.info("Creating escrow contract for token: $tokenAddress, buyer: $buyer, seller: $seller, amount: $amount")
 
             // Determine creator fee with special case logic
             val creatorFeeAmount = if (amount == BigInteger.valueOf(1000)) { // 0.001 USDC = 1000 units (6 decimals)
@@ -146,6 +147,7 @@ class EscrowTransactionService(
             val function = Function(
                 "createEscrowContract",
                 listOf(
+                    Address(tokenAddress),
                     Address(buyer),
                     Address(seller), 
                     Uint256(amount),

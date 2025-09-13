@@ -23,6 +23,7 @@ class ApiModelsValidationTest {
     fun `CreateContractRequest should validate successfully with valid data`() {
         // Given
         val request = CreateContractRequest(
+            tokenAddress = "0xA0b86a33E6441A9A0d7fc0C7F3C0A0D3E6A0b86a",
             buyer = "0x1234567890abcdef1234567890abcdef12345678",
             seller = "0x9876543210fedcba9876543210fedcba98765432",
             amount = BigInteger.valueOf(1000000),
@@ -38,9 +39,30 @@ class ApiModelsValidationTest {
     }
 
     @Test
+    fun `CreateContractRequest should fail validation with invalid token address`() {
+        // Given
+        val request = CreateContractRequest(
+            tokenAddress = "invalid-token-address",
+            buyer = "0x1234567890abcdef1234567890abcdef12345678",
+            seller = "0x9876543210fedcba9876543210fedcba98765432",
+            amount = BigInteger.valueOf(1000000),
+            expiryTimestamp = Instant.now().plusSeconds(3600).epochSecond,
+            description = "Test contract"
+        )
+
+        // When
+        val violations = validator.validate(request)
+
+        // Then
+        assertTrue(violations.isNotEmpty())
+        assertTrue(violations.any { it.message.contains("Invalid token address format") })
+    }
+
+    @Test
     fun `CreateContractRequest should fail validation with invalid buyer address`() {
         // Given
         val request = CreateContractRequest(
+            tokenAddress = "0xA0b86a33E6441A9A0d7fc0C7F3C0A0D3E6A0b86a",
             buyer = "invalid-address",
             seller = "0x9876543210fedcba9876543210fedcba98765432",
             amount = BigInteger.valueOf(1000000),
@@ -60,6 +82,7 @@ class ApiModelsValidationTest {
     fun `CreateContractRequest should fail validation with blank buyer address`() {
         // Given
         val request = CreateContractRequest(
+            tokenAddress = "0xA0b86a33E6441A9A0d7fc0C7F3C0A0D3E6A0b86a",
             buyer = "",
             seller = "0x9876543210fedcba9876543210fedcba98765432",
             amount = BigInteger.valueOf(1000000),
@@ -79,6 +102,7 @@ class ApiModelsValidationTest {
     fun `CreateContractRequest should fail validation with negative amount`() {
         // Given
         val request = CreateContractRequest(
+            tokenAddress = "0xA0b86a33E6441A9A0d7fc0C7F3C0A0D3E6A0b86a",
             buyer = "0x1234567890abcdef1234567890abcdef12345678",
             seller = "0x9876543210fedcba9876543210fedcba98765432",
             amount = BigInteger.valueOf(-1),
@@ -98,6 +122,7 @@ class ApiModelsValidationTest {
     fun `CreateContractRequest should fail validation with zero amount`() {
         // Given
         val request = CreateContractRequest(
+            tokenAddress = "0xA0b86a33E6441A9A0d7fc0C7F3C0A0D3E6A0b86a",
             buyer = "0x1234567890abcdef1234567890abcdef12345678",
             seller = "0x9876543210fedcba9876543210fedcba98765432",
             amount = BigInteger.ZERO,
@@ -118,6 +143,7 @@ class ApiModelsValidationTest {
         // Given
         val longDescription = "a".repeat(161) // 161 characters
         val request = CreateContractRequest(
+            tokenAddress = "0xA0b86a33E6441A9A0d7fc0C7F3C0A0D3E6A0b86a",
             buyer = "0x1234567890abcdef1234567890abcdef12345678",
             seller = "0x9876543210fedcba9876543210fedcba98765432",
             amount = BigInteger.valueOf(1000000),
@@ -383,6 +409,7 @@ class ApiModelsValidationTest {
     fun `multiple validation errors should be reported`() {
         // Given
         val request = CreateContractRequest(
+            tokenAddress = "invalid-token", // Invalid: wrong format
             buyer = "", // Invalid: blank
             seller = "invalid", // Invalid: wrong format
             amount = BigInteger.valueOf(-1), // Invalid: negative
@@ -407,6 +434,7 @@ class ApiModelsValidationTest {
     fun `hex address validation should be case insensitive`() {
         // Given
         val request = CreateContractRequest(
+            tokenAddress = "0xA0b86a33E6441A9A0d7fc0C7F3C0A0D3E6A0b86a",
             buyer = "0x1234567890ABCDEF1234567890ABCDEF12345678", // Uppercase hex
             seller = "0x9876543210fedcba9876543210fedcba98765432", // Lowercase hex
             amount = BigInteger.valueOf(1000000),
@@ -425,6 +453,7 @@ class ApiModelsValidationTest {
     fun `address validation should require 0x prefix`() {
         // Given
         val request = CreateContractRequest(
+            tokenAddress = "0xA0b86a33E6441A9A0d7fc0C7F3C0A0D3E6A0b86a",
             buyer = "1234567890abcdef1234567890abcdef12345678", // Missing 0x prefix
             seller = "0x9876543210fedcba9876543210fedcba98765432",
             amount = BigInteger.valueOf(1000000),
@@ -444,6 +473,7 @@ class ApiModelsValidationTest {
     fun `address validation should require exactly 40 hex characters after 0x`() {
         // Given
         val request = CreateContractRequest(
+            tokenAddress = "0xA0b86a33E6441A9A0d7fc0C7F3C0A0D3E6A0b86a",
             buyer = "0x1234567890abcdef1234567890abcdef1234567", // 39 chars (too short)
             seller = "0x9876543210fedcba9876543210fedcba98765432",
             amount = BigInteger.valueOf(1000000),
