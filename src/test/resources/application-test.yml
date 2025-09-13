@@ -16,7 +16,7 @@ blockchain:
 escrow:
   usdc-contract-address: "0x5425890298aed601595a70AB815c96711a31Bc65"
   contract-factory-address: "0x1234567890123456789012345678901234567890"
-  creator-fee: 1000000  # 1 USDC in micro USDC
+  min-creator-fee: 1000000  # 1 USDC in micro USDC
   gas:
     limit-create-contract: 500000
     limit-deposit: 74161

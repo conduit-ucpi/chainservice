@@ -31,7 +31,7 @@ blockchain:
 escrow:
   usdc-contract-address: ${USDC_CONTRACT_ADDRESS}
   contract-factory-address: ${CONTRACT_FACTORY_ADDRESS}
-  creator-fee: ${CREATOR_FEE_USDC_X_1M}
+  min-creator-fee: ${MIN_CREATOR_FEE_USDC_X_1M}
   # gas limits calculated from foundry
   limit-create-contract: ${GAS_LIMIT_CREATE_CONTRACT:400000} 
   limit-deposit: ${GAS_LIMIT_DEPOSIT:131055}

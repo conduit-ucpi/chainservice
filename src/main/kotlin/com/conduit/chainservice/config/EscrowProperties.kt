@@ -7,7 +7,7 @@ import java.math.BigInteger
 data class EscrowProperties(
     var usdcContractAddress: String = "",
     var contractFactoryAddress: String = "",
-    var creatorFee: BigInteger = BigInteger.ZERO,
+    var minCreatorFee: BigInteger = BigInteger.ZERO,
     var limitCreateContract: Long = 0,
     var limitDeposit: Long = 0, 
     var limitDispute: Long = 0,

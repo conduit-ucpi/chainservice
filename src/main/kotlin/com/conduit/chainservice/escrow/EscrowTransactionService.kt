@@ -31,7 +31,7 @@ class EscrowTransactionService(
     private val chainId: Long,
     @Value("\${escrow.usdc-contract-address}") private val usdcContractAddress: String,
     @Value("\${escrow.contract-factory-address}") private val contractFactoryAddress: String,
-    @Value("\${escrow.creator-fee}") private val creatorFee: String,
+    @Value("\${escrow.min-creator-fee}") private val minCreatorFee: String,
     @Value("\${escrow.limit-dispute}") private val limitDispute: Long,
     @Value("\${escrow.limit-claim}") private val limitClaim: Long,
     @Value("\${escrow.limit-deposit}") private val limitDeposit: Long,
@@ -118,21 +118,21 @@ class EscrowTransactionService(
         return try {
             logger.info("Creating escrow contract for token: $tokenAddress, buyer: $buyer, seller: $seller, amount: $amount")
 
-            // Determine creator fee with special case logic
-            val creatorFeeAmount = if (amount == BigInteger.valueOf(1000)) { // 0.001 USDC = 1000 units (6 decimals)
+            // Determine minimum creator fee with special case logic for validation
+            val minCreatorFeeAmount = if (amount == BigInteger.valueOf(1000)) { // 0.001 USDC = 1000 units (6 decimals)
                 BigInteger.ZERO
             } else {
-                BigInteger(creatorFee)
+                BigInteger(minCreatorFee)
             }
 
-            // Validate creator fee
-            if (creatorFeeAmount >= amount) {
-                logger.error("Creator fee ($creatorFeeAmount) must be less than contract amount ($amount)")
+            // Validate minimum creator fee
+            if (minCreatorFeeAmount >= amount) {
+                logger.error("Minimum creator fee ($minCreatorFeeAmount) must be less than contract amount ($amount)")
                 return ContractCreationResult(
                     success = false,
                     transactionHash = null,
                     contractAddress = null,
-                    error = "Creator fee must be less than contract amount"
+                    error = "Minimum creator fee must be less than contract amount"
                 )
             }
 
@@ -143,7 +143,7 @@ class EscrowTransactionService(
 
             val gasPrice = gasProvider.getGasPrice("createContract")
 
-            // Build function call data for createEscrowContract with creator fee
+            // Build function call data for createEscrowContract (fee now hardcoded in factory)
             val function = Function(
                 "createEscrowContract",
                 listOf(
@@ -152,8 +152,7 @@ class EscrowTransactionService(
                     Address(seller), 
                     Uint256(amount),
                     Uint256(BigInteger.valueOf(expiryTimestamp)),
-                    Utf8String(description),
-                    Uint256(creatorFeeAmount)
+                    Utf8String(description)
                 ),
                 emptyList()
             )

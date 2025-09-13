@@ -50,7 +50,7 @@ export CONTRACT_SERVICE_URL=http://localhost:8080
 export CORS_ALLOWED_ORIGINS=http://localhost:3000
 
 # Fee Configuration
-export CREATOR_FEE_USDC_X_1M=1000000
+export MIN_CREATOR_FEE_USDC_X_1M=1000000
 
 # Gas Configuration (optional)
 export MIN_GAS_WEI=6

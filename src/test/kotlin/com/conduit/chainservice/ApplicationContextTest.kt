@@ -22,7 +22,7 @@ import org.springframework.test.context.TestPropertySource
     // Required escrow properties  
     "escrow.usdc-contract-address=0x5425890298aed601595a70AB815c96711a31Bc65",
     "escrow.contract-factory-address=0x1234567890123456789012345678901234567890",
-    "escrow.creator-fee=1000000",
+    "escrow.min-creator-fee=1000000",
     
     // Auth properties
     "auth.user-service-url=http://localhost:8080",

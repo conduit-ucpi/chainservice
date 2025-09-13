@@ -107,7 +107,7 @@ jobs:
             -e CONTRACT_FACTORY_ADDRESS=${{ vars.CONTRACT_FACTORY_ADDRESS }} \
             -e RELAYER_WALLET_ADDRESS=${{ vars.RELAYER_WALLET_ADDRESS }} \
             -e RELAYER_PRIVATE_KEY=${{ secrets.RELAYER_PRIVATE_KEY }} \
-            -e CREATOR_FEE_USDC_X_1M=${{ vars.CREATOR_FEE_USDC_X_1M }} \
+            -e MIN_CREATOR_FEE_USDC_X_1M=${{ vars.MIN_CREATOR_FEE_USDC_X_1M }} \
             -e USER_SERVICE_URL=${{ vars.USER_SERVICE_URL }} \
             -e CONTRACT_SERVICE_URL=${{ vars.CONTRACT_SERVICE_URL }} \
             -e EMAIL_SERVICE_URL=${{ vars.EMAIL_SERVICE_URL }} \

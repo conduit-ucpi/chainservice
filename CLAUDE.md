@@ -150,7 +150,7 @@ The application requires these environment variables to start:
 - `CONTRACT_FACTORY_ADDRESS` - Escrow contract factory address
 - `RELAYER_PRIVATE_KEY` - **DEPRECATED in v4.0.1+** - Use JSON config file instead
 - `RELAYER_WALLET_ADDRESS` - Address of the relayer wallet
-- `CREATOR_FEE_USDC_X_1M` - Fee amount in USDC multiplied by 1 million (e.g., 1000000 = 1 USDC) to be paid to the creator on contract deposit (special case: 0.001 USDC contracts always have 0 creator fee)
+- `MIN_CREATOR_FEE_USDC_X_1M` - Minimum creator fee amount in USDC multiplied by 1 million (e.g., 1000000 = 1 USDC) used for validation (special case: 0.001 USDC contracts always have 0 fee). Actual fee is now hardcoded in the factory contract.
 - `USER_SERVICE_URL` - URL for user authentication service
 - `CONTRACT_SERVICE_URL` - URL for contract service (default: http://localhost:8080)
 - `SERVER_PORT` - Port for the service (default: 8978)

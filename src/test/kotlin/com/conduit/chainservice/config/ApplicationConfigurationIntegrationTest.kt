@@ -26,7 +26,7 @@ class ApplicationConfigurationIntegrationTest {
             .withPropertyValues(
                 "escrow.usdcContractAddress=0x1234567890123456789012345678901234567890",
                 "escrow.contractFactoryAddress=0x1234567890123456789012345678901234567890",
-                "escrow.creatorFee=1000000",
+                "escrow.minCreatorFee=1000000",
                 "escrow.limitCreateContract=273000",
                 "escrow.limitDeposit=86500",
                 "escrow.limitDispute=8800",
@@ -47,7 +47,7 @@ class ApplicationConfigurationIntegrationTest {
                 
                 assertEquals("0x1234567890123456789012345678901234567890", escrowProps.usdcContractAddress)
                 assertEquals("0x1234567890123456789012345678901234567890", escrowProps.contractFactoryAddress)
-                assertEquals(java.math.BigInteger.valueOf(1000000), escrowProps.creatorFee)
+                assertEquals(java.math.BigInteger.valueOf(1000000), escrowProps.minCreatorFee)
                 assertEquals(273000L, escrowProps.limitCreateContract)
                 assertEquals(86500L, escrowProps.limitDeposit)
                 assertEquals(8800L, escrowProps.limitDispute)
@@ -67,7 +67,7 @@ class ApplicationConfigurationIntegrationTest {
             .withPropertyValues(
                 "escrow.usdc-contract-address=0x1234567890123456789012345678901234567890",
                 "escrow.contract-factory-address=0x1234567890123456789012345678901234567890",
-                "escrow.creator-fee=1000000",
+                "escrow.min-creator-fee=1000000",
                 "escrow.gas.limit-create-contract=500000",
                 "escrow.gas.limit-deposit=74161",
                 "auth.user-service-url=http://localhost:8080",
@@ -102,7 +102,7 @@ class ApplicationConfigurationIntegrationTest {
                 val escrowProps = context.getBean(EscrowProperties::class.java)
                 val authProps = context.getBean(AuthProperties::class.java)
                 
-                assertEquals(java.math.BigInteger.ZERO, escrowProps.creatorFee) // Default value
+                assertEquals(java.math.BigInteger.ZERO, escrowProps.minCreatorFee) // Default value
                 assertEquals(273000L, escrowProps.limitCreateContract) // Default value
                 assertEquals(86500L, escrowProps.limitDeposit) // Default value
                 assertEquals(8800L, escrowProps.limitDispute) // Default value
