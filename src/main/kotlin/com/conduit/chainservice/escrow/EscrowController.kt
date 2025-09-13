@@ -336,6 +336,73 @@ class EscrowController(
         }
     }
 
+    @PostMapping("/claim-funds-as-gas-payer")
+    @Operation(
+        summary = "Claim Funds as Gas Payer",
+        description = "Allows anyone to request that the platform claim escrowed funds from an expired contract on behalf of the seller. This endpoint creates and signs the transaction using the gas payer's credentials. No authentication required since funds always go to the seller's address."
+    )
+    @ApiResponses(value = [
+        ApiResponse(
+            responseCode = "200",
+            description = "Funds claimed successfully",
+            content = [Content(schema = Schema(implementation = ClaimFundsResponse::class))]
+        ),
+        ApiResponse(
+            responseCode = "400",
+            description = "Invalid request or transaction failed",
+            content = [Content(schema = Schema(implementation = ClaimFundsResponse::class))]
+        ),
+        ApiResponse(
+            responseCode = "500",
+            description = "Internal server error",
+            content = [Content(schema = Schema(implementation = ClaimFundsResponse::class))]
+        )
+    ])
+    fun claimFundsAsGasPayer(
+        @Valid @RequestBody
+        @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            content = [Content(
+                examples = [ExampleObject(
+                    name = "Claim Funds as Gas Payer Example",
+                    value = """{"contractAddress": "0x1234567890abcdef1234567890abcdef12345678"}"""
+                )]
+            )]
+        )
+        request: ClaimFundsAsGasPayerRequest,
+        httpRequest: HttpServletRequest
+    ): ResponseEntity<ClaimFundsResponse> {
+        return try {
+            logger.info("Claim funds as gas payer request received for contract: ${request.contractAddress}")
+            
+            val result = runBlocking {
+                escrowTransactionService.claimFundsAsGasPayer(request.contractAddress)
+            }
+
+            val response = ClaimFundsResponse(
+                success = result.success,
+                transactionHash = result.transactionHash,
+                error = result.error
+            )
+
+            if (result.success) {
+                logger.info("Funds claimed as gas payer successfully: ${result.transactionHash}")
+                ResponseEntity.ok(response)
+            } else {
+                logger.error("Funds claiming as gas payer failed: ${result.error}")
+                ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response)
+            }
+
+        } catch (e: Exception) {
+            logger.error("Error in claim funds as gas payer endpoint", e)
+            val response = ClaimFundsResponse(
+                success = false,
+                transactionHash = null,
+                error = e.message ?: "Internal server error"
+            )
+            ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response)
+        }
+    }
+
     @PostMapping("/deposit-funds")
     @Operation(
         summary = "Deposit Funds",

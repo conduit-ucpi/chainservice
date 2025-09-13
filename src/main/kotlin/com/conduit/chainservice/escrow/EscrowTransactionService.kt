@@ -633,4 +633,102 @@ class EscrowTransactionService(
             null
         }
     }
+
+    /**
+     * Claims funds from an expired escrow contract as the gas payer
+     * This allows the platform to claim funds on behalf of sellers when needed
+     */
+    suspend fun claimFundsAsGasPayer(contractAddress: String): TransactionResult {
+        return try {
+            logger.info("Claiming funds as gas payer for contract: $contractAddress")
+            
+            val nonce = web3j.ethGetTransactionCount(
+                relayerCredentials.address,
+                DefaultBlockParameterName.PENDING
+            ).send().transactionCount
+            
+            val gasPrice = gasProvider.getGasPrice("claimFunds")
+            
+            val function = Function(
+                "claimFunds",
+                emptyList(),
+                emptyList()
+            )
+            val functionData = FunctionEncoder.encode(function)
+            
+            // Estimate gas for the claim funds transaction
+            val gasLimit = estimateGasWithBuffer(
+                relayerCredentials.address,
+                contractAddress,
+                functionData,
+                "claimFunds"
+            )
+            
+            val rawTransaction = RawTransaction.createTransaction(
+                nonce,
+                gasPrice,
+                gasLimit,
+                contractAddress,
+                BigInteger.ZERO,
+                functionData
+            )
+            
+            val signedTransaction = org.web3j.crypto.TransactionEncoder.signMessage(
+                rawTransaction,
+                chainId,
+                relayerCredentials
+            )
+            
+            // Send the signed transaction to gas-payer-service
+            val signedTransactionHex = Numeric.toHexString(signedTransaction)
+            val gasPayerResult = gasPayerServiceClient.processTransactionWithGasTransfer(
+                relayerCredentials.address, // Use relayer address as userWalletAddress since we're paying our own gas
+                signedTransactionHex,
+                "claimFundsAsGasPayer",
+                gasLimit
+            )
+            
+            if (!gasPayerResult.success) {
+                logger.error("Claim funds as gas payer failed via gas-payer-service: ${gasPayerResult.error}")
+                return TransactionResult(
+                    success = false,
+                    transactionHash = gasPayerResult.transactionHash,
+                    error = gasPayerResult.error
+                )
+            }
+            
+            val txHash = gasPayerResult.transactionHash!!
+            logger.info("Claim funds as gas payer transaction sent via gas-payer-service: $txHash")
+            
+            val receipt = waitForTransactionReceipt(txHash)
+            if (receipt != null && receipt.isStatusOK) {
+                // Invalidate cache for the contract whose funds were claimed
+                cacheInvalidationService.invalidateContractCacheIntelligently(
+                    contractAddress = contractAddress,
+                    operationType = "claimFundsAsGasPayer",
+                    newStatus = com.conduit.chainservice.escrow.models.ContractStatus.CLAIMED,
+                    transactionHash = txHash
+                )
+                
+                TransactionResult(
+                    success = true,
+                    transactionHash = txHash
+                )
+            } else {
+                TransactionResult(
+                    success = false,
+                    transactionHash = txHash,
+                    error = "Claim funds transaction failed"
+                )
+            }
+            
+        } catch (e: Exception) {
+            logger.error("Error claiming funds as gas payer for contract: $contractAddress", e)
+            TransactionResult(
+                success = false,
+                transactionHash = null,
+                error = e.message ?: "Failed to claim funds as gas payer"
+            )
+        }
+    }
 }
