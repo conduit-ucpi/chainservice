@@ -86,7 +86,9 @@ class AuthenticationFilter(
             "/actuator/info", 
             "/swagger-ui",
             "/api-docs",
-            "/v3/api-docs"
+            "/v3/api-docs",
+            "/api/chain/claim-funds-as-gas-payer",
+            "/api/chain/contracts/batch-info"
         )
         return publicPaths.any { uri.startsWith(it) }
     }
