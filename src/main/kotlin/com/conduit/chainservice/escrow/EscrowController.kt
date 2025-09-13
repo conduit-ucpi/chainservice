@@ -1248,11 +1248,13 @@ class EscrowController(
                 )
             }
             
-            // For non-admin users, filter contracts to only those they have access to
-            val allowedContracts = if (userType == "admin") {
+            // For unauthenticated requests (service-to-service calls), allow full access
+            // For authenticated users, check permissions
+            val allowedContracts = if (userType == null || userType == "admin") {
+                // No auth (internal service call) or admin user - allow all contracts
                 request.contractAddresses
             } else {
-                // Get user's wallet address for authorization
+                // Regular authenticated user - check wallet address
                 val userWalletAddress = httpRequest.getAttribute("userWallet") as? String
                 
                 if (userWalletAddress == null) {
@@ -1275,10 +1277,13 @@ class EscrowController(
                 contractQueryService.getBatchContractInfo(allowedContracts)
             }
             
-            // For non-admin users, filter out contracts they don't have access to
-            val filteredResults = if (userType == "admin") {
+            // For unauthenticated or admin users, return all results
+            // For regular authenticated users, filter out contracts they don't have access to
+            val filteredResults = if (userType == null || userType == "admin") {
+                // No auth (internal service call) or admin user - return all results
                 batchResults
             } else {
+                // Regular authenticated user - filter by wallet address
                 val userWalletAddress = httpRequest.getAttribute("userWallet") as? String
                 batchResults.mapValues { (contractAddress, result) ->
                     if (result.success && result.contractInfo != null && userWalletAddress != null) {
