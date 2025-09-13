@@ -31,7 +31,7 @@ class ConfigurationLogger(
         logger.info("Loaded escrow configuration:")
         logger.info("  - USDC contract: ${escrowProperties.usdcContractAddress}")
         logger.info("  - Factory contract: ${escrowProperties.contractFactoryAddress}")
-        logger.info("  - Creator fee: ${escrowProperties.creatorFee}")
+        logger.info("  - Minimum creator fee: ${escrowProperties.minCreatorFee}")
         logger.info("  - Gas limits:")
         logger.info("    - Create contract: ${escrowProperties.limitCreateContract}")
         logger.info("    - Deposit: ${escrowProperties.limitDeposit}")

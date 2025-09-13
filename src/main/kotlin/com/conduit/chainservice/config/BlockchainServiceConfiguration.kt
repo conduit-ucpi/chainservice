@@ -41,7 +41,7 @@ class BlockchainServiceConfiguration(
     fun contractFactoryAddress(): String = escrowProperties.contractFactoryAddress
 
     @Bean
-    fun creatorFee(): java.math.BigInteger = escrowProperties.creatorFee
+    fun minCreatorFee(): java.math.BigInteger = escrowProperties.minCreatorFee
 
     // Security configuration path for SecurityConfigurationService
     @Bean
