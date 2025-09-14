@@ -1,6 +1,5 @@
 package com.conduit.chainservice.escrow.models
 
-import com.conduit.chainservice.escrow.validation.ConditionalEmailFields
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.NotNull
 import jakarta.validation.constraints.Pattern
@@ -34,7 +33,6 @@ data class CreateContractRequest(
     val description: String
 )
 
-@ConditionalEmailFields
 data class RaiseDisputeRequest(
     @field:NotBlank(message = "Contract address is required")
     val contractAddress: String,
@@ -44,17 +42,6 @@ data class RaiseDisputeRequest(
     
     @field:NotBlank(message = "Signed transaction is required")
     val signedTransaction: String,
-    
-    val buyerEmail: String? = null,
-    val sellerEmail: String? = null,
-    val contractDescription: String? = null,
-    val amount: String? = null,
-    val currency: String? = null,
-    val payoutDateTime: String? = null,
-    val link: String? = null,
-    
-    @field:NotBlank(message = "Product name is required")
-    val productName: String,
     
     val reason: String? = null,
     val refundPercent: Int? = null,
@@ -93,7 +80,6 @@ data class DepositFundsRequest(
     val contractLink: String? = null
 )
 
-@ConditionalEmailFields
 data class ResolveDisputeRequest(
     @field:NotBlank(message = "Contract address is required")
     val contractAddress: String,

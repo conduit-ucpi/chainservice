@@ -1,13 +1,13 @@
 package com.conduit.chainservice.escrow
 
-import com.conduit.chainservice.escrow.models.RaiseDisputeRequest
 import com.conduit.chainservice.escrow.validation.EmailFieldValidator
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Assertions.*
 
 /**
- * Test class to verify the raise dispute validation logic for email notifications.
- * This specifically tests the fix for the issue where email notifications show "N/A" for required fields.
+ * Test class to verify email validation utility methods.
+ * Note: RaiseDisputeRequest no longer has email fields since email handling moved to contractservice.
+ * These tests validate the email utility methods still used by other request types.
  */
 class RaiseDisputeValidationTest {
 

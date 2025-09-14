@@ -128,7 +128,7 @@ class EscrowController(
     @PostMapping("/raise-dispute")
     @Operation(
         summary = "Raise Dispute",
-        description = "Raises a dispute on an existing escrow contract by relaying a user-signed transaction. The service provides gas money and forwards the user-signed transaction. The frontend must provide a transaction signed by the buyer or seller's wallet. Optional email notification fields can be provided, including a link parameter that will be included in dispute notification emails."
+        description = "Raises a dispute on an existing escrow contract by relaying a user-signed transaction. The service provides gas money and forwards the user-signed transaction. The frontend must provide a transaction signed by the buyer or seller's wallet."
     )
     @ApiResponses(value = [
         ApiResponse(
@@ -148,7 +148,7 @@ class EscrowController(
             content = [Content(
                 examples = [ExampleObject(
                     name = "Raise Dispute Example",
-                    value = """{"contractAddress": "0x1234567890abcdef1234567890abcdef12345678", "userWalletAddress": "0x9876543210fedcba9876543210fedcba98765432", "signedTransaction": "0xf86c8082520894...", "productName": "Sample Product", "buyerEmail": "buyer@example.com", "sellerEmail": "seller@example.com", "contractDescription": "Product purchase", "amount": "1500000", "currency": "microUSDC", "payoutDateTime": "2024-01-15T10:30:00.000Z", "serviceLink": "https://service.link", "reason": "The product was not delivered as described", "refundPercent": 50, "databaseId": "507f1f77bcf86cd799439011"}"""
+                    value = """{"contractAddress": "0x1234567890abcdef1234567890abcdef12345678", "userWalletAddress": "0x9876543210fedcba9876543210fedcba98765432", "signedTransaction": "0xf86c8082520894...", "reason": "The product was not delivered as described", "refundPercent": 50, "databaseId": "507f1f77bcf86cd799439011"}"""
                 )]
             )]
         )
@@ -189,73 +189,6 @@ class EscrowController(
                     }
                 } else {
                     logger.info("No databaseId provided in dispute request, skipping contract service update")
-                }
-                
-                // Send dispute raised email notifications if all required fields are provided
-                logger.info("Checking if email notification can be sent. Field values: buyerEmail=${request.buyerEmail}, sellerEmail=${request.sellerEmail}, amount=${request.amount}, payoutDateTime=${request.payoutDateTime}, contractDescription=${request.contractDescription}, productName=${request.productName}, currency=${request.currency}")
-                
-                if (EmailFieldValidator.canSendDisputeRaisedEmail(
-                    request.buyerEmail,
-                    request.sellerEmail,
-                    request.amount,
-                    request.payoutDateTime,
-                    request.contractDescription,
-                    request.productName
-                )) {
-                    try {
-                        // Validate that all fields are truly non-null before sending
-                        val validatedAmount = request.amount ?: throw IllegalStateException("Amount is null despite validation")
-                        val validatedPayoutDateTime = request.payoutDateTime ?: throw IllegalStateException("PayoutDateTime is null despite validation")
-                        val validatedContractDescription = request.contractDescription ?: throw IllegalStateException("ContractDescription is null despite validation")
-                        val validatedProductName = request.productName
-                        val validatedBuyerEmail = request.buyerEmail ?: throw IllegalStateException("BuyerEmail is null despite validation")
-                        val validatedSellerEmail = request.sellerEmail ?: throw IllegalStateException("SellerEmail is null despite validation")
-                        val validatedCurrency = request.currency ?: "USDC"
-                        val validatedLink = request.link ?: "$serviceLink/contract/${request.contractAddress}"
-                        
-                        logger.info("Sending dispute raised emails with validated values: amount=$validatedAmount, payoutDateTime=$validatedPayoutDateTime, description=$validatedContractDescription, product=$validatedProductName, link=$validatedLink")
-                        
-                        // Send notification to both parties about the dispute
-                        runBlocking {
-                            // Notify buyer
-                            emailServiceClient.sendDisputeRaised(
-                                recipientEmail = validatedBuyerEmail,
-                                buyerEmail = validatedBuyerEmail,
-                                sellerEmail = validatedSellerEmail,
-                                amount = validatedAmount,
-                                currency = validatedCurrency,
-                                contractDescription = validatedContractDescription,
-                                payoutDateTime = validatedPayoutDateTime,
-                                productName = validatedProductName,
-                                link = validatedLink,
-                                reason = request.reason,
-                                refundPercent = request.refundPercent,
-                                httpRequest = httpRequest
-                            ).block()
-                            
-                            // Notify seller
-                            emailServiceClient.sendDisputeRaised(
-                                recipientEmail = validatedSellerEmail,
-                                buyerEmail = validatedBuyerEmail,
-                                sellerEmail = validatedSellerEmail,
-                                amount = validatedAmount,
-                                currency = validatedCurrency,
-                                contractDescription = validatedContractDescription,
-                                payoutDateTime = validatedPayoutDateTime,
-                                productName = validatedProductName,
-                                link = validatedLink,
-                                reason = request.reason,
-                                refundPercent = request.refundPercent,
-                                httpRequest = httpRequest
-                            ).block()
-                        }
-                        logger.info("Dispute raised notification emails sent successfully to both parties")
-                    } catch (e: Exception) {
-                        // Log the error but don't fail the dispute response since the blockchain transaction succeeded
-                        logger.error("Failed to send dispute raised notification emails", e)
-                    }
-                } else {
-                    logger.warn("Email notification skipped for dispute raised - invalid or missing required fields. Field validation details: buyerEmail=${request.buyerEmail?.let { "present(${it.length} chars)" } ?: "null"}, sellerEmail=${request.sellerEmail?.let { "present(${it.length} chars)" } ?: "null"}, amount=${request.amount?.let { "present($it)" } ?: "null"}, payoutDateTime=${request.payoutDateTime?.let { "present($it)" } ?: "null"}, contractDescription=${request.contractDescription?.let { "present(${it.length} chars)" } ?: "null"}, productName=present(${request.productName})")
                 }
                 
                 ResponseEntity.ok(response)

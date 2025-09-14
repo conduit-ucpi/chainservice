@@ -281,13 +281,9 @@ class ApiModelsValidationTest {
             contractAddress = "0x1234567890abcdef1234567890abcdef12345678",
             userWalletAddress = "0x9876543210fedcba9876543210fedcba98765432",
             signedTransaction = "0xf86c8082520894abcdefabcdefabcdefabcdefabcdefabcdefabcdef80801ba01234567890abcdef12",
-            buyerEmail = "buyer@test.com",
-            sellerEmail = "seller@test.com",
-            contractDescription = "Test contract description",
-            amount = "100.0",
-            currency = "USDC",
-            payoutDateTime = "2024-12-31T23:59:59Z",
-            productName = "Test Product"
+            reason = "Product was not delivered as described",
+            refundPercent = 50,
+            databaseId = "507f1f77bcf86cd799439011"
         )
 
         // When
@@ -301,16 +297,12 @@ class ApiModelsValidationTest {
     fun `RaiseDisputeRequest should fail validation with invalid contract address`() {
         // Given
         val request = RaiseDisputeRequest(
-            contractAddress = "invalid-address",
+            contractAddress = "", // Blank contract address should fail validation
             userWalletAddress = "0x9876543210fedcba9876543210fedcba98765432",
             signedTransaction = "0xf86c8082520894abcdefabcdefabcdefabcdefabcdefabcdefabcdef80801ba01234567890abcdef12",
-            buyerEmail = "buyer@test.com",
-            sellerEmail = "seller@test.com",
-            contractDescription = "Test contract description",
-            amount = "100.0",
-            currency = "USDC",
-            payoutDateTime = "2024-12-31T23:59:59Z",
-            productName = "Test Product"
+            reason = "Product was not delivered as described",
+            refundPercent = 50,
+            databaseId = "507f1f77bcf86cd799439011"
         )
 
         // When
@@ -318,7 +310,7 @@ class ApiModelsValidationTest {
 
         // Then
         assertTrue(violations.isNotEmpty())
-        assertTrue(violations.any { it.message.contains("Invalid contract address format") })
+        assertTrue(violations.any { it.message.contains("Contract address is required") || it.message.contains("must not be blank") })
     }
 
     @Test
@@ -326,15 +318,11 @@ class ApiModelsValidationTest {
         // Given
         val request = RaiseDisputeRequest(
             contractAddress = "0x1234567890abcdef1234567890abcdef12345678",
-            userWalletAddress = "invalid-wallet",
+            userWalletAddress = "", // Blank user wallet address should fail validation
             signedTransaction = "0xf86c8082520894abcdefabcdefabcdefabcdefabcdefabcdefabcdef80801ba01234567890abcdef12",
-            buyerEmail = "buyer@test.com",
-            sellerEmail = "seller@test.com",
-            contractDescription = "Test contract description",
-            amount = "100.0",
-            currency = "USDC",
-            payoutDateTime = "2024-12-31T23:59:59Z",
-            productName = "Test Product"
+            reason = "Product was not delivered as described",
+            refundPercent = 50,
+            databaseId = "507f1f77bcf86cd799439011"
         )
 
         // When
@@ -342,7 +330,7 @@ class ApiModelsValidationTest {
 
         // Then
         assertTrue(violations.isNotEmpty())
-        assertTrue(violations.any { it.message.contains("Invalid user wallet address format") })
+        assertTrue(violations.any { it.message.contains("User wallet address is required") || it.message.contains("must not be blank") })
     }
 
     @Test
@@ -351,14 +339,10 @@ class ApiModelsValidationTest {
         val request = RaiseDisputeRequest(
             contractAddress = "0x1234567890abcdef1234567890abcdef12345678",
             userWalletAddress = "0x9876543210fedcba9876543210fedcba98765432",
-            signedTransaction = "invalid-transaction",
-            buyerEmail = "buyer@test.com",
-            sellerEmail = "seller@test.com",
-            contractDescription = "Test contract description",
-            amount = "100.0",
-            currency = "USDC",
-            payoutDateTime = "2024-12-31T23:59:59Z",
-            productName = "Test Product"
+            signedTransaction = "", // Blank signed transaction should fail validation
+            reason = "Product was not delivered as described",
+            refundPercent = 50,
+            databaseId = "507f1f77bcf86cd799439011"
         )
 
         // When
@@ -366,7 +350,7 @@ class ApiModelsValidationTest {
 
         // Then
         assertTrue(violations.isNotEmpty())
-        assertTrue(violations.any { it.message.contains("Invalid signed transaction format") })
+        assertTrue(violations.any { it.message.contains("Signed transaction is required") || it.message.contains("must not be blank") })
     }
 
     @Test

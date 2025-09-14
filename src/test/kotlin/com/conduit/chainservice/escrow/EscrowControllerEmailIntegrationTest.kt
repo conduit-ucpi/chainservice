@@ -106,19 +106,15 @@ class EscrowControllerEmailIntegrationTest {
     }
 
     @Test
-    fun `raise dispute with complete email fields should send email notifications`() {
-        // Arrange
+    fun `raise dispute should complete blockchain transaction successfully`() {
+        // Arrange - simplified without email fields
         val request = RaiseDisputeRequest(
             contractAddress = "0x1234567890abcdef1234567890abcdef12345678",
             userWalletAddress = "0x9876543210fedcba9876543210fedcba98765432",
             signedTransaction = "0xf86c8082520894...",
-            buyerEmail = "buyer@example.com",
-            sellerEmail = "seller@example.com",
-            amount = "100.00 USDC",
-            currency = "USDC",
-            payoutDateTime = "2024-12-31T23:59:59Z",
-            contractDescription = "Test escrow contract",
-            productName = "Test Product"
+            reason = "Product was not delivered as described",
+            refundPercent = 50,
+            databaseId = "507f1f77bcf86cd799439011"
         )
 
         runBlocking {
@@ -132,8 +128,8 @@ class EscrowControllerEmailIntegrationTest {
             ))
         }
 
-        whenever(emailServiceClient.sendDisputeRaised(any(), any(), any(), any(), any(), any(), any(), any(), any(), anyOrNull(), anyOrNull(), any()))
-            .thenReturn(Mono.just(SendEmailResponse(true, "msg-123", "Email sent successfully")))
+        whenever(contractServiceClient.updateContractWithDispute(any(), any(), any(), any()))
+            .thenReturn(Mono.just(mapOf("success" to true)))
 
         // Act & Assert
         mockMvc.perform(post("/api/chain/raise-dispute")
@@ -142,53 +138,73 @@ class EscrowControllerEmailIntegrationTest {
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.success").value(true))
 
-        // Verify email service was called twice (buyer and seller)
-        verify(emailServiceClient, times(2)).sendDisputeRaised(
+        // Verify blockchain transaction was called
+        runBlocking {
+            verify(escrowTransactionService, times(1)).raiseDisputeWithGasTransfer(
+                eq(request.userWalletAddress),
+                eq(request.signedTransaction)
+            )
+        }
+        
+        // Verify contract service was updated
+        verify(contractServiceClient, times(1)).updateContractWithDispute(
+            eq(request.databaseId!!), eq(request.reason), eq(request.refundPercent), any()
+        )
+
+        // Verify email service is never called (now handled by contract service)
+        verify(emailServiceClient, never()).sendDisputeRaised(
             any(), any(), any(), any(), any(), any(), any(), any(), any(), anyOrNull(), anyOrNull(), any()
         )
     }
 
     @Test
-    fun `raise dispute with incomplete email fields should fail validation`() {
-        // Arrange - productName is now required, so this test should check validation failure for a different reason
+    fun `raise dispute with invalid contract address should fail validation`() {
+        // Arrange - invalid contract address format
         val request = RaiseDisputeRequest(
-            contractAddress = "0x1234567890abcdef1234567890abcdef12345678",
+            contractAddress = "invalid-address", // Invalid contract address format
             userWalletAddress = "0x9876543210fedcba9876543210fedcba98765432",
             signedTransaction = "0xf86c8082520894...",
-            buyerEmail = "buyer@example.com",
-            sellerEmail = "seller@example.com",
-            amount = "", // Empty amount should fail validation
-            currency = "USDC",
-            payoutDateTime = "2024-12-31T23:59:59Z",
-            contractDescription = "Test escrow contract",
-            productName = "Test Product"
+            reason = "Product was not delivered as described",
+            refundPercent = 50,
+            databaseId = "507f1f77bcf86cd799439011"
         )
 
-        // Act & Assert - should fail validation
+        runBlocking {
+            whenever(escrowTransactionService.raiseDisputeWithGasTransfer(
+                eq(request.userWalletAddress),
+                eq(request.signedTransaction)
+            )).thenReturn(TransactionResult(
+                success = false,
+                transactionHash = null,
+                error = "Transaction failed due to invalid contract address"
+            ))
+        }
+
+        // Act & Assert - should fail at blockchain level due to invalid address
         mockMvc.perform(post("/api/chain/raise-dispute")
             .contentType(MediaType.APPLICATION_JSON)
             .content(objectMapper.writeValueAsString(request)))
             .andExpect(status().isBadRequest)
 
-        // Verify email service was never called
-        verify(emailServiceClient, never()).sendDisputeRaised(
-            any(), any(), any(), any(), any(), any(), any(), any(), any(), anyOrNull(), anyOrNull(), any()
-        )
-        
-        // Verify transaction service was never called due to validation failure
+        // Verify transaction service was called but failed
         runBlocking {
-            verify(escrowTransactionService, never()).raiseDisputeWithGasTransfer(any(), any())
+            verify(escrowTransactionService, times(1)).raiseDisputeWithGasTransfer(any(), any())
         }
+        
+        // Verify contract service was never called due to transaction failure
+        verify(contractServiceClient, never()).updateContractWithDispute(any(), any(), any(), any())
     }
 
     @Test
-    fun `raise dispute with no email fields should skip email notifications`() {
-        // Arrange - no email fields provided
+    fun `raise dispute without database id should skip contract service update`() {
+        // Arrange - no database id provided
         val request = RaiseDisputeRequest(
             contractAddress = "0x1234567890abcdef1234567890abcdef12345678",
             userWalletAddress = "0x9876543210fedcba9876543210fedcba98765432",
             signedTransaction = "0xf86c8082520894...",
-            productName = "Test Product"
+            reason = "Product was not delivered as described",
+            refundPercent = 50
+            // databaseId is null
         )
 
         runBlocking {
@@ -209,7 +225,18 @@ class EscrowControllerEmailIntegrationTest {
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.success").value(true))
 
-        // Verify email service was never called
+        // Verify blockchain transaction was called
+        runBlocking {
+            verify(escrowTransactionService, times(1)).raiseDisputeWithGasTransfer(
+                eq(request.userWalletAddress),
+                eq(request.signedTransaction)
+            )
+        }
+
+        // Verify contract service was never called since no database id provided
+        verify(contractServiceClient, never()).updateContractWithDispute(any(), any(), any(), any())
+        
+        // Verify email service was never called (emails handled by contract service)
         verify(emailServiceClient, never()).sendDisputeRaised(
             any(), any(), any(), any(), any(), any(), any(), any(), any(), anyOrNull(), anyOrNull(), any()
         )

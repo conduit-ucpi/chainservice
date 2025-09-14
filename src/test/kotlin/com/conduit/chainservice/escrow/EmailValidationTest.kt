@@ -24,85 +24,47 @@ class EmailValidationTest {
     }
 
     @Test
-    fun `RaiseDisputeRequest with no email fields should pass validation`() {
+    fun `RaiseDisputeRequest with valid core fields should pass validation`() {
         val request = RaiseDisputeRequest(
             contractAddress = "0x1234567890abcdef1234567890abcdef12345678",
             userWalletAddress = "0x9876543210fedcba9876543210fedcba98765432",
             signedTransaction = "0xf86c8082520894...",
-            buyerEmail = "buyer@example.com",
-            sellerEmail = "seller@example.com",
-            contractDescription = "Test contract description",
-            amount = "100.0",
-            currency = "USDC",
-            payoutDateTime = "2024-12-31T23:59:59Z",
-            productName = "Test Product"
+            reason = "Product was not delivered as described",
+            refundPercent = 50,
+            databaseId = "507f1f77bcf86cd799439011"
         )
 
         val violations: Set<ConstraintViolation<RaiseDisputeRequest>> = validator.validate(request)
-        assertTrue(violations.isEmpty(), "Should pass validation when no email fields provided")
+        assertTrue(violations.isEmpty(), "Should pass validation with valid core fields")
     }
 
     @Test
-    fun `RaiseDisputeRequest with only buyer email should pass validation`() {
+    fun `RaiseDisputeRequest with minimal fields should pass validation`() {
         val request = RaiseDisputeRequest(
             contractAddress = "0x1234567890abcdef1234567890abcdef12345678",
             userWalletAddress = "0x9876543210fedcba9876543210fedcba98765432",
-            signedTransaction = "0xf86c8082520894...",
-            buyerEmail = "buyer@example.com",
-            sellerEmail = "seller@example.com",
-            contractDescription = "Test contract description",
-            amount = "100.0",
-            currency = "USDC",
-            payoutDateTime = "2024-12-31T23:59:59Z",
-            productName = "Test Product"
+            signedTransaction = "0xf86c8082520894..."
+            // All other fields are optional
         )
 
         val violations: Set<ConstraintViolation<RaiseDisputeRequest>> = validator.validate(request)
-        assertTrue(violations.isEmpty(), "Should pass validation when only buyer email provided")
+        assertTrue(violations.isEmpty(), "Should pass validation with only required fields")
     }
 
     @Test
-    fun `RaiseDisputeRequest with both emails but missing required fields should fail validation`() {
+    fun `RaiseDisputeRequest with blank contract address should fail validation`() {
         val request = RaiseDisputeRequest(
-            contractAddress = "0x1234567890abcdef1234567890abcdef12345678",
+            contractAddress = "", // Empty contract address should fail
             userWalletAddress = "0x9876543210fedcba9876543210fedcba98765432",
             signedTransaction = "0xf86c8082520894...",
-            buyerEmail = "buyer@example.com",
-            sellerEmail = "seller@example.com",
-            contractDescription = "N/A", // Invalid value that should trigger validation failure
-            amount = "N/A", // Invalid value that should trigger validation failure
-            currency = "USDC",
-            payoutDateTime = "N/A", // Invalid value that should trigger validation failure
-            productName = "Test Product"
+            reason = "Product was not delivered as described"
         )
 
         val violations: Set<ConstraintViolation<RaiseDisputeRequest>> = validator.validate(request)
-        assertFalse(violations.isEmpty(), "Should fail validation when email fields provided but required fields missing")
+        assertFalse(violations.isEmpty(), "Should fail validation when contract address is blank")
         
         val violationMessage = violations.first().message
-        assertTrue(violationMessage.contains("amount"), "Should mention missing amount field")
-        assertTrue(violationMessage.contains("payoutDateTime"), "Should mention missing payoutDateTime field")
-        assertTrue(violationMessage.contains("contractDescription"), "Should mention missing contractDescription field")
-        // productName is now required with @NotBlank so it cannot be N/A at the model level
-    }
-
-    @Test
-    fun `RaiseDisputeRequest with all required fields should pass validation`() {
-        val request = RaiseDisputeRequest(
-            contractAddress = "0x1234567890abcdef1234567890abcdef12345678",
-            userWalletAddress = "0x9876543210fedcba9876543210fedcba98765432",
-            signedTransaction = "0xf86c8082520894...",
-            buyerEmail = "buyer@example.com",
-            sellerEmail = "seller@example.com",
-            amount = "100.00 USDC",
-            currency = "USDC",
-            payoutDateTime = "2024-12-31T23:59:59Z",
-            contractDescription = "Test escrow contract",
-            productName = "Test Product"
-        )
-
-        val violations: Set<ConstraintViolation<RaiseDisputeRequest>> = validator.validate(request)
-        assertTrue(violations.isEmpty(), "Should pass validation when all required fields provided")
+        assertTrue(violationMessage.contains("Contract address is required"), "Should mention contract address is required")
     }
 
     @Test
@@ -127,7 +89,7 @@ class EmailValidationTest {
     }
 
     @Test
-    fun `ResolveDisputeRequest with emails but missing required fields should fail validation`() {
+    fun `ResolveDisputeRequest with valid fields should pass validation`() {
         val request = ResolveDisputeRequest(
             contractAddress = "0x1234567890abcdef1234567890abcdef12345678",
             productName = "Test Product",
@@ -135,23 +97,16 @@ class EmailValidationTest {
             sellerPercentage = 40.0,
             buyerEmail = "buyer@example.com",
             sellerEmail = "seller@example.com",
-            contractDescription = "N/A", // Invalid value
-            amount = "N/A", // Invalid value
+            contractDescription = "Valid contract description",
+            amount = "100.00 USDC",
             currency = "USDC",
-            payoutDateTime = "N/A", // Invalid value
-            sellerActualAmount = "N/A", // Invalid value
-            buyerActualAmount = "N/A" // Invalid value
+            payoutDateTime = "2024-12-31T23:59:59Z",
+            sellerActualAmount = "40.00 USDC",
+            buyerActualAmount = "60.00 USDC"
         )
 
         val violations: Set<ConstraintViolation<ResolveDisputeRequest>> = validator.validate(request)
-        assertFalse(violations.isEmpty(), "Should fail validation when email fields provided but required fields missing")
-        
-        val violationMessage = violations.first().message
-        assertTrue(violationMessage.contains("amount"), "Should mention missing amount field")
-        assertTrue(violationMessage.contains("payoutDateTime"), "Should mention missing payoutDateTime field")
-        assertTrue(violationMessage.contains("contractDescription"), "Should mention missing contractDescription field")
-        assertTrue(violationMessage.contains("sellerActualAmount"), "Should mention missing sellerActualAmount field")
-        assertTrue(violationMessage.contains("buyerActualAmount"), "Should mention missing buyerActualAmount field")
+        assertTrue(violations.isEmpty(), "Should pass validation with valid fields since ConditionalEmailFields was removed")
     }
 
     @Test
