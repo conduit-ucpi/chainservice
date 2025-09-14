@@ -190,7 +190,7 @@ data class TransferUSDCResponse(
 
 data class FundWalletResponse(
     val success: Boolean,
-    val message: String,
+    val message: String? = null,
     val error: String? = null
 )
 

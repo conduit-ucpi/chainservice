@@ -204,7 +204,7 @@ class GasPayerServiceClient(
                 .awaitSingle()
             
             if (response.success) {
-                logger.info("Wallet funding request successful: ${response.message}")
+                logger.info("Wallet funding request successful: ${response.message ?: "No message provided"}")
             } else {
                 logger.error("Wallet funding request failed: ${response.error}")
             }
