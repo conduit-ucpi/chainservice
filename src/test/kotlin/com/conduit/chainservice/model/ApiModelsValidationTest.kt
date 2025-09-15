@@ -28,7 +28,8 @@ class ApiModelsValidationTest {
             seller = "0x9876543210fedcba9876543210fedcba98765432",
             amount = BigInteger.valueOf(1000000),
             expiryTimestamp = Instant.now().plusSeconds(3600).epochSecond,
-            description = "Valid test contract"
+            description = "Valid test contract",
+            contractserviceId = "507f1f77bcf86cd799439011"
         )
 
         // When
@@ -47,7 +48,8 @@ class ApiModelsValidationTest {
             seller = "0x9876543210fedcba9876543210fedcba98765432",
             amount = BigInteger.valueOf(1000000),
             expiryTimestamp = Instant.now().plusSeconds(3600).epochSecond,
-            description = "Test contract"
+            description = "Test contract",
+            contractserviceId = "507f1f77bcf86cd799439011"
         )
 
         // When
@@ -67,7 +69,8 @@ class ApiModelsValidationTest {
             seller = "0x9876543210fedcba9876543210fedcba98765432",
             amount = BigInteger.valueOf(1000000),
             expiryTimestamp = Instant.now().plusSeconds(3600).epochSecond,
-            description = "Test contract"
+            description = "Test contract",
+            contractserviceId = "507f1f77bcf86cd799439011"
         )
 
         // When
@@ -87,7 +90,8 @@ class ApiModelsValidationTest {
             seller = "0x9876543210fedcba9876543210fedcba98765432",
             amount = BigInteger.valueOf(1000000),
             expiryTimestamp = Instant.now().plusSeconds(3600).epochSecond,
-            description = "Test contract"
+            description = "Test contract",
+            contractserviceId = "507f1f77bcf86cd799439011"
         )
 
         // When
@@ -107,7 +111,8 @@ class ApiModelsValidationTest {
             seller = "0x9876543210fedcba9876543210fedcba98765432",
             amount = BigInteger.valueOf(-1),
             expiryTimestamp = Instant.now().plusSeconds(3600).epochSecond,
-            description = "Test contract"
+            description = "Test contract",
+            contractserviceId = "507f1f77bcf86cd799439011"
         )
 
         // When
@@ -127,7 +132,8 @@ class ApiModelsValidationTest {
             seller = "0x9876543210fedcba9876543210fedcba98765432",
             amount = BigInteger.ZERO,
             expiryTimestamp = Instant.now().plusSeconds(3600).epochSecond,
-            description = "Test contract"
+            description = "Test contract",
+            contractserviceId = "507f1f77bcf86cd799439011"
         )
 
         // When
@@ -148,7 +154,8 @@ class ApiModelsValidationTest {
             seller = "0x9876543210fedcba9876543210fedcba98765432",
             amount = BigInteger.valueOf(1000000),
             expiryTimestamp = Instant.now().plusSeconds(3600).epochSecond,
-            description = longDescription
+            description = longDescription,
+            contractserviceId = "507f1f77bcf86cd799439011"
         )
 
         // When
@@ -157,6 +164,27 @@ class ApiModelsValidationTest {
         // Then
         assertTrue(violations.isNotEmpty())
         assertTrue(violations.any { it.message.contains("Description must be 160 characters or less") })
+    }
+
+    @Test
+    fun `CreateContractRequest should fail validation with blank contractserviceId`() {
+        // Given
+        val request = CreateContractRequest(
+            tokenAddress = "0xA0b86a33E6441A9A0d7fc0C7F3C0A0D3E6A0b86a",
+            buyer = "0x1234567890abcdef1234567890abcdef12345678",
+            seller = "0x9876543210fedcba9876543210fedcba98765432",
+            amount = BigInteger.valueOf(1000000),
+            expiryTimestamp = Instant.now().plusSeconds(3600).epochSecond,
+            description = "Valid test contract",
+            contractserviceId = "" // Empty string should fail validation
+        )
+
+        // When
+        val violations = validator.validate(request)
+
+        // Then
+        assertTrue(violations.isNotEmpty())
+        assertTrue(violations.any { it.message.contains("Contract service ID is required") })
     }
 
     @Test
@@ -398,7 +426,8 @@ class ApiModelsValidationTest {
             seller = "invalid", // Invalid: wrong format
             amount = BigInteger.valueOf(-1), // Invalid: negative
             expiryTimestamp = 0L, // Invalid: zero
-            description = "" // Invalid: blank
+            description = "", // Invalid: blank
+            contractserviceId = "" // Invalid: blank
         )
 
         // When
@@ -423,7 +452,8 @@ class ApiModelsValidationTest {
             seller = "0x9876543210fedcba9876543210fedcba98765432", // Lowercase hex
             amount = BigInteger.valueOf(1000000),
             expiryTimestamp = Instant.now().plusSeconds(3600).epochSecond,
-            description = "Test contract"
+            description = "Test contract",
+            contractserviceId = "507f1f77bcf86cd799439011"
         )
 
         // When
@@ -442,7 +472,8 @@ class ApiModelsValidationTest {
             seller = "0x9876543210fedcba9876543210fedcba98765432",
             amount = BigInteger.valueOf(1000000),
             expiryTimestamp = Instant.now().plusSeconds(3600).epochSecond,
-            description = "Test contract"
+            description = "Test contract",
+            contractserviceId = "507f1f77bcf86cd799439011"
         )
 
         // When
@@ -462,7 +493,8 @@ class ApiModelsValidationTest {
             seller = "0x9876543210fedcba9876543210fedcba98765432",
             amount = BigInteger.valueOf(1000000),
             expiryTimestamp = Instant.now().plusSeconds(3600).epochSecond,
-            description = "Test contract"
+            description = "Test contract",
+            contractserviceId = "507f1f77bcf86cd799439011"
         )
 
         // When

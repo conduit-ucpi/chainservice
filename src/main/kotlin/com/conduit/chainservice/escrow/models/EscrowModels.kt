@@ -30,7 +30,10 @@ data class CreateContractRequest(
     
     @field:NotBlank(message = "Description is required")
     @field:Size(max = 160, message = "Description must be 160 characters or less")
-    val description: String
+    val description: String,
+    
+    @field:NotBlank(message = "Contract service ID is required")
+    val contractserviceId: String
 )
 
 data class RaiseDisputeRequest(

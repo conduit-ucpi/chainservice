@@ -52,7 +52,7 @@ class EscrowController(
     @PostMapping("/create-contract")
     @Operation(
         summary = "Create Escrow Contract",
-        description = "Deploys a new escrow contract by calling the factory contract. The service pays the gas fees. Creator fee is determined by the CREATOR_FEE environment variable, except for 0.001 USDC contracts which have zero creator fee."
+        description = "Deploys a new escrow contract by calling the factory contract. The service pays the gas fees. Creator fee is determined by the CREATOR_FEE environment variable, except for 0.001 USDC contracts which have zero creator fee. The contract service will be notified of the successful deployment with the provided contractserviceId."
     )
     @ApiResponses(value = [
         ApiResponse(
@@ -77,7 +77,7 @@ class EscrowController(
             content = [Content(
                 examples = [ExampleObject(
                     name = "Create Contract Example",
-                    value = """{"tokenAddress": "0xA0b86a33E6441A9A0d7fc0C7F3C0A0D3E6A0b86a", "buyer": "0x1234567890abcdef1234567890abcdef12345678", "seller": "0x9876543210fedcba9876543210fedcba98765432", "amount": "1000000", "expiryTimestamp": 1735689600, "description": "Product delivery escrow"}"""  
+                    value = """{"tokenAddress": "0xA0b86a33E6441A9A0d7fc0C7F3C0A0D3E6A0b86a", "buyer": "0x1234567890abcdef1234567890abcdef12345678", "seller": "0x9876543210fedcba9876543210fedcba98765432", "amount": "1000000", "expiryTimestamp": 1735689600, "description": "Product delivery escrow", "contractserviceId": "507f1f77bcf86cd799439011"}"""  
                 )]
             )]
         )
@@ -107,6 +107,26 @@ class EscrowController(
 
             if (result.success) {
                 logger.info("Contract created successfully: ${result.contractAddress}")
+                
+                // Always notify contract service since contractserviceId is required
+                if (result.contractAddress != null) {
+                    try {
+                        runBlocking {
+                            contractServiceClient.notifyContractCreation(
+                                contractId = request.contractserviceId,
+                                contractHash = result.contractAddress,
+                                request = httpRequest
+                            ).block()
+                        }
+                        logger.info("Contract service notified of contract creation for contractserviceId: ${request.contractserviceId}")
+                    } catch (e: Exception) {
+                        // Log the error but don't fail the response since the blockchain transaction succeeded
+                        logger.error("Failed to notify contract service of contract creation for contractserviceId: ${request.contractserviceId}", e)
+                    }
+                } else {
+                    logger.error("Contract creation succeeded but no contract address returned, cannot notify contract service")
+                }
+                
                 ResponseEntity.ok(response)
             } else {
                 logger.error("Contract creation failed: ${result.error}")

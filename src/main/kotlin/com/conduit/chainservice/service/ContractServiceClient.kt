@@ -307,6 +307,60 @@ class ContractServiceClient(
             }
     }
 
+    fun notifyContractCreation(
+        contractId: String,
+        contractHash: String,
+        request: HttpServletRequest
+    ): Mono<Map<String, Any>> {
+        if (!enabled) {
+            logger.info("Contract service integration disabled, skipping create notification")
+            return Mono.just(mapOf("status" to "skipped"))
+        }
+
+        val notificationRequest = mapOf(
+            "contractId" to contractId,
+            "contractHash" to contractHash
+        )
+
+        logger.info("Notifying contract service of contract creation: contractId=$contractId, contractHash=$contractHash")
+
+        return webClient.post()
+            .uri("/api/contracts/create-notification")
+            .headers { headers ->
+                // Forward authentication headers
+                request.getHeader(HttpHeaders.AUTHORIZATION)?.let {
+                    headers.set(HttpHeaders.AUTHORIZATION, it)
+                }
+                
+                // Forward cookies including AUTH-TOKEN and session
+                request.getHeader(HttpHeaders.COOKIE)?.let {
+                    headers.set(HttpHeaders.COOKIE, it)
+                }
+                
+                // Add any custom headers that might be needed
+                headers.set("X-Forwarded-For", request.remoteAddr)
+                headers.set("X-Original-URI", request.requestURI)
+            }
+            .bodyValue(notificationRequest)
+            .retrieve()
+            .bodyToMono(object : org.springframework.core.ParameterizedTypeReference<Map<String, Any>>() {})
+            .doOnSuccess { response ->
+                logger.info("Successfully notified contract service of contract creation for contractId: $contractId")
+            }
+            .onErrorResume { error ->
+                when (error) {
+                    is WebClientResponseException -> {
+                        logger.error("Contract service returned error for create notification: ${error.statusCode} - ${error.responseBodyAsString}")
+                        Mono.error<Map<String, Any>>(error)
+                    }
+                    else -> {
+                        logger.error("Failed to notify contract service of contract creation", error)
+                        Mono.error<Map<String, Any>>(error)
+                    }
+                }
+            }
+    }
+
     data class DisputeStatusResponse(
         val sellerLatestRefundEntry: Int?,
         val buyerLatestRefundEntry: Int?
