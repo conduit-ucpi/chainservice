@@ -19,6 +19,13 @@ import org.web3j.protocol.core.methods.request.EthFilter
 import org.web3j.protocol.core.methods.response.EthCall
 import org.web3j.protocol.exceptions.ClientConnectionException
 import org.web3j.utils.Convert
+import org.web3j.abi.FunctionEncoder
+import org.web3j.abi.FunctionReturnDecoder
+import org.web3j.abi.datatypes.Function
+import org.web3j.abi.datatypes.DynamicArray
+import org.web3j.abi.datatypes.DynamicStruct
+import org.web3j.abi.datatypes.Type
+import org.web3j.abi.datatypes.Bool
 import java.math.BigInteger
 import java.time.Instant
 import kotlinx.coroutines.async
@@ -444,40 +451,227 @@ class ContractQueryService(
         logger.debug("Batching contract state queries for ${contractAddresses.size} contracts")
         val results = mutableMapOf<String, Map<String, Any>>()
         
+        // Use Multicall3 contract on Base (same address on mainnet and testnet)
+        val multicall3Address = "0xcA11bde05977b3631167028862bE2a173976CA11"
+        
         try {
-            // Create batch calls for all contracts
+            // If we have contracts to query, use true multicall
+            if (contractAddresses.isNotEmpty()) {
+                val multicallResults = executeMulticall3(multicall3Address, contractAddresses)
+                results.putAll(multicallResults)
+                logger.debug("Multicall3 batch completed: ${results.size} results retrieved in single RPC call")
+            }
+            
+        } catch (e: Exception) {
+            logger.warn("Multicall3 batch failed, falling back to parallel queries", e)
+            // Fallback to parallel queries if multicall fails
             val batchCalls = contractAddresses.map { contractAddress ->
                 async {
                     try {
                         contractAddress to callGetContractInfo(contractAddress)
                     } catch (e: Exception) {
                         logger.debug("Failed to get contract state for $contractAddress: ${e.message}")
-                        contractAddress to mapOf<String, Any>(
-                            "buyer" to "0x0000000000000000000000000000000000000000",
-                            "seller" to "0x0000000000000000000000000000000000000000",
-                            "amount" to BigInteger.ZERO,
-                            "expiryTimestamp" to 0L,
-                            "description" to "",
-                            "funded" to false,
-                            "disputed" to false,
-                            "resolved" to false,
-                            "claimed" to false
-                        )
+                        contractAddress to getEmptyContractState()
                     }
                 }
             }
             
-            // Execute all calls in parallel (limited by coroutine dispatcher)
             val batchResults = batchCalls.awaitAll()
             results.putAll(batchResults)
-            
-            logger.debug("Contract state batch completed: ${results.size} results")
-            
-        } catch (e: Exception) {
-            logger.warn("Batch contract state query failed, using empty results", e)
         }
         
         return@coroutineScope results
+    }
+    
+    /**
+     * Execute multicall3 to batch multiple contract calls into a single RPC request
+     */
+    private suspend fun executeMulticall3(
+        multicall3Address: String,
+        contractAddresses: List<String>
+    ): Map<String, Map<String, Any>> = coroutineScope {
+        val results = mutableMapOf<String, Map<String, Any>>()
+        
+        try {
+            // Prepare the encoded function calls for each contract
+            val calls = contractAddresses.map { contractAddress ->
+                // Encode the getContractInfo() function call
+                val function = Function(
+                    "getContractInfo",
+                    emptyList(),
+                    listOf(
+                        TypeReference.create(Address::class.java),     // buyer
+                        TypeReference.create(Address::class.java),     // seller
+                        TypeReference.create(Uint256::class.java),     // amount
+                        TypeReference.create(Uint256::class.java),     // expiryTimestamp
+                        TypeReference.create(Utf8String::class.java),  // description
+                        TypeReference.create(org.web3j.abi.datatypes.generated.Uint8::class.java),   // currentState
+                        TypeReference.create(Uint256::class.java),     // currentTimestamp
+                        TypeReference.create(Uint256::class.java),     // creatorFee
+                        TypeReference.create(Uint256::class.java)      // createdAt
+                    )
+                )
+                val encodedFunction = FunctionEncoder.encode(function)
+                
+                // Create Call3 struct: (address target, bool allowFailure, bytes callData)
+                listOf(
+                    Address(contractAddress),
+                    Bool(true), // allowFailure = true to handle failed calls gracefully
+                    org.web3j.abi.datatypes.DynamicBytes(org.web3j.utils.Numeric.hexStringToByteArray(encodedFunction))
+                )
+            }
+            
+            // Encode the aggregate3 function call for Multicall3
+            val aggregate3Function = Function(
+                "aggregate3",
+                listOf(DynamicArray(
+                    DynamicStruct::class.java,
+                    calls.map { callData ->
+                        DynamicStruct(callData)
+                    }
+                )),
+                listOf(TypeReference.create(DynamicArray::class.java)) // returns Result[] struct
+            )
+            
+            val encodedMulticall = FunctionEncoder.encode(aggregate3Function)
+            
+            // Execute the single multicall
+            val ethCall: EthCall = web3j.ethCall(
+                org.web3j.protocol.core.methods.request.Transaction.createEthCallTransaction(
+                    null, multicall3Address, encodedMulticall
+                ),
+                DefaultBlockParameterName.LATEST
+            ).send()
+            
+            if (ethCall.hasError()) {
+                throw RuntimeException("Multicall3 error: ${ethCall.error.message}")
+            }
+            
+            val returnValue = ethCall.value
+            if (returnValue.isNullOrEmpty() || returnValue == "0x") {
+                logger.warn("Empty response from multicall3")
+                return@coroutineScope results
+            }
+            
+            // Decode the results
+            val outputTypes = listOf(TypeReference.create(DynamicArray::class.java))
+            val decodedOutput = FunctionReturnDecoder.decode(returnValue, outputTypes as List<TypeReference<Type<Any>>>)
+            
+            if (decodedOutput.isNotEmpty()) {
+                val resultsArray = decodedOutput[0].value as List<*>
+                
+                resultsArray.forEachIndexed { index, result ->
+                    if (index < contractAddresses.size) {
+                        val contractAddress = contractAddresses[index]
+                        try {
+                            // Each result is a struct with (bool success, bytes returnData)
+                            val resultStruct = result as DynamicStruct
+                            val success = resultStruct.value[0] as Bool
+                            val returnData = resultStruct.value[1] as org.web3j.abi.datatypes.DynamicBytes
+                            
+                            if (success.value) {
+                                // Decode the getContractInfo return data
+                                val contractData = decodeContractInfoResult(org.web3j.utils.Numeric.toHexString(returnData.value))
+                                results[contractAddress] = contractData
+                            } else {
+                                logger.debug("Contract call failed for $contractAddress in multicall")
+                                results[contractAddress] = getEmptyContractState()
+                            }
+                        } catch (e: Exception) {
+                            logger.debug("Failed to decode result for $contractAddress: ${e.message}")
+                            results[contractAddress] = getEmptyContractState()
+                        }
+                    }
+                }
+            }
+            
+        } catch (e: Exception) {
+            // Check if this is a rate limiting error
+            val isRateLimited = handleRateLimitingError(e, operation = "Multicall3 aggregate")
+            if (!isRateLimited) {
+                logger.error("Error executing multicall3", e)
+            }
+            throw e
+        }
+        
+        results
+    }
+    
+    /**
+     * Decode the result from getContractInfo function call
+     */
+    private fun decodeContractInfoResult(hexData: String): Map<String, Any> {
+        try {
+            val outputTypes = listOf(
+                TypeReference.create(Address::class.java),     // buyer
+                TypeReference.create(Address::class.java),     // seller  
+                TypeReference.create(Uint256::class.java),     // amount
+                TypeReference.create(Uint256::class.java),     // expiryTimestamp
+                TypeReference.create(Utf8String::class.java),  // description
+                TypeReference.create(org.web3j.abi.datatypes.generated.Uint8::class.java),   // currentState
+                TypeReference.create(Uint256::class.java),     // currentTimestamp
+                TypeReference.create(Uint256::class.java),     // creatorFee
+                TypeReference.create(Uint256::class.java)      // createdAt
+            )
+            
+            val decodedOutput = FunctionReturnDecoder.decode(hexData, outputTypes as List<TypeReference<Type<Any>>>)
+            
+            if (decodedOutput.size >= 9) {
+                val buyer = (decodedOutput[0] as Address).value
+                val seller = (decodedOutput[1] as Address).value
+                val amount = (decodedOutput[2] as Uint256).value
+                val expiryTimestamp = (decodedOutput[3] as Uint256).value.toLong()
+                val description = (decodedOutput[4] as Utf8String).value
+                val currentState = (decodedOutput[5] as org.web3j.abi.datatypes.generated.Uint8).value.toInt()
+                val currentTimestamp = (decodedOutput[6] as Uint256).value.toLong()
+                val creatorFee = (decodedOutput[7] as Uint256).value
+                val createdAt = (decodedOutput[8] as Uint256).value.toLong()
+                
+                // Determine boolean states from currentState enum
+                val funded = currentState >= 1
+                val disputed = currentState == 2
+                val resolved = currentState == 3
+                val claimed = currentState == 4 || currentState == 5
+                
+                return mapOf(
+                    "buyer" to buyer,
+                    "seller" to seller,
+                    "amount" to amount,
+                    "expiryTimestamp" to expiryTimestamp,
+                    "description" to description,
+                    "funded" to funded,
+                    "disputed" to disputed,
+                    "resolved" to resolved,
+                    "claimed" to claimed,
+                    "createdAt" to createdAt,
+                    "currentState" to currentState,
+                    "currentTimestamp" to currentTimestamp,
+                    "creatorFee" to creatorFee
+                )
+            }
+        } catch (e: Exception) {
+            logger.debug("Failed to decode contract info result: ${e.message}")
+        }
+        
+        return getEmptyContractState()
+    }
+    
+    /**
+     * Returns an empty contract state for failed queries
+     */
+    private fun getEmptyContractState(): Map<String, Any> {
+        return mapOf(
+            "buyer" to "0x0000000000000000000000000000000000000000",
+            "seller" to "0x0000000000000000000000000000000000000000",
+            "amount" to BigInteger.ZERO,
+            "expiryTimestamp" to 0L,
+            "description" to "",
+            "funded" to false,
+            "disputed" to false,
+            "resolved" to false,
+            "claimed" to false,
+            "createdAt" to 0L
+        )
     }
     
     // LEVEL 2: Event data batch method removed - no longer needed since createdAt comes from contract directly
