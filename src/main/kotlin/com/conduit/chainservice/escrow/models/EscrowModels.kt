@@ -330,3 +330,41 @@ data class ContractInfoJson(
     val tokenAddress: String,
     val exists: Boolean
 )
+
+// Verify and webhook models
+data class VerifyWebhookRequest(
+    @field:NotBlank(message = "Transaction hash is required")
+    @field:Pattern(regexp = "^0x[a-fA-F0-9]{64}$", message = "Invalid transaction hash format")
+    val transaction_hash: String,
+
+    @field:NotBlank(message = "Contract address is required")
+    @field:Pattern(regexp = "^0x[a-fA-F0-9]{40}$", message = "Invalid contract address format")
+    val contract_address: String,
+
+    @field:NotBlank(message = "Webhook URL is required")
+    val webhook_url: String,
+
+    @field:NotNull(message = "Order ID is required")
+    @field:Positive(message = "Order ID must be positive")
+    val order_id: Int,
+
+    @field:NotNull(message = "Expected amount is required")
+    @field:Positive(message = "Expected amount must be positive")
+    val expected_amount: Double,
+
+    @field:NotBlank(message = "Expected recipient is required")
+    @field:Pattern(regexp = "^0x[a-fA-F0-9]{40}$", message = "Invalid expected recipient address format")
+    val expected_recipient: String,
+
+    @field:NotBlank(message = "Merchant wallet is required")
+    @field:Pattern(regexp = "^0x[a-fA-F0-9]{40}$", message = "Invalid merchant wallet address format")
+    val merchant_wallet: String
+)
+
+data class VerifyWebhookResponse(
+    val success: Boolean,
+    val message: String,
+    val transaction_verified: Boolean? = null,
+    val webhook_sent: Boolean? = null,
+    val error: String? = null
+)

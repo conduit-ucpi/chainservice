@@ -7,6 +7,7 @@ import com.conduit.chainservice.service.ContractQueryServiceInterface
 import com.conduit.chainservice.service.ContractServiceClient
 import com.conduit.chainservice.service.EmailServiceClient
 import com.conduit.chainservice.service.GasPayerServiceClient
+import com.conduit.chainservice.service.WebhookService
 import com.conduit.chainservice.model.OperationGasCost
 import com.conduit.chainservice.model.TransactionResult
 import io.swagger.v3.oas.annotations.Operation
@@ -38,6 +39,7 @@ class EscrowController(
     private val contractServiceClient: ContractServiceClient,
     private val emailServiceClient: EmailServiceClient,
     private val gasPayerServiceClient: GasPayerServiceClient,
+    private val webhookService: WebhookService,
     private val escrowProperties: EscrowProperties
 ) {
 
@@ -1310,6 +1312,118 @@ class EscrowController(
                 timestamp = Instant.now().toString()
             )
             ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse)
+        }
+    }
+
+    @PostMapping("/verify-and-webhook")
+    @Operation(
+        summary = "Verify Transaction and Send Webhook",
+        description = "Verifies a blockchain transaction and sends a webhook to WordPress. Validates that the transaction exists, has sufficient confirmations, matches the expected recipient and amount, and is a USDC transfer. On successful verification, sends a webhook with status 'funded' to the specified WordPress URL."
+    )
+    @ApiResponses(value = [
+        ApiResponse(
+            responseCode = "200",
+            description = "Transaction verified and webhook sent successfully",
+            content = [Content(schema = Schema(implementation = VerifyWebhookResponse::class))]
+        ),
+        ApiResponse(
+            responseCode = "400",
+            description = "Invalid request or transaction verification failed",
+            content = [Content(schema = Schema(implementation = VerifyWebhookResponse::class))]
+        ),
+        ApiResponse(
+            responseCode = "500",
+            description = "Internal server error",
+            content = [Content(schema = Schema(implementation = VerifyWebhookResponse::class))]
+        )
+    ])
+    fun verifyAndWebhook(
+        @Valid @RequestBody
+        @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            content = [Content(
+                examples = [ExampleObject(
+                    name = "Verify and Webhook Example",
+                    value = """{"transaction_hash": "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890", "contract_address": "0x1234567890abcdef1234567890abcdef12345678", "webhook_url": "https://example.com/webhook", "order_id": 123, "expected_amount": 100.00, "expected_recipient": "0x9876543210fedcba9876543210fedcba98765432", "merchant_wallet": "0x9876543210fedcba9876543210fedcba98765432"}"""
+                )]
+            )]
+        )
+        request: VerifyWebhookRequest
+    ): ResponseEntity<VerifyWebhookResponse> {
+        return try {
+            logger.info("Verify and webhook request received for transaction: ${request.transaction_hash}")
+
+            // Step 1: Verify the blockchain transaction
+            val verificationResult = runBlocking {
+                escrowTransactionService.verifyTransactionForWebhook(
+                    transactionHash = request.transaction_hash,
+                    contractAddress = request.contract_address,
+                    expectedAmount = request.expected_amount,
+                    expectedRecipient = request.expected_recipient,
+                    merchantWallet = request.merchant_wallet
+                )
+            }
+
+            if (!verificationResult.verified) {
+                logger.error("Transaction verification failed: ${verificationResult.error}")
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
+                    VerifyWebhookResponse(
+                        success = false,
+                        message = "Transaction verification failed",
+                        transaction_verified = false,
+                        webhook_sent = false,
+                        error = verificationResult.error
+                    )
+                )
+            }
+
+            logger.info("Transaction ${request.transaction_hash} verified successfully")
+
+            // Step 2: Send webhook to WordPress
+            val webhookResult = runBlocking {
+                webhookService.sendWebhook(
+                    webhookUrl = request.webhook_url,
+                    contractId = request.contract_address,
+                    orderId = request.order_id,
+                    transactionHash = request.transaction_hash,
+                    amount = verificationResult.actualAmount ?: request.expected_amount
+                )
+            }
+
+            if (!webhookResult.success) {
+                logger.error("Webhook sending failed: ${webhookResult.error}")
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
+                    VerifyWebhookResponse(
+                        success = false,
+                        message = "Transaction verified but webhook failed",
+                        transaction_verified = true,
+                        webhook_sent = false,
+                        error = webhookResult.error
+                    )
+                )
+            }
+
+            logger.info("Webhook sent successfully to ${request.webhook_url}")
+
+            ResponseEntity.ok(
+                VerifyWebhookResponse(
+                    success = true,
+                    message = "Transaction verified and webhook sent successfully",
+                    transaction_verified = true,
+                    webhook_sent = true
+                )
+            )
+
+        } catch (e: Exception) {
+            logger.error("Error in verify and webhook endpoint", e)
+            ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
+                VerifyWebhookResponse(
+                    success = false,
+                    message = "Internal server error",
+                    transaction_verified = false,
+                    webhook_sent = false,
+                    error = e.message ?: "Unknown error occurred"
+                )
+            )
         }
     }
 

@@ -730,4 +730,196 @@ class EscrowTransactionService(
             )
         }
     }
+
+    /**
+     * Verifies a blockchain transaction for WordPress webhook integration
+     * Validates transaction details and returns verification result
+     */
+    suspend fun verifyTransactionForWebhook(
+        transactionHash: String,
+        contractAddress: String,
+        expectedAmount: Double,
+        expectedRecipient: String,
+        merchantWallet: String
+    ): TransactionVerificationResult {
+        return try {
+            logger.info("Verifying transaction $transactionHash for webhook integration")
+
+            // Get transaction details from blockchain
+            val transaction = web3j.ethGetTransactionByHash(transactionHash).send()
+            if (transaction.result == null) {
+                return TransactionVerificationResult(
+                    verified = false,
+                    error = "Transaction not found on blockchain"
+                )
+            }
+
+            val tx = transaction.result
+
+            // Get transaction receipt to check if it was successful
+            val receipt = web3j.ethGetTransactionReceipt(transactionHash).send()
+            if (receipt.result == null) {
+                return TransactionVerificationResult(
+                    verified = false,
+                    error = "Transaction receipt not found"
+                )
+            }
+
+            val txReceipt = receipt.result
+            if (!txReceipt.isStatusOK) {
+                return TransactionVerificationResult(
+                    verified = false,
+                    error = "Transaction failed on blockchain"
+                )
+            }
+
+            // Check minimum confirmations (at least 1 confirmation)
+            val currentBlock = web3j.ethBlockNumber().send().blockNumber
+            val txBlock = tx.blockNumber
+            if (txBlock == null || currentBlock.subtract(txBlock).compareTo(BigInteger.ZERO) < 0) {
+                return TransactionVerificationResult(
+                    verified = false,
+                    error = "Transaction not yet confirmed"
+                )
+            }
+
+            // Verify recipient matches expected merchant wallet
+            val actualRecipient = tx.to?.lowercase()
+            val expectedRecipientLower = expectedRecipient.lowercase()
+            val merchantWalletLower = merchantWallet.lowercase()
+
+            if (actualRecipient != expectedRecipientLower && actualRecipient != merchantWalletLower) {
+                return TransactionVerificationResult(
+                    verified = false,
+                    error = "Transaction recipient does not match expected merchant wallet"
+                )
+            }
+
+            // Check if transaction is to USDC contract (for token transfers) or direct ETH transfer
+            if (actualRecipient == usdcContractAddress.lowercase()) {
+                // This is a USDC token transfer - parse the transaction data
+                val verificationResult = verifyUSDCTransfer(tx, expectedAmount, expectedRecipient, merchantWallet)
+                if (!verificationResult.verified) {
+                    return verificationResult
+                }
+            } else {
+                // Direct transfer - verify amount
+                val actualAmount = org.web3j.utils.Convert.fromWei(tx.value.toBigDecimal(), org.web3j.utils.Convert.Unit.ETHER).toDouble()
+                if (actualAmount < expectedAmount) {
+                    return TransactionVerificationResult(
+                        verified = false,
+                        error = "Transaction amount ($actualAmount) is less than expected amount ($expectedAmount)"
+                    )
+                }
+            }
+
+            logger.info("Transaction $transactionHash successfully verified for webhook")
+            TransactionVerificationResult(
+                verified = true,
+                transactionHash = transactionHash,
+                contractAddress = contractAddress,
+                amount = expectedAmount,
+                recipient = actualRecipient ?: expectedRecipient
+            )
+
+        } catch (e: Exception) {
+            logger.error("Error verifying transaction $transactionHash", e)
+            TransactionVerificationResult(
+                verified = false,
+                error = e.message ?: "Failed to verify transaction"
+            )
+        }
+    }
+
+    /**
+     * Verifies USDC token transfer by parsing transaction data
+     */
+    private fun verifyUSDCTransfer(
+        transaction: org.web3j.protocol.core.methods.response.Transaction,
+        expectedAmount: Double,
+        expectedRecipient: String,
+        merchantWallet: String
+    ): TransactionVerificationResult {
+        return try {
+            val input = transaction.input
+            if (input.isNullOrEmpty() || input == "0x") {
+                return TransactionVerificationResult(
+                    verified = false,
+                    error = "No transaction data found for USDC transfer"
+                )
+            }
+
+            // Parse USDC transfer function call
+            // transfer(address to, uint256 amount) has function selector 0xa9059cbb
+            if (!input.startsWith("0xa9059cbb")) {
+                return TransactionVerificationResult(
+                    verified = false,
+                    error = "Transaction is not a USDC transfer"
+                )
+            }
+
+            // Extract recipient and amount from transaction data
+            val data = input.substring(10) // Remove 0xa9059cbb
+            if (data.length < 128) {
+                return TransactionVerificationResult(
+                    verified = false,
+                    error = "Invalid USDC transfer data length"
+                )
+            }
+
+            // Parse recipient address (first 32 bytes, last 20 bytes are the address)
+            val recipientHex = "0x" + data.substring(24, 64)
+            val actualRecipient = recipientHex.lowercase()
+
+            // Parse amount (second 32 bytes)
+            val amountHex = data.substring(64, 128)
+            val amountBigInt = BigInteger(amountHex, 16)
+            val actualAmount = amountBigInt.toDouble() / 1_000_000.0 // Convert from microUSDC to USDC
+
+            // Verify recipient
+            val expectedRecipientLower = expectedRecipient.lowercase()
+            val merchantWalletLower = merchantWallet.lowercase()
+
+            if (actualRecipient != expectedRecipientLower && actualRecipient != merchantWalletLower) {
+                return TransactionVerificationResult(
+                    verified = false,
+                    error = "USDC transfer recipient does not match expected merchant wallet"
+                )
+            }
+
+            // Verify amount
+            if (actualAmount < expectedAmount) {
+                return TransactionVerificationResult(
+                    verified = false,
+                    error = "USDC transfer amount ($actualAmount) is less than expected amount ($expectedAmount)"
+                )
+            }
+
+            TransactionVerificationResult(
+                verified = true,
+                actualAmount = actualAmount,
+                recipient = actualRecipient
+            )
+
+        } catch (e: Exception) {
+            logger.error("Error parsing USDC transfer data", e)
+            TransactionVerificationResult(
+                verified = false,
+                error = "Failed to parse USDC transfer data: ${e.message}"
+            )
+        }
+    }
 }
+
+/**
+ * Result of transaction verification
+ */
+data class TransactionVerificationResult(
+    val verified: Boolean,
+    val transactionHash: String? = null,
+    val contractAddress: String? = null,
+    val amount: Double? = null,
+    val actualAmount: Double? = null,
+    val recipient: String? = null,
+    val error: String? = null
+)

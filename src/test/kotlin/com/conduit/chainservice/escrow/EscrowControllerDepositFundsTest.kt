@@ -7,6 +7,7 @@ import com.conduit.chainservice.service.ContractServiceClient
 import com.conduit.chainservice.service.ContractQueryService
 import com.conduit.chainservice.service.EmailServiceClient
 import com.conduit.chainservice.service.GasPayerServiceClient
+import com.conduit.chainservice.service.WebhookService
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.conduit.chainservice.model.TransactionResult
 import jakarta.servlet.http.HttpServletRequest
@@ -48,6 +49,9 @@ class EscrowControllerDepositFundsTest {
     private lateinit var gasPayerServiceClient: GasPayerServiceClient
 
     @Mock
+    private lateinit var webhookService: WebhookService
+
+    @Mock
     private lateinit var escrowProperties: EscrowProperties
 
     private lateinit var escrowController: EscrowController
@@ -56,11 +60,12 @@ class EscrowControllerDepositFundsTest {
     fun setup() {
         MockitoAnnotations.openMocks(this)
         escrowController = EscrowController(
-            escrowTransactionService, 
+            escrowTransactionService,
             contractQueryService,
             contractServiceClient,
             emailServiceClient,
             gasPayerServiceClient,
+            webhookService,
             escrowProperties
         )
         

@@ -1,0 +1,261 @@
+package com.conduit.chainservice.escrow
+
+import kotlinx.coroutines.runBlocking
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.extension.ExtendWith
+import org.junit.jupiter.api.Assertions.*
+import org.mockito.Mock
+import org.mockito.Mockito.*
+import org.mockito.junit.jupiter.MockitoExtension
+import org.mockito.kotlin.whenever
+import org.web3j.protocol.Web3j
+import org.web3j.protocol.core.Request
+import org.web3j.protocol.core.methods.response.*
+import java.math.BigInteger
+
+@ExtendWith(MockitoExtension::class)
+class TransactionVerificationServiceTest {
+
+    @Mock
+    private lateinit var web3j: Web3j
+
+    @Mock
+    private lateinit var gasPayerServiceClient: com.conduit.chainservice.service.GasPayerServiceClient
+
+    @Mock
+    private lateinit var cacheInvalidationService: com.conduit.chainservice.service.StateAwareCacheInvalidationService
+
+    @Mock
+    private lateinit var relayerCredentials: org.web3j.crypto.Credentials
+
+    @Mock
+    private lateinit var gasProvider: org.web3j.tx.gas.ContractGasProvider
+
+    private val usdcContractAddress = "0xA0b86a33E6441A9A0d7fc0C7F3C0A0D3E6A0b86a"
+    private val contractFactoryAddress = "0xFactory123456789abcdef123456789abcdef12345678"
+    private val minCreatorFee = "1000000"
+    private val chainId = 84532L
+
+    private fun createService(): EscrowTransactionService {
+        return EscrowTransactionService(
+            gasPayerServiceClient = gasPayerServiceClient,
+            cacheInvalidationService = cacheInvalidationService,
+            web3j = web3j,
+            relayerCredentials = relayerCredentials,
+            gasProvider = gasProvider,
+            chainId = chainId,
+            usdcContractAddress = usdcContractAddress,
+            contractFactoryAddress = contractFactoryAddress,
+            minCreatorFee = minCreatorFee,
+            limitDispute = 300000L,
+            limitClaim = 200000L,
+            limitDeposit = 250000L,
+            limitApproveUsdc = 150000L,
+            gasMultiplier = 1.2
+        )
+    }
+
+    @Test
+    fun `should successfully verify USDC transaction`() = runBlocking {
+        // Given
+        val service = createService()
+        val txHash = "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+        val contractAddress = "0x9876543210fedcba9876543210fedcba98765432"
+        val expectedAmount = 100.0
+        val expectedRecipient = "0xabcdefabcdefabcdefabcdefabcdefabcdefabcdef"
+        val merchantWallet = "0xabcdefabcdefabcdefabcdefabcdefabcdefabcdef"
+
+        // Mock transaction
+        val transaction = mock(Transaction::class.java)
+        whenever(transaction.to).thenReturn(usdcContractAddress)
+        whenever(transaction.blockNumber).thenReturn(BigInteger.valueOf(1000))
+        whenever(transaction.input).thenReturn("0xa9059cbb000000000000000000000000abcdefabcdefabcdefabcdefabcdefabcdefabcdef0000000000000000000000000000000000000000000000000000000005f5e100") // 100 USDC
+
+        val ethGetTransactionByHash = mock(EthGetTransactionByHash::class.java)
+        whenever(ethGetTransactionByHash.result).thenReturn(transaction)
+
+        // Mock transaction receipt
+        val receipt = mock(TransactionReceipt::class.java)
+        whenever(receipt.isStatusOK).thenReturn(true)
+
+        val ethGetTransactionReceipt = mock(EthGetTransactionReceipt::class.java)
+        whenever(ethGetTransactionReceipt.result).thenReturn(receipt)
+
+        // Mock current block number
+        val ethBlockNumber = mock(EthBlockNumber::class.java)
+        whenever(ethBlockNumber.blockNumber).thenReturn(BigInteger.valueOf(1001))
+
+        // Mock Web3j calls
+        whenever(web3j.ethGetTransactionByHash(txHash)).thenReturn(
+            mock(Request::class.java) as Request<*, EthGetTransactionByHash>
+        )
+        whenever(web3j.ethGetTransactionByHash(txHash).send()).thenReturn(ethGetTransactionByHash)
+
+        whenever(web3j.ethGetTransactionReceipt(txHash)).thenReturn(
+            mock(Request::class.java) as Request<*, EthGetTransactionReceipt>
+        )
+        whenever(web3j.ethGetTransactionReceipt(txHash).send()).thenReturn(ethGetTransactionReceipt)
+
+        whenever(web3j.ethBlockNumber()).thenReturn(
+            mock(Request::class.java) as Request<*, EthBlockNumber>
+        )
+        whenever(web3j.ethBlockNumber().send()).thenReturn(ethBlockNumber)
+
+        // When
+        val result = service.verifyTransactionForWebhook(
+            transactionHash = txHash,
+            contractAddress = contractAddress,
+            expectedAmount = expectedAmount,
+            expectedRecipient = expectedRecipient,
+            merchantWallet = merchantWallet
+        )
+
+        // Then
+        assertTrue(result.verified)
+        assertEquals(txHash, result.transactionHash)
+        assertEquals(contractAddress, result.contractAddress)
+        assertEquals(expectedAmount, result.amount)
+    }
+
+    @Test
+    fun `should fail verification when transaction not found`() = runBlocking {
+        // Given
+        val service = createService()
+        val txHash = "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+        val contractAddress = "0x9876543210fedcba9876543210fedcba98765432"
+        val expectedAmount = 100.0
+        val expectedRecipient = "0xabcdefabcdefabcdefabcdefabcdefabcdefabcdef"
+        val merchantWallet = "0xabcdefabcdefabcdefabcdefabcdefabcdefabcdef"
+
+        val ethGetTransactionByHash = mock(EthGetTransactionByHash::class.java)
+        whenever(ethGetTransactionByHash.result).thenReturn(null)
+
+        whenever(web3j.ethGetTransactionByHash(txHash)).thenReturn(
+            mock(Request::class.java) as Request<*, EthGetTransactionByHash>
+        )
+        whenever(web3j.ethGetTransactionByHash(txHash).send()).thenReturn(ethGetTransactionByHash)
+
+        // When
+        val result = service.verifyTransactionForWebhook(
+            transactionHash = txHash,
+            contractAddress = contractAddress,
+            expectedAmount = expectedAmount,
+            expectedRecipient = expectedRecipient,
+            merchantWallet = merchantWallet
+        )
+
+        // Then
+        assertFalse(result.verified)
+        assertEquals("Transaction not found on blockchain", result.error)
+    }
+
+    @Test
+    fun `should fail verification when transaction failed on blockchain`() = runBlocking {
+        // Given
+        val service = createService()
+        val txHash = "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+        val contractAddress = "0x9876543210fedcba9876543210fedcba98765432"
+        val expectedAmount = 100.0
+        val expectedRecipient = "0xabcdefabcdefabcdefabcdefabcdefabcdefabcdef"
+        val merchantWallet = "0xabcdefabcdefabcdefabcdefabcdefabcdefabcdef"
+
+        // Mock transaction
+        val transaction = mock(Transaction::class.java)
+        whenever(transaction.to).thenReturn(expectedRecipient)
+        whenever(transaction.blockNumber).thenReturn(BigInteger.valueOf(1000))
+
+        val ethGetTransactionByHash = mock(EthGetTransactionByHash::class.java)
+        whenever(ethGetTransactionByHash.result).thenReturn(transaction)
+
+        // Mock failed transaction receipt
+        val receipt = mock(TransactionReceipt::class.java)
+        whenever(receipt.isStatusOK).thenReturn(false)
+
+        val ethGetTransactionReceipt = mock(EthGetTransactionReceipt::class.java)
+        whenever(ethGetTransactionReceipt.result).thenReturn(receipt)
+
+        // Mock Web3j calls
+        whenever(web3j.ethGetTransactionByHash(txHash)).thenReturn(
+            mock(Request::class.java) as Request<*, EthGetTransactionByHash>
+        )
+        whenever(web3j.ethGetTransactionByHash(txHash).send()).thenReturn(ethGetTransactionByHash)
+
+        whenever(web3j.ethGetTransactionReceipt(txHash)).thenReturn(
+            mock(Request::class.java) as Request<*, EthGetTransactionReceipt>
+        )
+        whenever(web3j.ethGetTransactionReceipt(txHash).send()).thenReturn(ethGetTransactionReceipt)
+
+        // When
+        val result = service.verifyTransactionForWebhook(
+            transactionHash = txHash,
+            contractAddress = contractAddress,
+            expectedAmount = expectedAmount,
+            expectedRecipient = expectedRecipient,
+            merchantWallet = merchantWallet
+        )
+
+        // Then
+        assertFalse(result.verified)
+        assertEquals("Transaction failed on blockchain", result.error)
+    }
+
+    @Test
+    fun `should fail verification when recipient doesn't match`() = runBlocking {
+        // Given
+        val service = createService()
+        val txHash = "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+        val contractAddress = "0x9876543210fedcba9876543210fedcba98765432"
+        val expectedAmount = 100.0
+        val expectedRecipient = "0xabcdefabcdefabcdefabcdefabcdefabcdefabcdef"
+        val merchantWallet = "0xabcdefabcdefabcdefabcdefabcdefabcdefabcdef"
+        val wrongRecipient = "0x1111111111111111111111111111111111111111"
+
+        // Mock transaction
+        val transaction = mock(Transaction::class.java)
+        whenever(transaction.to).thenReturn(wrongRecipient)
+        whenever(transaction.blockNumber).thenReturn(BigInteger.valueOf(1000))
+
+        val ethGetTransactionByHash = mock(EthGetTransactionByHash::class.java)
+        whenever(ethGetTransactionByHash.result).thenReturn(transaction)
+
+        // Mock transaction receipt
+        val receipt = mock(TransactionReceipt::class.java)
+        whenever(receipt.isStatusOK).thenReturn(true)
+
+        val ethGetTransactionReceipt = mock(EthGetTransactionReceipt::class.java)
+        whenever(ethGetTransactionReceipt.result).thenReturn(receipt)
+
+        // Mock current block number
+        val ethBlockNumber = mock(EthBlockNumber::class.java)
+        whenever(ethBlockNumber.blockNumber).thenReturn(BigInteger.valueOf(1001))
+
+        // Mock Web3j calls
+        whenever(web3j.ethGetTransactionByHash(txHash)).thenReturn(
+            mock(Request::class.java) as Request<*, EthGetTransactionByHash>
+        )
+        whenever(web3j.ethGetTransactionByHash(txHash).send()).thenReturn(ethGetTransactionByHash)
+
+        whenever(web3j.ethGetTransactionReceipt(txHash)).thenReturn(
+            mock(Request::class.java) as Request<*, EthGetTransactionReceipt>
+        )
+        whenever(web3j.ethGetTransactionReceipt(txHash).send()).thenReturn(ethGetTransactionReceipt)
+
+        whenever(web3j.ethBlockNumber()).thenReturn(
+            mock(Request::class.java) as Request<*, EthBlockNumber>
+        )
+        whenever(web3j.ethBlockNumber().send()).thenReturn(ethBlockNumber)
+
+        // When
+        val result = service.verifyTransactionForWebhook(
+            transactionHash = txHash,
+            contractAddress = contractAddress,
+            expectedAmount = expectedAmount,
+            expectedRecipient = expectedRecipient,
+            merchantWallet = merchantWallet
+        )
+
+        // Then
+        assertFalse(result.verified)
+        assertEquals("Transaction recipient does not match expected merchant wallet", result.error)
+    }
+}

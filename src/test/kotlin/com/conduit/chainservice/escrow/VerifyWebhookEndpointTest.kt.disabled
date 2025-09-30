@@ -1,0 +1,262 @@
+package com.conduit.chainservice.escrow
+
+import com.conduit.chainservice.escrow.models.VerifyWebhookRequest
+import com.conduit.chainservice.escrow.models.VerifyWebhookResponse
+import com.conduit.chainservice.service.WebhookService
+import com.conduit.chainservice.service.WebhookResult
+import com.fasterxml.jackson.databind.ObjectMapper
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.extension.ExtendWith
+import org.mockito.Mockito.*
+import org.mockito.kotlin.whenever
+import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest
+import org.springframework.boot.test.mock.mockito.MockBean
+import org.springframework.http.MediaType
+import org.springframework.test.context.junit.jupiter.SpringJUnitExtension
+import org.springframework.test.web.servlet.MockMvc
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.*
+import kotlinx.coroutines.runBlocking
+
+@ExtendWith(SpringJUnitExtension::class)
+@WebMvcTest(EscrowController::class)
+class VerifyWebhookEndpointTest {
+
+    @Autowired
+    private lateinit var mockMvc: MockMvc
+
+    @Autowired
+    private lateinit var objectMapper: ObjectMapper
+
+    @MockBean
+    private lateinit var escrowTransactionService: EscrowTransactionService
+
+    @MockBean
+    private lateinit var webhookService: WebhookService
+
+    // Mock other required dependencies
+    @MockBean
+    private lateinit var contractQueryService: com.conduit.chainservice.service.ContractQueryServiceInterface
+
+    @MockBean
+    private lateinit var contractServiceClient: com.conduit.chainservice.service.ContractServiceClient
+
+    @MockBean
+    private lateinit var emailServiceClient: com.conduit.chainservice.service.EmailServiceClient
+
+    @MockBean
+    private lateinit var gasPayerServiceClient: com.conduit.chainservice.service.GasPayerServiceClient
+
+    @MockBean
+    private lateinit var escrowProperties: com.conduit.chainservice.config.EscrowProperties
+
+    @Test
+    fun `should successfully verify transaction and send webhook`() {
+        // Given
+        val request = VerifyWebhookRequest(
+            transaction_hash = "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+            contract_address = "0x9876543210fedcba9876543210fedcba98765432",
+            webhook_url = "https://example.com/webhook",
+            order_id = 123,
+            expected_amount = 100.0,
+            expected_recipient = "0xabcdefabcdefabcdefabcdefabcdefabcdefabcdef",
+            merchant_wallet = "0xabcdefabcdefabcdefabcdefabcdefabcdefabcdef"
+        )
+
+        val verificationResult = TransactionVerificationResult(
+            verified = true,
+            transactionHash = request.transaction_hash,
+            contractAddress = request.contract_address,
+            amount = request.expected_amount,
+            actualAmount = 100.0,
+            recipient = request.expected_recipient
+        )
+
+        val webhookResult = WebhookResult(
+            success = true,
+            responseBody = "OK"
+        )
+
+        whenever(runBlocking {
+            escrowTransactionService.verifyTransactionForWebhook(
+                transactionHash = request.transaction_hash,
+                contractAddress = request.contract_address,
+                expectedAmount = request.expected_amount,
+                expectedRecipient = request.expected_recipient,
+                merchantWallet = request.merchant_wallet
+            )
+        }).thenReturn(verificationResult)
+
+        whenever(runBlocking {
+            webhookService.sendWebhook(
+                webhookUrl = request.webhook_url,
+                contractId = request.contract_address,
+                orderId = request.order_id,
+                transactionHash = request.transaction_hash,
+                amount = 100.0
+            )
+        }).thenReturn(webhookResult)
+
+        // When & Then
+        mockMvc.perform(
+            post("/api/chain/verify-and-webhook")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request))
+        )
+        .andExpect(status().isOk)
+        .andExpect(jsonPath("$.success").value(true))
+        .andExpect(jsonPath("$.message").value("Transaction verified and webhook sent successfully"))
+        .andExpect(jsonPath("$.transaction_verified").value(true))
+        .andExpect(jsonPath("$.webhook_sent").value(true))
+        .andExpect(jsonPath("$.error").doesNotExist())
+    }
+
+    @Test
+    fun `should return error when transaction verification fails`() {
+        // Given
+        val request = VerifyWebhookRequest(
+            transaction_hash = "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+            contract_address = "0x9876543210fedcba9876543210fedcba98765432",
+            webhook_url = "https://example.com/webhook",
+            order_id = 123,
+            expected_amount = 100.0,
+            expected_recipient = "0xabcdefabcdefabcdefabcdefabcdefabcdefabcdef",
+            merchant_wallet = "0xabcdefabcdefabcdefabcdefabcdefabcdefabcdef"
+        )
+
+        val verificationResult = TransactionVerificationResult(
+            verified = false,
+            error = "Transaction not found on blockchain"
+        )
+
+        whenever(runBlocking {
+            escrowTransactionService.verifyTransactionForWebhook(
+                transactionHash = request.transaction_hash,
+                contractAddress = request.contract_address,
+                expectedAmount = request.expected_amount,
+                expectedRecipient = request.expected_recipient,
+                merchantWallet = request.merchant_wallet
+            )
+        }).thenReturn(verificationResult)
+
+        // When & Then
+        mockMvc.perform(
+            post("/api/chain/verify-and-webhook")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request))
+        )
+        .andExpect(status().isBadRequest)
+        .andExpect(jsonPath("$.success").value(false))
+        .andExpect(jsonPath("$.message").value("Transaction verification failed"))
+        .andExpect(jsonPath("$.transaction_verified").value(false))
+        .andExpect(jsonPath("$.webhook_sent").value(false))
+        .andExpect(jsonPath("$.error").value("Transaction not found on blockchain"))
+    }
+
+    @Test
+    fun `should return error when webhook sending fails`() {
+        // Given
+        val request = VerifyWebhookRequest(
+            transaction_hash = "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+            contract_address = "0x9876543210fedcba9876543210fedcba98765432",
+            webhook_url = "https://example.com/webhook",
+            order_id = 123,
+            expected_amount = 100.0,
+            expected_recipient = "0xabcdefabcdefabcdefabcdefabcdefabcdefabcdef",
+            merchant_wallet = "0xabcdefabcdefabcdefabcdefabcdefabcdefabcdef"
+        )
+
+        val verificationResult = TransactionVerificationResult(
+            verified = true,
+            transactionHash = request.transaction_hash,
+            contractAddress = request.contract_address,
+            amount = request.expected_amount,
+            actualAmount = 100.0,
+            recipient = request.expected_recipient
+        )
+
+        val webhookResult = WebhookResult(
+            success = false,
+            error = "HTTP 404: Not Found",
+            statusCode = 404
+        )
+
+        whenever(runBlocking {
+            escrowTransactionService.verifyTransactionForWebhook(
+                transactionHash = request.transaction_hash,
+                contractAddress = request.contract_address,
+                expectedAmount = request.expected_amount,
+                expectedRecipient = request.expected_recipient,
+                merchantWallet = request.merchant_wallet
+            )
+        }).thenReturn(verificationResult)
+
+        whenever(runBlocking {
+            webhookService.sendWebhook(
+                webhookUrl = request.webhook_url,
+                contractId = request.contract_address,
+                orderId = request.order_id,
+                transactionHash = request.transaction_hash,
+                amount = 100.0
+            )
+        }).thenReturn(webhookResult)
+
+        // When & Then
+        mockMvc.perform(
+            post("/api/chain/verify-and-webhook")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request))
+        )
+        .andExpect(status().isBadRequest)
+        .andExpect(jsonPath("$.success").value(false))
+        .andExpect(jsonPath("$.message").value("Transaction verified but webhook failed"))
+        .andExpect(jsonPath("$.transaction_verified").value(true))
+        .andExpect(jsonPath("$.webhook_sent").value(false))
+        .andExpect(jsonPath("$.error").value("HTTP 404: Not Found"))
+    }
+
+    @Test
+    fun `should validate request parameters`() {
+        // Given - invalid transaction hash
+        val invalidRequest = mapOf(
+            "transaction_hash" to "invalid_hash",
+            "contract_address" to "0x9876543210fedcba9876543210fedcba98765432",
+            "webhook_url" to "https://example.com/webhook",
+            "order_id" to 123,
+            "expected_amount" to 100.0,
+            "expected_recipient" to "0xabcdefabcdefabcdefabcdefabcdefabcdefabcdef",
+            "merchant_wallet" to "0xabcdefabcdefabcdefabcdefabcdefabcdefabcdef"
+        )
+
+        // When & Then
+        mockMvc.perform(
+            post("/api/chain/verify-and-webhook")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(invalidRequest))
+        )
+        .andExpect(status().isBadRequest)
+    }
+
+    @Test
+    fun `should validate required fields`() {
+        // Given - missing required field
+        val incompleteRequest = mapOf(
+            "transaction_hash" to "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+            "contract_address" to "0x9876543210fedcba9876543210fedcba98765432",
+            // Missing webhook_url
+            "order_id" to 123,
+            "expected_amount" to 100.0,
+            "expected_recipient" to "0xabcdefabcdefabcdefabcdefabcdefabcdefabcdef",
+            "merchant_wallet" to "0xabcdefabcdefabcdefabcdefabcdefabcdefabcdef"
+        )
+
+        // When & Then
+        mockMvc.perform(
+            post("/api/chain/verify-and-webhook")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(incompleteRequest))
+        )
+        .andExpect(status().isBadRequest)
+    }
+}

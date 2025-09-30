@@ -1,0 +1,192 @@
+package com.conduit.chainservice.service
+
+import kotlinx.coroutines.runBlocking
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.extension.ExtendWith
+import org.junit.jupiter.api.Assertions.*
+import org.mockito.Mock
+import org.mockito.Mockito.*
+import org.mockito.junit.jupiter.MockitoExtension
+import org.mockito.kotlin.any
+import org.mockito.kotlin.whenever
+import org.springframework.http.HttpStatus
+import org.springframework.web.reactive.function.client.WebClient
+import org.springframework.web.reactive.function.client.WebClientResponseException
+import reactor.core.publisher.Mono
+
+@ExtendWith(MockitoExtension::class)
+class WebhookServiceTest {
+
+    @Mock
+    private lateinit var webClientBuilder: WebClient.Builder
+
+    @Mock
+    private lateinit var webClient: WebClient
+
+    @Mock
+    private lateinit var requestBodyUriSpec: WebClient.RequestBodyUriSpec
+
+    @Mock
+    private lateinit var requestBodySpec: WebClient.RequestBodySpec
+
+    @Mock
+    private lateinit var requestHeadersSpec: WebClient.RequestHeadersSpec<*>
+
+    @Mock
+    private lateinit var responseSpec: WebClient.ResponseSpec
+
+    private fun createService(): WebhookService {
+        whenever(webClientBuilder.defaultHeader(any(), any())).thenReturn(webClientBuilder)
+        whenever(webClientBuilder.build()).thenReturn(webClient)
+        return WebhookService(webClientBuilder)
+    }
+
+    @Test
+    fun `should successfully send webhook`() = runBlocking {
+        // Given
+        val service = createService()
+        val webhookUrl = "https://example.com/webhook"
+        val contractId = "0x1234567890abcdef1234567890abcdef12345678"
+        val orderId = 123
+        val transactionHash = "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
+        val amount = 100.0
+
+        val expectedResponse = "OK"
+
+        // Mock WebClient chain
+        whenever(webClient.post()).thenReturn(requestBodyUriSpec)
+        whenever(requestBodyUriSpec.uri(webhookUrl)).thenReturn(requestBodySpec)
+        whenever(requestBodySpec.bodyValue(any())).thenReturn(requestHeadersSpec)
+        whenever(requestHeadersSpec.retrieve()).thenReturn(responseSpec)
+        whenever(responseSpec.bodyToMono(String::class.java)).thenReturn(Mono.just(expectedResponse))
+
+        // When
+        val result = service.sendWebhook(
+            webhookUrl = webhookUrl,
+            contractId = contractId,
+            orderId = orderId,
+            transactionHash = transactionHash,
+            amount = amount
+        )
+
+        // Then
+        assertTrue(result.success)
+        assertEquals(expectedResponse, result.responseBody)
+        assertEquals(null, result.error)
+        assertEquals(null, result.statusCode)
+    }
+
+    @Test
+    fun `should handle HTTP error response`() = runBlocking {
+        // Given
+        val service = createService()
+        val webhookUrl = "https://example.com/webhook"
+        val contractId = "0x1234567890abcdef1234567890abcdef12345678"
+        val orderId = 123
+        val transactionHash = "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
+        val amount = 100.0
+
+        val webClientException = WebClientResponseException.create(
+            HttpStatus.NOT_FOUND.value(),
+            "Not Found",
+            null,
+            "Endpoint not found".toByteArray(),
+            null
+        )
+
+        // Mock WebClient chain
+        whenever(webClient.post()).thenReturn(requestBodyUriSpec)
+        whenever(requestBodyUriSpec.uri(webhookUrl)).thenReturn(requestBodySpec)
+        whenever(requestBodySpec.bodyValue(any())).thenReturn(requestHeadersSpec)
+        whenever(requestHeadersSpec.retrieve()).thenReturn(responseSpec)
+        whenever(responseSpec.bodyToMono(String::class.java)).thenReturn(Mono.error(webClientException))
+
+        // When
+        val result = service.sendWebhook(
+            webhookUrl = webhookUrl,
+            contractId = contractId,
+            orderId = orderId,
+            transactionHash = transactionHash,
+            amount = amount
+        )
+
+        // Then
+        assertFalse(result.success)
+        assertEquals("HTTP 404: Endpoint not found", result.error)
+        assertEquals(404, result.statusCode)
+        assertEquals(null, result.responseBody)
+    }
+
+    @Test
+    fun `should handle general exception`() = runBlocking {
+        // Given
+        val service = createService()
+        val webhookUrl = "https://example.com/webhook"
+        val contractId = "0x1234567890abcdef1234567890abcdef12345678"
+        val orderId = 123
+        val transactionHash = "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
+        val amount = 100.0
+
+        val exception = RuntimeException("Connection timeout")
+
+        // Mock WebClient chain
+        whenever(webClient.post()).thenReturn(requestBodyUriSpec)
+        whenever(requestBodyUriSpec.uri(webhookUrl)).thenReturn(requestBodySpec)
+        whenever(requestBodySpec.bodyValue(any())).thenReturn(requestHeadersSpec)
+        whenever(requestHeadersSpec.retrieve()).thenReturn(responseSpec)
+        whenever(responseSpec.bodyToMono(String::class.java)).thenReturn(Mono.error(exception))
+
+        // When
+        val result = service.sendWebhook(
+            webhookUrl = webhookUrl,
+            contractId = contractId,
+            orderId = orderId,
+            transactionHash = transactionHash,
+            amount = amount
+        )
+
+        // Then
+        assertFalse(result.success)
+        assertEquals("Connection timeout", result.error)
+        assertEquals(null, result.statusCode)
+        assertEquals(null, result.responseBody)
+    }
+
+    @Test
+    fun `should send correct payload format`() = runBlocking {
+        // Given
+        val service = createService()
+        val webhookUrl = "https://example.com/webhook"
+        val contractId = "0x1234567890abcdef1234567890abcdef12345678"
+        val orderId = 123
+        val transactionHash = "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
+        val amount = 100.0
+
+        // Mock WebClient chain
+        whenever(webClient.post()).thenReturn(requestBodyUriSpec)
+        whenever(requestBodyUriSpec.uri(webhookUrl)).thenReturn(requestBodySpec)
+        whenever(requestBodySpec.bodyValue(any())).thenReturn(requestHeadersSpec)
+        whenever(requestHeadersSpec.retrieve()).thenReturn(responseSpec)
+        whenever(responseSpec.bodyToMono(String::class.java)).thenReturn(Mono.just("OK"))
+
+        // When
+        service.sendWebhook(
+            webhookUrl = webhookUrl,
+            contractId = contractId,
+            orderId = orderId,
+            transactionHash = transactionHash,
+            amount = amount
+        )
+
+        // Then - verify the correct payload was sent
+        verify(requestBodySpec).bodyValue(argThat { payload ->
+            payload is Map<*, *> &&
+            payload["contract_id"] == contractId &&
+            payload["status"] == "funded" &&
+            payload["order_id"] == orderId &&
+            payload["transaction_hash"] == transactionHash &&
+            payload["amount"] == amount &&
+            payload.containsKey("timestamp")
+        })
+    }
+}

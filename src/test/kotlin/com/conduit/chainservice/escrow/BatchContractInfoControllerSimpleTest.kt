@@ -6,6 +6,7 @@ import com.conduit.chainservice.service.ContractQueryService
 import com.conduit.chainservice.service.ContractServiceClient
 import com.conduit.chainservice.service.EmailServiceClient
 import com.conduit.chainservice.service.GasPayerServiceClient
+import com.conduit.chainservice.service.WebhookService
 import jakarta.servlet.http.HttpServletRequest
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.BeforeEach
@@ -37,6 +38,9 @@ class BatchContractInfoControllerSimpleTest {
     private lateinit var gasPayerServiceClient: GasPayerServiceClient
 
     @Mock
+    private lateinit var webhookService: WebhookService
+
+    @Mock
     private lateinit var escrowProperties: EscrowProperties
 
     @Mock
@@ -61,6 +65,7 @@ class BatchContractInfoControllerSimpleTest {
             contractServiceClient,
             emailServiceClient,
             gasPayerServiceClient,
+            webhookService,
             escrowProperties
         )
     }
