@@ -11,6 +11,9 @@ import org.mockito.kotlin.whenever
 import org.web3j.protocol.Web3j
 import org.web3j.protocol.core.Request
 import org.web3j.protocol.core.methods.response.*
+import org.web3j.protocol.core.methods.response.EthGetTransactionByHash
+import org.web3j.protocol.core.methods.response.EthGetTransactionReceipt
+import org.web3j.protocol.core.methods.response.EthBlockNumber
 import java.math.BigInteger
 
 @ExtendWith(MockitoExtension::class)
@@ -56,7 +59,7 @@ class TransactionVerificationServiceTest {
     }
 
     @Test
-    fun `should successfully verify USDC transaction`() = runBlocking {
+    fun `should successfully verify USDC transaction from Transfer event logs`() = runBlocking {
         // Given
         val service = createService()
         val txHash = "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
@@ -65,18 +68,28 @@ class TransactionVerificationServiceTest {
         val expectedRecipient = "0xabcdefabcdefabcdefabcdefabcdefabcdefabcdef"
         val merchantWallet = "0xabcdefabcdefabcdefabcdefabcdefabcdefabcdef"
 
-        // Mock transaction
+        // Mock transaction (to escrow contract, not USDC contract)
         val transaction = mock(Transaction::class.java)
-        whenever(transaction.to).thenReturn(usdcContractAddress)
+        whenever(transaction.to).thenReturn(contractAddress) // Transaction is to escrow contract
         whenever(transaction.blockNumber).thenReturn(BigInteger.valueOf(1000))
-        whenever(transaction.input).thenReturn("0xa9059cbb000000000000000000000000abcdefabcdefabcdefabcdefabcdefabcdefabcdef0000000000000000000000000000000000000000000000000000000005f5e100") // 100 USDC
 
         val ethGetTransactionByHash = mock(EthGetTransactionByHash::class.java)
         whenever(ethGetTransactionByHash.result).thenReturn(transaction)
 
-        // Mock transaction receipt
+        // Mock USDC Transfer event log
+        val transferLog = mock(Log::class.java)
+        whenever(transferLog.address).thenReturn(usdcContractAddress) // From USDC contract
+        whenever(transferLog.topics).thenReturn(listOf(
+            "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef", // Transfer event signature
+            "0x000000000000000000000000deadbeefdeadbeefdeadbeefdeadbeefdeadbeef", // from address (sender)
+            "0x000000000000000000000000abcdefabcdefabcdefabcdefabcdefabcdefabcdef"  // to address (recipient)
+        ))
+        whenever(transferLog.data).thenReturn("0x0000000000000000000000000000000000000000000000000000000005f5e100") // 100 USDC (100 * 1e6)
+
+        // Mock transaction receipt with USDC Transfer event
         val receipt = mock(TransactionReceipt::class.java)
         whenever(receipt.isStatusOK).thenReturn(true)
+        whenever(receipt.logs).thenReturn(listOf(transferLog))
 
         val ethGetTransactionReceipt = mock(EthGetTransactionReceipt::class.java)
         whenever(ethGetTransactionReceipt.result).thenReturn(receipt)
@@ -115,6 +128,7 @@ class TransactionVerificationServiceTest {
         assertEquals(txHash, result.transactionHash)
         assertEquals(contractAddress, result.contractAddress)
         assertEquals(expectedAmount, result.amount)
+        assertEquals(100.0, result.actualAmount) // Verify parsed amount
     }
 
     @Test
@@ -257,5 +271,135 @@ class TransactionVerificationServiceTest {
         // Then
         assertFalse(result.verified)
         assertEquals("Transaction recipient does not match expected merchant wallet", result.error)
+    }
+
+    @Test
+    fun `should fail verification when no USDC Transfer events found`() = runBlocking {
+        // Given
+        val service = createService()
+        val txHash = "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+        val contractAddress = "0x9876543210fedcba9876543210fedcba98765432"
+        val expectedAmount = 100.0
+        val expectedRecipient = "0xabcdefabcdefabcdefabcdefabcdefabcdefabcdef"
+        val merchantWallet = "0xabcdefabcdefabcdefabcdefabcdefabcdefabcdef"
+
+        // Mock transaction
+        val transaction = mock(Transaction::class.java)
+        whenever(transaction.to).thenReturn(contractAddress)
+        whenever(transaction.blockNumber).thenReturn(BigInteger.valueOf(1000))
+
+        val ethGetTransactionByHash = mock(EthGetTransactionByHash::class.java)
+        whenever(ethGetTransactionByHash.result).thenReturn(transaction)
+
+        // Mock transaction receipt with no USDC logs
+        val receipt = mock(TransactionReceipt::class.java)
+        whenever(receipt.isStatusOK).thenReturn(true)
+        whenever(receipt.logs).thenReturn(emptyList()) // No logs
+
+        val ethGetTransactionReceipt = mock(EthGetTransactionReceipt::class.java)
+        whenever(ethGetTransactionReceipt.result).thenReturn(receipt)
+
+        // Mock current block number
+        val ethBlockNumber = mock(EthBlockNumber::class.java)
+        whenever(ethBlockNumber.blockNumber).thenReturn(BigInteger.valueOf(1001))
+
+        // Mock Web3j calls
+        whenever(web3j.ethGetTransactionByHash(txHash)).thenReturn(
+            mock(Request::class.java) as Request<*, EthGetTransactionByHash>
+        )
+        whenever(web3j.ethGetTransactionByHash(txHash).send()).thenReturn(ethGetTransactionByHash)
+
+        whenever(web3j.ethGetTransactionReceipt(txHash)).thenReturn(
+            mock(Request::class.java) as Request<*, EthGetTransactionReceipt>
+        )
+        whenever(web3j.ethGetTransactionReceipt(txHash).send()).thenReturn(ethGetTransactionReceipt)
+
+        whenever(web3j.ethBlockNumber()).thenReturn(
+            mock(Request::class.java) as Request<*, EthBlockNumber>
+        )
+        whenever(web3j.ethBlockNumber().send()).thenReturn(ethBlockNumber)
+
+        // When
+        val result = service.verifyTransactionForWebhook(
+            transactionHash = txHash,
+            contractAddress = contractAddress,
+            expectedAmount = expectedAmount,
+            expectedRecipient = expectedRecipient,
+            merchantWallet = merchantWallet
+        )
+
+        // Then
+        assertFalse(result.verified)
+        assertEquals("No USDC Transfer event found to expected recipient", result.error)
+    }
+
+    @Test
+    fun `should fail verification when USDC transfer amount is insufficient`() = runBlocking {
+        // Given
+        val service = createService()
+        val txHash = "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+        val contractAddress = "0x9876543210fedcba9876543210fedcba98765432"
+        val expectedAmount = 100.0
+        val expectedRecipient = "0xabcdefabcdefabcdefabcdefabcdefabcdefabcdef"
+        val merchantWallet = "0xabcdefabcdefabcdefabcdefabcdefabcdefabcdef"
+
+        // Mock transaction
+        val transaction = mock(Transaction::class.java)
+        whenever(transaction.to).thenReturn(contractAddress)
+        whenever(transaction.blockNumber).thenReturn(BigInteger.valueOf(1000))
+
+        val ethGetTransactionByHash = mock(EthGetTransactionByHash::class.java)
+        whenever(ethGetTransactionByHash.result).thenReturn(transaction)
+
+        // Mock USDC Transfer event log with insufficient amount (50 USDC instead of 100)
+        val transferLog = mock(Log::class.java)
+        whenever(transferLog.address).thenReturn(usdcContractAddress)
+        whenever(transferLog.topics).thenReturn(listOf(
+            "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef",
+            "0x000000000000000000000000deadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
+            "0x000000000000000000000000abcdefabcdefabcdefabcdefabcdefabcdefabcdef"
+        ))
+        whenever(transferLog.data).thenReturn("0x00000000000000000000000000000000000000000000000000000000002faf80") // 50 USDC (50 * 1e6)
+
+        // Mock transaction receipt
+        val receipt = mock(TransactionReceipt::class.java)
+        whenever(receipt.isStatusOK).thenReturn(true)
+        whenever(receipt.logs).thenReturn(listOf(transferLog))
+
+        val ethGetTransactionReceipt = mock(EthGetTransactionReceipt::class.java)
+        whenever(ethGetTransactionReceipt.result).thenReturn(receipt)
+
+        // Mock current block number
+        val ethBlockNumber = mock(EthBlockNumber::class.java)
+        whenever(ethBlockNumber.blockNumber).thenReturn(BigInteger.valueOf(1001))
+
+        // Mock Web3j calls
+        whenever(web3j.ethGetTransactionByHash(txHash)).thenReturn(
+            mock(Request::class.java) as Request<*, EthGetTransactionByHash>
+        )
+        whenever(web3j.ethGetTransactionByHash(txHash).send()).thenReturn(ethGetTransactionByHash)
+
+        whenever(web3j.ethGetTransactionReceipt(txHash)).thenReturn(
+            mock(Request::class.java) as Request<*, EthGetTransactionReceipt>
+        )
+        whenever(web3j.ethGetTransactionReceipt(txHash).send()).thenReturn(ethGetTransactionReceipt)
+
+        whenever(web3j.ethBlockNumber()).thenReturn(
+            mock(Request::class.java) as Request<*, EthBlockNumber>
+        )
+        whenever(web3j.ethBlockNumber().send()).thenReturn(ethBlockNumber)
+
+        // When
+        val result = service.verifyTransactionForWebhook(
+            transactionHash = txHash,
+            contractAddress = contractAddress,
+            expectedAmount = expectedAmount,
+            expectedRecipient = expectedRecipient,
+            merchantWallet = merchantWallet
+        )
+
+        // Then
+        assertFalse(result.verified)
+        assertEquals("USDC transfer amount (50.0) is less than expected amount (100.0)", result.error)
     }
 }

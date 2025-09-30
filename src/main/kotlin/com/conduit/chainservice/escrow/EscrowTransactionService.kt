@@ -795,30 +795,19 @@ class EscrowTransactionService(
                 )
             }
 
-            // Check if transaction is to USDC contract (for token transfers) or direct ETH transfer
-            if (actualRecipient == usdcContractAddress.lowercase()) {
-                // This is a USDC token transfer - parse the transaction data
-                val verificationResult = verifyUSDCTransfer(tx, expectedAmount, expectedRecipient, merchantWallet)
-                if (!verificationResult.verified) {
-                    return verificationResult
-                }
-            } else {
-                // Direct transfer - verify amount
-                val actualAmount = org.web3j.utils.Convert.fromWei(tx.value.toBigDecimal(), org.web3j.utils.Convert.Unit.ETHER).toDouble()
-                if (actualAmount < expectedAmount) {
-                    return TransactionVerificationResult(
-                        verified = false,
-                        error = "Transaction amount ($actualAmount) is less than expected amount ($expectedAmount)"
-                    )
-                }
+            // Parse USDC transfer amount from transaction receipt logs (ERC-20 Transfer events)
+            val usdcTransferResult = parseUSDCTransferFromLogs(txReceipt, expectedAmount, expectedRecipient, merchantWallet)
+            if (!usdcTransferResult.verified) {
+                return usdcTransferResult
             }
 
-            logger.info("Transaction $transactionHash successfully verified for webhook")
+            logger.info("Transaction $transactionHash successfully verified for webhook with USDC amount: ${usdcTransferResult.actualAmount}")
             TransactionVerificationResult(
                 verified = true,
                 transactionHash = transactionHash,
                 contractAddress = contractAddress,
                 amount = expectedAmount,
+                actualAmount = usdcTransferResult.actualAmount,
                 recipient = actualRecipient ?: expectedRecipient
             )
 
@@ -827,6 +816,106 @@ class EscrowTransactionService(
             TransactionVerificationResult(
                 verified = false,
                 error = e.message ?: "Failed to verify transaction"
+            )
+        }
+    }
+
+    /**
+     * Parses USDC transfer amount from transaction receipt logs (ERC-20 Transfer events)
+     * This handles escrow contract transactions where USDC transfers are recorded as events
+     */
+    private fun parseUSDCTransferFromLogs(
+        txReceipt: TransactionReceipt,
+        expectedAmount: Double,
+        expectedRecipient: String,
+        merchantWallet: String
+    ): TransactionVerificationResult {
+        return try {
+            logger.debug("Parsing USDC transfer from ${txReceipt.logs.size} logs in transaction receipt")
+
+            // ERC-20 Transfer event signature: Transfer(address indexed from, address indexed to, uint256 value)
+            val transferEventSignature = "0x" + org.web3j.crypto.Hash.sha3String("Transfer(address,address,uint256)").substring(2)
+            logger.debug("Looking for Transfer event signature: $transferEventSignature")
+
+            var totalUSDCTransferred = 0.0
+            var foundValidTransfer = false
+
+            for (log in txReceipt.logs) {
+                // Check if this log is from the USDC contract
+                if (!log.address.equals(usdcContractAddress, ignoreCase = true)) {
+                    continue
+                }
+
+                // Check if this is a Transfer event
+                if (log.topics.size < 3 || !log.topics[0].equals(transferEventSignature, ignoreCase = true)) {
+                    continue
+                }
+
+                logger.debug("Found USDC Transfer event: topics=${log.topics.size}, data=${log.data}")
+
+                try {
+                    // Extract recipient address from indexed parameter (topic[2] - 'to' address)
+                    val toAddressTopic = log.topics[2]
+                    val toAddress = if (toAddressTopic.length == 66) {
+                        "0x" + toAddressTopic.substring(26) // Last 20 bytes = address
+                    } else {
+                        toAddressTopic
+                    }.lowercase()
+
+                    // Parse transfer amount from log data (non-indexed parameter)
+                    val transferAmount = if (log.data.isNotEmpty() && log.data != "0x") {
+                        val amountHex = log.data.substring(2) // Remove 0x prefix
+                        val amountBigInt = BigInteger(amountHex, 16)
+                        amountBigInt.toDouble() / 1_000_000.0 // Convert from microUSDC to USDC (6 decimals)
+                    } else {
+                        0.0
+                    }
+
+                    logger.debug("Transfer event: to=$toAddress, amount=$transferAmount USDC")
+
+                    // Check if this transfer is to the expected recipient or merchant wallet
+                    val expectedRecipientLower = expectedRecipient.lowercase()
+                    val merchantWalletLower = merchantWallet.lowercase()
+
+                    if (toAddress == expectedRecipientLower || toAddress == merchantWalletLower) {
+                        totalUSDCTransferred += transferAmount
+                        foundValidTransfer = true
+                        logger.debug("Valid USDC transfer found: $transferAmount USDC to $toAddress")
+                    }
+
+                } catch (e: Exception) {
+                    logger.warn("Failed to parse Transfer event: ${e.message}")
+                    // Continue processing other logs
+                }
+            }
+
+            if (!foundValidTransfer) {
+                return TransactionVerificationResult(
+                    verified = false,
+                    error = "No USDC Transfer event found to expected recipient"
+                )
+            }
+
+            logger.info("Total USDC transferred: $totalUSDCTransferred, expected: $expectedAmount")
+
+            // Verify the transfer amount meets the expected minimum
+            if (totalUSDCTransferred < expectedAmount) {
+                return TransactionVerificationResult(
+                    verified = false,
+                    error = "USDC transfer amount ($totalUSDCTransferred) is less than expected amount ($expectedAmount)"
+                )
+            }
+
+            TransactionVerificationResult(
+                verified = true,
+                actualAmount = totalUSDCTransferred
+            )
+
+        } catch (e: Exception) {
+            logger.error("Error parsing USDC transfer from logs", e)
+            TransactionVerificationResult(
+                verified = false,
+                error = "Failed to parse USDC transfer from transaction logs: ${e.message}"
             )
         }
     }
