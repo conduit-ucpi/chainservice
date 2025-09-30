@@ -30,7 +30,8 @@ class WebSecurityConfiguration(
                         "/api-docs/**",
                         "/v3/api-docs/**",
                         "/api/chain/claim-funds-as-gas-payer",
-                        "/api/chain/contracts/batch-info"
+                        "/api/chain/contracts/batch-info",
+                        "/api/chain/verify-and-webhook"
                     ).permitAll()
                     // All API endpoints require authentication
                     .requestMatchers("/api/**").authenticated()
