@@ -1378,12 +1378,12 @@ class EscrowController(
 
             logger.info("Transaction ${request.transaction_hash} verified successfully")
 
-            // Step 2: Send webhook to WordPress
+            // Step 2: Send webhook to WordPress with contract_hash as primary identifier
             val webhookResult = runBlocking {
                 webhookService.sendWebhook(
                     webhookUrl = request.webhook_url,
-                    contractId = request.contract_address,
-                    orderId = request.order_id,
+                    contractHash = request.contract_address, // Primary identifier: full contract address
+                    orderId = request.order_id,              // Supplementary data for reference
                     transactionHash = request.transaction_hash,
                     amount = verificationResult.actualAmount ?: request.expected_amount
                 )

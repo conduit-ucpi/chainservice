@@ -17,21 +17,23 @@ class WebhookService(
 
     /**
      * Sends a webhook to WordPress with transaction verification result
+     * Uses contract_hash as the primary identifier and order_id as supplementary data
      */
     suspend fun sendWebhook(
         webhookUrl: String,
-        contractId: String,
+        contractHash: String,
         orderId: Int,
         transactionHash: String,
         amount: Double
     ): WebhookResult {
         return try {
-            logger.info("Sending webhook to WordPress: url=$webhookUrl, contractId=$contractId, orderId=$orderId")
+            logger.info("Sending webhook to WordPress: url=$webhookUrl, contractHash=$contractHash (primary ID), orderId=$orderId (supplementary)")
 
             val webhookPayload = mapOf(
-                "contract_id" to contractId,
+                "contract_hash" to contractHash, // Primary identifier - full contract address
+                "contract_id" to contractHash,   // Alias for backward compatibility
                 "status" to "funded",
-                "order_id" to orderId,
+                "order_id" to orderId,           // Supplementary data for reference
                 "transaction_hash" to transactionHash,
                 "amount" to amount,
                 "timestamp" to Instant.now().epochSecond
