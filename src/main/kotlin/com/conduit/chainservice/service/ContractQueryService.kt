@@ -498,7 +498,7 @@ class ContractQueryService(
         
         try {
             // Prepare the encoded function calls for each contract using proper Call3 structs
-            val calls = contractAddresses.map { contractAddress ->
+            val calls = contractAddresses.mapIndexed { index, contractAddress ->
                 // Encode the getContractInfo() function call
                 val function = Function(
                     "getContractInfo",
@@ -516,6 +516,15 @@ class ContractQueryService(
                     )
                 )
                 val encodedFunction = FunctionEncoder.encode(function)
+
+                // Log details for first few calls to help debug
+                if (index < 3) {
+                    logger.debug("Call $index details:")
+                    logger.debug("  - Contract: $contractAddress")
+                    logger.debug("  - Function signature: ${function.name}")
+                    logger.debug("  - Encoded function: $encodedFunction")
+                    logger.debug("  - Encoded function length: ${encodedFunction.length}")
+                }
 
                 // Create Call3 struct: (address target, bool allowFailure, bytes callData)
                 Multicall3Call3.create(
@@ -536,7 +545,15 @@ class ContractQueryService(
             )
             
             val encodedMulticall = FunctionEncoder.encode(aggregate3Function)
-            
+
+            // Log detailed multicall3 information for debugging
+            logger.debug("Multicall3 Details:")
+            logger.debug("  - Target address: $multicall3Address")
+            logger.debug("  - Contract count: ${contractAddresses.size}")
+            logger.debug("  - Contracts: ${contractAddresses.take(5)}${if (contractAddresses.size > 5) "... (+${contractAddresses.size - 5} more)" else ""}")
+            logger.debug("  - Encoded multicall length: ${encodedMulticall.length} chars")
+            logger.debug("  - Encoded multicall: ${encodedMulticall.take(200)}${if (encodedMulticall.length > 200) "..." else ""}")
+
             // Execute the single multicall
             val ethCall: EthCall = web3j.ethCall(
                 org.web3j.protocol.core.methods.request.Transaction.createEthCallTransaction(
@@ -544,8 +561,15 @@ class ContractQueryService(
                 ),
                 DefaultBlockParameterName.LATEST
             ).send()
-            
+
             if (ethCall.hasError()) {
+                logger.error("Multicall3 execution failed:")
+                logger.error("  - Error code: ${ethCall.error.code}")
+                logger.error("  - Error message: ${ethCall.error.message}")
+                logger.error("  - Error data: ${ethCall.error.data}")
+                logger.error("  - Multicall3 address: $multicall3Address")
+                logger.error("  - Number of calls: ${contractAddresses.size}")
+                logger.error("  - Sample contracts: ${contractAddresses.take(3)}")
                 throw RuntimeException("Multicall3 error: ${ethCall.error.message}")
             }
             
@@ -588,11 +612,47 @@ class ContractQueryService(
             }
             
         } catch (e: Exception) {
-            // Check if this is a rate limiting error
-            val isRateLimited = handleRateLimitingError(e, operation = "Multicall3 aggregate")
-            if (!isRateLimited) {
-                logger.error("Error executing multicall3", e)
+            // Enhanced error logging for multicall3 failures
+            val errorMessage = e.message ?: "Unknown error"
+
+            when {
+                errorMessage.contains("execution reverted", ignoreCase = true) -> {
+                    logger.error("Multicall3 execution reverted - this usually means one or more contract calls failed:")
+                    logger.error("  - Possible causes: invalid contract addresses, contracts without getContractInfo() function, gas limit exceeded")
+                    logger.error("  - Contract count: ${contractAddresses.size}")
+                    logger.error("  - Multicall3 address: $multicall3Address (Base network)")
+                    logger.error("  - First few contracts: ${contractAddresses.take(5)}")
+
+                    // Test the first contract individually to help diagnose the issue
+                    if (contractAddresses.isNotEmpty()) {
+                        try {
+                            val testContract = contractAddresses.first()
+                            logger.info("Testing individual call to first contract: $testContract")
+                            val testResult = getContractInfo(testContract)
+                            logger.info("Individual call succeeded - multicall3 issue is likely with batch processing or gas limits")
+                        } catch (testE: Exception) {
+                            logger.error("Individual call also failed for first contract - issue may be with contract addresses or getContractInfo function: ${testE.message}")
+                        }
+                    }
+
+                    // Try to get more info about which contracts might be invalid
+                    logger.error("  - Will fall back to individual parallel queries to identify problematic contracts")
+                }
+
+                errorMessage.contains("rate limit", ignoreCase = true) ||
+                errorMessage.contains("429", ignoreCase = true) -> {
+                    handleRateLimitingError(e, operation = "Multicall3 aggregate")
+                }
+
+                else -> {
+                    logger.error("Unexpected error in multicall3 execution:")
+                    logger.error("  - Error type: ${e::class.simpleName}")
+                    logger.error("  - Error message: $errorMessage")
+                    logger.error("  - Contract count: ${contractAddresses.size}")
+                    logger.error("  - Multicall3 address: $multicall3Address")
+                }
             }
+
             throw e
         }
         
