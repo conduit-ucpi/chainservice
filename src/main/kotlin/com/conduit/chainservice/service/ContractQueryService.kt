@@ -459,11 +459,38 @@ class ContractQueryService(
         val multicall3Address = "0xcA11bde05977b3631167028862bE2a173976CA11"
         
         try {
-            // If we have contracts to query, use true multicall
+            // If we have contracts to query, use multicall3 with batch size limiting
             if (contractAddresses.isNotEmpty()) {
-                val multicallResults = executeMulticall3(multicall3Address, contractAddresses)
-                results.putAll(multicallResults)
-                logger.debug("Multicall3 batch completed: ${results.size} results retrieved in single RPC call")
+                val maxBatchSize = 10 // Conservative batch size to avoid gas limits
+
+                if (contractAddresses.size <= maxBatchSize) {
+                    // Small batch - try direct multicall3
+                    logger.debug("Small batch (${contractAddresses.size} contracts), using single multicall3")
+                    val multicallResults = executeMulticall3(multicall3Address, contractAddresses)
+                    results.putAll(multicallResults)
+                    logger.debug("Multicall3 batch completed: ${results.size} results retrieved in single RPC call")
+                } else {
+                    // Large batch - split into smaller chunks to avoid gas limits
+                    logger.info("Large batch detected (${contractAddresses.size} contracts), splitting into chunks of $maxBatchSize")
+                    val chunks = contractAddresses.chunked(maxBatchSize)
+                    var successfulChunks = 0
+
+                    for ((chunkIndex, chunk) in chunks.withIndex()) {
+                        try {
+                            logger.debug("Processing multicall3 chunk ${chunkIndex + 1}/${chunks.size}: ${chunk.size} contracts")
+                            val chunkResults = executeMulticall3(multicall3Address, chunk)
+                            results.putAll(chunkResults)
+                            successfulChunks++
+                            logger.debug("Chunk ${chunkIndex + 1} completed: ${chunkResults.size} results")
+                        } catch (chunkException: Exception) {
+                            logger.warn("Multicall3 chunk ${chunkIndex + 1} failed: ${chunkException.message}")
+                            // This chunk failed - will be handled by the outer catch block
+                            throw chunkException
+                        }
+                    }
+
+                    logger.info("Multicall3 batch processing completed: $successfulChunks/${chunks.size} chunks successful, ${results.size} total results")
+                }
             }
             
         } catch (e: Exception) {
