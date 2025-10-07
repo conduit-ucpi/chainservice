@@ -530,7 +530,7 @@ class ContractQueryService(
                         DynamicStruct(callData)
                     }
                 )),
-                listOf(TypeReference.create(DynamicArray::class.java)) // returns Result[] struct
+                listOf(object : TypeReference<DynamicArray<DynamicStruct>>() {}) // returns Result[] struct with proper parameterization
             )
             
             val encodedMulticall = FunctionEncoder.encode(aggregate3Function)
@@ -554,7 +554,7 @@ class ContractQueryService(
             }
             
             // Decode the results
-            val outputTypes = listOf(TypeReference.create(DynamicArray::class.java))
+            val outputTypes = listOf(object : TypeReference<DynamicArray<DynamicStruct>>() {})
             val decodedOutput = FunctionReturnDecoder.decode(returnValue, outputTypes as List<TypeReference<Type<Any>>>)
             
             if (decodedOutput.isNotEmpty()) {

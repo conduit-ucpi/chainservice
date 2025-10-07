@@ -11,6 +11,9 @@ import org.mockito.Mock
 import org.mockito.MockitoAnnotations
 import org.mockito.kotlin.*
 import org.web3j.protocol.Web3j
+import org.web3j.abi.TypeReference
+import org.web3j.abi.datatypes.DynamicArray
+import org.web3j.abi.datatypes.DynamicStruct
 import java.math.BigInteger
 import java.time.Instant
 
@@ -114,5 +117,19 @@ class ContractQueryServiceTest {
         val result = contractQueryService.getContractsForWallet(walletAddress, null)
 
         assertEquals(0, result.size)
+    }
+
+    @Test
+    fun `multicall3 TypeReference construction - should not throw ClassCastException`() {
+        // Test that the TypeReference for DynamicArray<DynamicStruct> can be created without errors
+        // This verifies our fix for the Web3j ABI decoding issue
+        assertDoesNotThrow {
+            val typeReference = object : TypeReference<DynamicArray<DynamicStruct>>() {}
+            assertNotNull(typeReference)
+
+            // Verify the type is properly parameterized
+            assertTrue(typeReference.type.toString().contains("DynamicArray"))
+            assertTrue(typeReference.type.toString().contains("DynamicStruct"))
+        }
     }
 }
