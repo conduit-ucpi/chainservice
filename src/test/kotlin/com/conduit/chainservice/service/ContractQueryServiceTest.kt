@@ -14,6 +14,7 @@ import org.web3j.protocol.Web3j
 import org.web3j.abi.TypeReference
 import org.web3j.abi.datatypes.DynamicArray
 import org.web3j.abi.datatypes.DynamicStruct
+import com.conduit.chainservice.model.Multicall3Result
 import java.math.BigInteger
 import java.time.Instant
 
@@ -121,15 +122,15 @@ class ContractQueryServiceTest {
 
     @Test
     fun `multicall3 TypeReference construction - should not throw ClassCastException`() {
-        // Test that the TypeReference for DynamicArray<DynamicStruct> can be created without errors
+        // Test that the TypeReference for DynamicArray<Multicall3Result> can be created without errors
         // This verifies our fix for the Web3j ABI decoding issue
         assertDoesNotThrow {
-            val typeReference = object : TypeReference<DynamicArray<DynamicStruct>>() {}
+            val typeReference = object : TypeReference<DynamicArray<Multicall3Result>>() {}
             assertNotNull(typeReference)
 
             // Verify the type is properly parameterized
             assertTrue(typeReference.type.toString().contains("DynamicArray"))
-            assertTrue(typeReference.type.toString().contains("DynamicStruct"))
+            assertTrue(typeReference.type.toString().contains("Multicall3Result"))
         }
     }
 }

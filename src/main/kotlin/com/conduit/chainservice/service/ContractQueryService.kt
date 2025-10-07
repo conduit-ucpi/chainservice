@@ -26,6 +26,10 @@ import org.web3j.abi.datatypes.DynamicArray
 import org.web3j.abi.datatypes.DynamicStruct
 import org.web3j.abi.datatypes.Type
 import org.web3j.abi.datatypes.Bool
+import org.web3j.abi.datatypes.DynamicBytes
+import org.web3j.abi.datatypes.StaticStruct
+import com.conduit.chainservice.model.Multicall3Result
+import com.conduit.chainservice.model.Multicall3Call3
 import java.math.BigInteger
 import java.time.Instant
 import kotlinx.coroutines.async
@@ -493,7 +497,7 @@ class ContractQueryService(
         val results = mutableMapOf<String, Map<String, Any>>()
         
         try {
-            // Prepare the encoded function calls for each contract
+            // Prepare the encoded function calls for each contract using proper Call3 structs
             val calls = contractAddresses.map { contractAddress ->
                 // Encode the getContractInfo() function call
                 val function = Function(
@@ -512,25 +516,23 @@ class ContractQueryService(
                     )
                 )
                 val encodedFunction = FunctionEncoder.encode(function)
-                
+
                 // Create Call3 struct: (address target, bool allowFailure, bytes callData)
-                listOf(
-                    Address(contractAddress),
-                    Bool(true), // allowFailure = true to handle failed calls gracefully
-                    org.web3j.abi.datatypes.DynamicBytes(org.web3j.utils.Numeric.hexStringToByteArray(encodedFunction))
+                Multicall3Call3.create(
+                    contractAddress,
+                    true, // allowFailure = true to handle failed calls gracefully
+                    org.web3j.utils.Numeric.hexStringToByteArray(encodedFunction)
                 )
             }
-            
+
             // Encode the aggregate3 function call for Multicall3
             val aggregate3Function = Function(
                 "aggregate3",
                 listOf(DynamicArray(
-                    DynamicStruct::class.java,
-                    calls.map { callData ->
-                        DynamicStruct(callData)
-                    }
+                    Multicall3Call3::class.java,
+                    calls
                 )),
-                listOf(object : TypeReference<DynamicArray<DynamicStruct>>() {}) // returns Result[] struct with proper parameterization
+                listOf(object : TypeReference<DynamicArray<Multicall3Result>>() {}) // returns Result[] struct with proper parameterization
             )
             
             val encodedMulticall = FunctionEncoder.encode(aggregate3Function)
@@ -554,7 +556,7 @@ class ContractQueryService(
             }
             
             // Decode the results
-            val outputTypes = listOf(object : TypeReference<DynamicArray<DynamicStruct>>() {})
+            val outputTypes = listOf(object : TypeReference<DynamicArray<Multicall3Result>>() {})
             val decodedOutput = FunctionReturnDecoder.decode(returnValue, outputTypes as List<TypeReference<Type<Any>>>)
             
             if (decodedOutput.isNotEmpty()) {
@@ -565,9 +567,9 @@ class ContractQueryService(
                         val contractAddress = contractAddresses[index]
                         try {
                             // Each result is a struct with (bool success, bytes returnData)
-                            val resultStruct = result as DynamicStruct
-                            val success = resultStruct.value[0] as Bool
-                            val returnData = resultStruct.value[1] as org.web3j.abi.datatypes.DynamicBytes
+                            val resultStruct = result as Multicall3Result
+                            val success = resultStruct.success
+                            val returnData = resultStruct.returnData
                             
                             if (success.value) {
                                 // Decode the getContractInfo return data
