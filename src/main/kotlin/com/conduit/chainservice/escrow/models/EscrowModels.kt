@@ -242,37 +242,35 @@ data class ErrorResponse(
 data class AdminResolveContractRequest(
     @field:NotNull(message = "Buyer percentage is required")
     val buyerPercentage: Double,
-    
+
     @field:NotNull(message = "Seller percentage is required")
     val sellerPercentage: Double,
-    
+
     val resolutionNote: String? = null,
-    
-    // Email fields for notifications - required for admin resolving disputes
-    @field:NotBlank(message = "Buyer email is required")
-    val buyerEmail: String,
-    
-    @field:NotBlank(message = "Seller email is required")
-    val sellerEmail: String,
-    
+
+    // Email fields for notifications - optional for wallet-only users (empty string indicates wallet-only)
+    val buyerEmail: String? = null,
+
+    val sellerEmail: String? = null,
+
     @field:NotBlank(message = "Contract description is required")
     val contractDescription: String,
-    
+
     @field:NotBlank(message = "Product name is required")
     val productName: String,
-    
+
     @field:NotBlank(message = "Amount is required")
     val amount: String,
-    
+
     @field:NotBlank(message = "Currency is required")
     val currency: String,
-    
+
     @field:NotBlank(message = "Payout date time is required")
     val payoutDateTime: String,
-    
+
     @field:NotBlank(message = "Chain address is required")
     val chainAddress: String,
-    
+
     val sellerActualAmount: String? = null,
     val buyerActualAmount: String? = null,
     val link: String? = null
