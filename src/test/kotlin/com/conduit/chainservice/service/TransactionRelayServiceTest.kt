@@ -67,7 +67,7 @@ class TransactionRelayServiceTest {
         val operationNames = gasCosts.map { it.operation }
         assertTrue(operationNames.contains("claimFunds"))
         assertTrue(operationNames.contains("depositFunds"))
-        assertTrue(operationNames.contains("approveUSDC"))
+        assertTrue(operationNames.contains("approveToken"))
         assertTrue(operationNames.contains("createContract"))
         assertTrue(operationNames.contains("raiseDispute"))
         assertTrue(operationNames.contains("resolveDispute"))
@@ -79,22 +79,26 @@ class TransactionRelayServiceTest {
         // This test verifies that our refactoring correctly maintains the public API
         val publicMethods = TransactionRelayService::class.java.methods
         val methodNames = publicMethods.map { it.name }
-        
+
         assertTrue(methodNames.contains("depositFundsWithGasTransfer"))
-        assertTrue(methodNames.contains("approveUSDCWithGasTransfer"))  
+        assertTrue(methodNames.contains("approveTokenWithGasTransfer"))
+        assertTrue(methodNames.contains("approveUSDCWithGasTransfer")) // Deprecated but still available
         assertTrue(methodNames.contains("claimFundsWithGasTransfer"))
         assertTrue(methodNames.contains("raiseDisputeWithGasTransfer"))
-        
+
         // Verify the methods have the correct signature (should have String and String parameters)
         val depositMethod = publicMethods.find { it.name == "depositFundsWithGasTransfer" }
         assertNotNull(depositMethod, "depositFundsWithGasTransfer method should exist")
-        
-        val approveMethod = publicMethods.find { it.name == "approveUSDCWithGasTransfer" }
-        assertNotNull(approveMethod, "approveUSDCWithGasTransfer method should exist")
-        
+
+        val approveTokenMethod = publicMethods.find { it.name == "approveTokenWithGasTransfer" }
+        assertNotNull(approveTokenMethod, "approveTokenWithGasTransfer method should exist")
+
+        val approveUsdcMethod = publicMethods.find { it.name == "approveUSDCWithGasTransfer" }
+        assertNotNull(approveUsdcMethod, "approveUSDCWithGasTransfer method should exist (deprecated)")
+
         val claimMethod = publicMethods.find { it.name == "claimFundsWithGasTransfer" }
         assertNotNull(claimMethod, "claimFundsWithGasTransfer method should exist")
-        
+
         val raiseDisputeMethod = publicMethods.find { it.name == "raiseDisputeWithGasTransfer" }
         assertNotNull(raiseDisputeMethod, "raiseDisputeWithGasTransfer method should exist")
     }
@@ -132,13 +136,14 @@ class TransactionRelayServiceTest {
         
         val expectedMethods = listOf(
             "createContract",
-            "relayTransaction", 
+            "relayTransaction",
             "resolveDispute",
             "raiseDispute",
-            "claimFunds", 
+            "claimFunds",
             "depositFunds",
             "depositFundsWithGasTransfer",
-            "approveUSDCWithGasTransfer",
+            "approveTokenWithGasTransfer",
+            "approveUSDCWithGasTransfer", // Deprecated wrapper
             "claimFundsWithGasTransfer",
             "raiseDisputeWithGasTransfer",
             "getOperationGasCosts"

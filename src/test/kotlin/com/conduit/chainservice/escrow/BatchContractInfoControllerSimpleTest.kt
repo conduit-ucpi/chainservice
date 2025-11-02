@@ -55,10 +55,10 @@ class BatchContractInfoControllerSimpleTest {
     @BeforeEach
     fun setUp() {
         MockitoAnnotations.openMocks(this)
-        
-        // Mock the USDC contract address
-        whenever(escrowProperties.usdcContractAddress).thenReturn("0x5425890298aed601595a70AB815c96711a31Bc65")
-        
+
+        // Mock the token address query for all contracts
+        whenever(escrowTransactionService.getTokenAddressFromContract(any())).thenReturn("0x5425890298aed601595a70AB815c96711a31Bc65")
+
         escrowController = EscrowController(
             escrowTransactionService,
             contractQueryService,

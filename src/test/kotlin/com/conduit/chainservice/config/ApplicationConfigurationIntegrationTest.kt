@@ -24,7 +24,6 @@ class ApplicationConfigurationIntegrationTest {
     fun `should load configuration properties successfully with required environment variables`() {
         contextRunner
             .withPropertyValues(
-                "escrow.usdcContractAddress=0x1234567890123456789012345678901234567890",
                 "escrow.contractFactoryAddress=0x1234567890123456789012345678901234567890",
                 "escrow.minCreatorFee=1000000",
                 "escrow.limitCreateContract=273000",
@@ -32,7 +31,7 @@ class ApplicationConfigurationIntegrationTest {
                 "escrow.limitDispute=8800",
                 "escrow.limitClaim=40800",
                 "escrow.limitResolve=68000",
-                "escrow.limitApproveUsdc=60000",
+                "escrow.limitApproveToken=60000",
                 "escrow.gasMultiplier=1.11",
                 "auth.userServiceUrl=http://localhost:8080",
                 "auth.enabled=true"
@@ -41,11 +40,10 @@ class ApplicationConfigurationIntegrationTest {
                 // Check if we can get the beans by type
                 assertNotNull(context.getBean(EscrowProperties::class.java))
                 assertNotNull(context.getBean(AuthProperties::class.java))
-                
+
                 val escrowProps = context.getBean(EscrowProperties::class.java)
                 val authProps = context.getBean(AuthProperties::class.java)
-                
-                assertEquals("0x1234567890123456789012345678901234567890", escrowProps.usdcContractAddress)
+
                 assertEquals("0x1234567890123456789012345678901234567890", escrowProps.contractFactoryAddress)
                 assertEquals(java.math.BigInteger.valueOf(1000000), escrowProps.minCreatorFee)
                 assertEquals(273000L, escrowProps.limitCreateContract)
@@ -53,7 +51,7 @@ class ApplicationConfigurationIntegrationTest {
                 assertEquals(8800L, escrowProps.limitDispute)
                 assertEquals(40800L, escrowProps.limitClaim)
                 assertEquals(68000L, escrowProps.limitResolve)
-                assertEquals(60000L, escrowProps.limitApproveUsdc)
+                assertEquals(60000L, escrowProps.limitApproveToken)
                 assertEquals(1.11, escrowProps.gasMultiplier, 0.001)
                 
                 assertEquals("http://localhost:8080", authProps.userServiceUrl)
@@ -65,20 +63,19 @@ class ApplicationConfigurationIntegrationTest {
     fun `should work with kebab-case property names from YAML`() {
         contextRunner
             .withPropertyValues(
-                "escrow.usdc-contract-address=0x1234567890123456789012345678901234567890",
                 "escrow.contract-factory-address=0x1234567890123456789012345678901234567890",
                 "escrow.min-creator-fee=1000000",
-                "escrow.gas.limit-create-contract=500000",
-                "escrow.gas.limit-deposit=74161",
+                "escrow.limit-create-contract=500000",
+                "escrow.limit-deposit=74161",
+                "escrow.gas-multiplier=1.2",
                 "auth.user-service-url=http://localhost:8080",
                 "auth.enabled=true"
             )
             .run { context ->
                 val escrowProps = context.getBean(EscrowProperties::class.java)
                 val authProps = context.getBean(AuthProperties::class.java)
-                
+
                 // Spring Boot should handle kebab-case to camelCase conversion
-                assertEquals("0x1234567890123456789012345678901234567890", escrowProps.usdcContractAddress)
                 assertEquals("0x1234567890123456789012345678901234567890", escrowProps.contractFactoryAddress)
                 assertEquals("http://localhost:8080", authProps.userServiceUrl)
             }
@@ -94,7 +91,7 @@ class ApplicationConfigurationIntegrationTest {
                 "escrow.limitDispute=8800",
                 "escrow.limitClaim=40800",
                 "escrow.limitResolve=68000",
-                "escrow.limitApproveUsdc=60000",
+                "escrow.limitApproveToken=60000",
                 "escrow.gasMultiplier=1.11",
                 "auth.userServiceUrl=http://localhost:8080"
             )
@@ -108,7 +105,7 @@ class ApplicationConfigurationIntegrationTest {
                 assertEquals(8800L, escrowProps.limitDispute) // Default value
                 assertEquals(40800L, escrowProps.limitClaim) // Default value
                 assertEquals(68000L, escrowProps.limitResolve) // Default value
-                assertEquals(60000L, escrowProps.limitApproveUsdc) // Default value
+                assertEquals(60000L, escrowProps.limitApproveToken) // Default value
                 assertEquals(1.11, escrowProps.gasMultiplier, 0.001) // Default value
                 assertTrue(authProps.enabled) // Default value
             }

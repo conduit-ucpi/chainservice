@@ -33,7 +33,6 @@ class ConfigurationIntegrationTest {
                 "blockchain.gas.minimum-gas-price-wei=6",
                 
                 // Escrow properties (kebab-case - flattened structure)
-                "escrow.usdc-contract-address=0x5425890298aed601595a70AB815c96711a31Bc65",
                 "escrow.contract-factory-address=0x1234567890123456789012345678901234567890",
                 "escrow.min-creator-fee=1000000",
                 "escrow.limit-create-contract=273000",
@@ -41,7 +40,7 @@ class ConfigurationIntegrationTest {
                 "escrow.limit-dispute=8800",
                 "escrow.limit-claim=40800",
                 "escrow.limit-resolve=68000",
-                "escrow.limit-approve-usdc=60000",
+                "escrow.limit-approve-token=60000",
                 "escrow.gas-multiplier=1.11",
                 
                 // Auth properties (kebab-case)
@@ -63,7 +62,6 @@ class ConfigurationIntegrationTest {
                     assertEquals(6L, blockchainProps.gas.minimumGasPriceWei)
                     
                     // Verify escrow properties
-                    assertEquals("0x5425890298aed601595a70AB815c96711a31Bc65", escrowProps.usdcContractAddress)
                     assertEquals("0x1234567890123456789012345678901234567890", escrowProps.contractFactoryAddress)
                     assertEquals(java.math.BigInteger.valueOf(1000000), escrowProps.minCreatorFee)
                     assertEquals(273000L, escrowProps.limitCreateContract)
@@ -71,7 +69,7 @@ class ConfigurationIntegrationTest {
                     assertEquals(8800L, escrowProps.limitDispute)
                     assertEquals(40800L, escrowProps.limitClaim)
                     assertEquals(68000L, escrowProps.limitResolve)
-                    assertEquals(60000L, escrowProps.limitApproveUsdc)
+                    assertEquals(60000L, escrowProps.limitApproveToken)
                     assertEquals(1.11, escrowProps.gasMultiplier, 0.001)
                     
                     // Verify auth properties

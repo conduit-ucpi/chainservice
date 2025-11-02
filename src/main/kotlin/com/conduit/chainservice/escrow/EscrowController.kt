@@ -873,7 +873,7 @@ class EscrowController(
             
             val operationCosts = listOf(
                 OperationGasCost("createContract", escrowProperties.limitCreateContract.toBigInteger(), 0.toBigInteger(), 0.toBigInteger()),
-                OperationGasCost("approveUSDC", escrowProperties.limitApproveUsdc.toBigInteger(), 0.toBigInteger(), 0.toBigInteger()),
+                OperationGasCost("approveToken", escrowProperties.limitApproveToken.toBigInteger(), 0.toBigInteger(), 0.toBigInteger()),
                 OperationGasCost("depositFunds", escrowProperties.limitDeposit.toBigInteger(), 0.toBigInteger(), 0.toBigInteger()),
                 OperationGasCost("raiseDispute", escrowProperties.limitDispute.toBigInteger(), 0.toBigInteger(), 0.toBigInteger()),
                 OperationGasCost("claimFunds", escrowProperties.limitClaim.toBigInteger(), 0.toBigInteger(), 0.toBigInteger()),
@@ -900,57 +900,57 @@ class EscrowController(
         }
     }
 
-    @PostMapping("/transfer-usdc")
+    @PostMapping("/transfer-token")
     @Operation(
-        summary = "Transfer USDC",
-        description = "Transfers USDC tokens to another address by relaying a user-signed transaction. The service provides gas money and forwards the user-signed transaction. The transaction must be a standard ERC20 transfer call signed by the user's wallet."
+        summary = "Transfer Token",
+        description = "Transfers ERC20 tokens to another address by relaying a user-signed transaction. The service provides gas money and forwards the user-signed transaction. The transaction must be a standard ERC20 transfer call signed by the user's wallet. Works with any ERC20 token (USDC, USDT, DAI, etc.)."
     )
     @ApiResponses(value = [
         ApiResponse(
             responseCode = "200",
-            description = "USDC transfer successful",
-            content = [Content(schema = Schema(implementation = TransferUSDCResponse::class))]
+            description = "Token transfer successful",
+            content = [Content(schema = Schema(implementation = TransferTokenResponse::class))]
         ),
         ApiResponse(
             responseCode = "400",
             description = "Invalid request or transaction failed",
-            content = [Content(schema = Schema(implementation = TransferUSDCResponse::class))]
+            content = [Content(schema = Schema(implementation = TransferTokenResponse::class))]
         ),
         ApiResponse(
             responseCode = "401",
             description = "Authentication failed",
-            content = [Content(schema = Schema(implementation = TransferUSDCResponse::class))]
+            content = [Content(schema = Schema(implementation = TransferTokenResponse::class))]
         ),
         ApiResponse(
             responseCode = "500",
             description = "Internal server error",
-            content = [Content(schema = Schema(implementation = TransferUSDCResponse::class))]
+            content = [Content(schema = Schema(implementation = TransferTokenResponse::class))]
         )
     ])
-    fun transferUSDC(
+    fun transferToken(
         @Valid @RequestBody
         @io.swagger.v3.oas.annotations.parameters.RequestBody(
             content = [Content(
                 examples = [ExampleObject(
-                    name = "Transfer USDC Example",
+                    name = "Transfer Token Example",
                     value = """{"recipientAddress": "0x1234567890abcdef1234567890abcdef12345678", "amount": "100.50", "userWalletAddress": "0x9876543210fedcba9876543210fedcba98765432", "signedTransaction": "0xf86c8082520894..."}"""
                 )]
             )]
         )
-        request: TransferUSDCRequest,
+        request: TransferTokenRequest,
         httpRequest: HttpServletRequest
-    ): ResponseEntity<TransferUSDCResponse> {
+    ): ResponseEntity<TransferTokenResponse> {
         return try {
-            logger.info("Transfer USDC request received from ${request.userWalletAddress} to ${request.recipientAddress}, amount: ${request.amount} USDC")
-            
+            logger.info("Transfer token request received from ${request.userWalletAddress} to ${request.recipientAddress}, amount: ${request.amount}")
+
             // Validate that the authenticated user matches the wallet address
             val authenticatedUserWallet = httpRequest.getAttribute("userWallet") as? String
             val userType = httpRequest.getAttribute("userType") as? String
-            
+
             if (authenticatedUserWallet == null) {
                 logger.error("No authenticated user wallet found in request")
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
-                    TransferUSDCResponse(
+                    TransferTokenResponse(
                         success = false,
                         transactionHash = null,
                         message = "Authentication required",
@@ -958,11 +958,11 @@ class EscrowController(
                     )
                 )
             }
-            
+
             if (!authenticatedUserWallet.equals(request.userWalletAddress, ignoreCase = true)) {
                 logger.error("User wallet mismatch - authenticated: $authenticatedUserWallet, requested: ${request.userWalletAddress}")
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
-                    TransferUSDCResponse(
+                    TransferTokenResponse(
                         success = false,
                         transactionHash = null,
                         message = "Authentication failed",
@@ -970,29 +970,29 @@ class EscrowController(
                     )
                 )
             }
-            
+
             val result = runBlocking {
-                escrowTransactionService.transferUSDCWithGasTransfer(request.userWalletAddress, request.signedTransaction)
+                escrowTransactionService.transferTokenWithGasTransfer(request.userWalletAddress, request.signedTransaction)
             }
 
-            val response = TransferUSDCResponse(
+            val response = TransferTokenResponse(
                 success = result.success,
                 transactionHash = result.transactionHash,
-                message = if (result.success) "USDC transfer successful" else "USDC transfer failed",
+                message = if (result.success) "Token transfer successful" else "Token transfer failed",
                 error = if (!result.success) result.error else null
             )
 
             if (result.success) {
-                logger.info("USDC transferred successfully: ${result.transactionHash}")
+                logger.info("Token transferred successfully: ${result.transactionHash}")
                 ResponseEntity.ok(response)
             } else {
-                logger.error("USDC transfer failed: ${result.error}")
+                logger.error("Token transfer failed: ${result.error}")
                 ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response)
             }
 
         } catch (e: Exception) {
-            logger.error("Error in transfer USDC endpoint", e)
-            val response = TransferUSDCResponse(
+            logger.error("Error in transfer token endpoint", e)
+            val response = TransferTokenResponse(
                 success = false,
                 transactionHash = null,
                 message = "Internal server error",
@@ -1073,59 +1073,59 @@ class EscrowController(
         }
     }
 
-    @PostMapping("/approve-usdc")
+    @PostMapping("/approve-token")
     @Operation(
-        summary = "Approve USDC Spending",
-        description = "Approves an escrow contract to spend USDC tokens on behalf of the user. The service provides gas money and forwards the user-signed transaction."
+        summary = "Approve Token Spending",
+        description = "Approves an escrow contract to spend ERC20 tokens on behalf of the user. The service provides gas money and forwards the user-signed transaction. Works with any ERC20 token (USDC, USDT, DAI, etc.)."
     )
     @ApiResponses(value = [
         ApiResponse(
             responseCode = "200",
-            description = "USDC approval successful",
-            content = [Content(schema = Schema(implementation = ApproveUSDCResponse::class))]
+            description = "Token approval successful",
+            content = [Content(schema = Schema(implementation = ApproveTokenResponse::class))]
         ),
         ApiResponse(
             responseCode = "400",
             description = "Invalid request or transaction failed",
-            content = [Content(schema = Schema(implementation = ApproveUSDCResponse::class))]
+            content = [Content(schema = Schema(implementation = ApproveTokenResponse::class))]
         )
     ])
-    fun approveUSDC(
+    fun approveToken(
         @Valid @RequestBody
         @io.swagger.v3.oas.annotations.parameters.RequestBody(
             content = [Content(
                 examples = [ExampleObject(
-                    name = "Approve USDC Example",
+                    name = "Approve Token Example",
                     value = """{"userWalletAddress": "0x9876543210fedcba9876543210fedcba98765432", "signedTransaction": "0xf86c8082520894..."}"""
                 )]
             )]
         )
-        request: ApproveUSDCRequest
-    ): ResponseEntity<ApproveUSDCResponse> {
+        request: ApproveTokenRequest
+    ): ResponseEntity<ApproveTokenResponse> {
         return try {
-            logger.info("Approve USDC request received for user: ${request.userWalletAddress}")
-            
+            logger.info("Approve token request received for user: ${request.userWalletAddress}")
+
             val result = runBlocking {
-                escrowTransactionService.approveUSDCWithGasTransfer(request.userWalletAddress, request.signedTransaction)
+                escrowTransactionService.approveTokenWithGasTransfer(request.userWalletAddress, request.signedTransaction)
             }
 
-            val response = ApproveUSDCResponse(
+            val response = ApproveTokenResponse(
                 success = result.success,
                 transactionHash = result.transactionHash,
                 error = result.error
             )
 
             if (result.success) {
-                logger.info("USDC approved successfully: ${result.transactionHash}")
+                logger.info("Token approved successfully: ${result.transactionHash}")
                 ResponseEntity.ok(response)
             } else {
-                logger.error("USDC approval failed: ${result.error}")
+                logger.error("Token approval failed: ${result.error}")
                 ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response)
             }
 
         } catch (e: Exception) {
-            logger.error("Error in approve USDC endpoint", e)
-            val response = ApproveUSDCResponse(
+            logger.error("Error in approve token endpoint", e)
+            val response = ApproveTokenResponse(
                 success = false,
                 transactionHash = null,
                 error = e.message ?: "Internal server error"
@@ -1265,6 +1265,14 @@ class EscrowController(
             filteredResults.forEach { (contractAddress, result) ->
                 if (result.success && result.contractInfo != null) {
                     val contract = result.contractInfo!!
+                    // Query the token address from each contract dynamically
+                    val tokenAddress = try {
+                        escrowTransactionService.getTokenAddressFromContract(contractAddress)
+                    } catch (e: Exception) {
+                        logger.warn("Failed to query token address for contract $contractAddress: ${e.message}")
+                        "0x0000000000000000000000000000000000000000" // Fallback to zero address if query fails
+                    }
+
                     contractsMap[contractAddress] = ContractInfoJson(
                         contractAddress = contractAddress,
                         status = contract.status.name,
@@ -1274,7 +1282,7 @@ class EscrowController(
                         seller = contract.seller,
                         expiryTimestamp = contract.expiryTimestamp,
                         amount = contract.amount.toString(),
-                        tokenAddress = escrowProperties.usdcContractAddress,
+                        tokenAddress = tokenAddress,
                         exists = true
                     )
                 } else {

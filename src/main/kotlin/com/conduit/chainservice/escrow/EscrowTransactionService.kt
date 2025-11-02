@@ -29,13 +29,12 @@ class EscrowTransactionService(
     private val relayerCredentials: Credentials,
     private val gasProvider: ContractGasProvider,
     private val chainId: Long,
-    @Value("\${escrow.usdc-contract-address}") private val usdcContractAddress: String,
     @Value("\${escrow.contract-factory-address}") private val contractFactoryAddress: String,
     @Value("\${escrow.min-creator-fee}") private val minCreatorFee: String,
     @Value("\${escrow.limit-dispute}") private val limitDispute: Long,
     @Value("\${escrow.limit-claim}") private val limitClaim: Long,
     @Value("\${escrow.limit-deposit}") private val limitDeposit: Long,
-    @Value("\${escrow.limit-approve-usdc}") private val limitApproveUsdc: Long,
+    @Value("\${escrow.limit-approve-token}") private val limitApproveToken: Long,
     @Value("\${escrow.gas-multiplier}") private val gasMultiplier: Double
 ) {
 
@@ -103,7 +102,7 @@ class EscrowTransactionService(
         logger.debug("  - limitDispute: $limitDispute")
         logger.debug("  - limitClaim: $limitClaim")
         logger.debug("  - limitDeposit: $limitDeposit")
-        logger.debug("  - limitApproveUsdc: $limitApproveUsdc")
+        logger.debug("  - limitApproveToken: $limitApproveToken")
         logger.debug("  - gasMultiplier: $gasMultiplier")
     }
 
@@ -558,38 +557,38 @@ class EscrowTransactionService(
         return result
     }
 
-    suspend fun approveUSDCWithGasTransfer(userWalletAddress: String, signedTransactionHex: String): TransactionResult {
-        val gasLimit = BigInteger.valueOf((limitApproveUsdc * gasMultiplier).toLong())
-        logger.debug("approveUSDC gas calculation: baseLimit=$limitApproveUsdc, multiplier=$gasMultiplier, finalLimit=$gasLimit")
-        
-        val result = gasPayerServiceClient.processTransactionWithGasTransfer(
-            userWalletAddress, 
-            signedTransactionHex, 
-            "approveUSDC",
-            gasLimit
-        )
-        
-        // For approveUSDC, we're approving the USDC contract to spend tokens on behalf of the escrow contract
-        // This doesn't directly change contract state, but we might want to invalidate cache for related contracts
-        // For now, we'll skip cache invalidation for approve operations as they don't change escrow contract state
-        
-        return result
-    }
+    suspend fun approveTokenWithGasTransfer(userWalletAddress: String, signedTransactionHex: String): TransactionResult {
+        val gasLimit = BigInteger.valueOf((limitApproveToken * gasMultiplier).toLong())
+        logger.debug("approveToken gas calculation: baseLimit=$limitApproveToken, multiplier=$gasMultiplier, finalLimit=$gasLimit")
 
-    suspend fun transferUSDCWithGasTransfer(userWalletAddress: String, signedTransactionHex: String): TransactionResult {
-        val gasLimit = BigInteger.valueOf((limitApproveUsdc * gasMultiplier).toLong()) // Using same gas limit as approve since it's a similar ERC20 operation
-        logger.debug("transferUSDC gas calculation: baseLimit=$limitApproveUsdc, multiplier=$gasMultiplier, finalLimit=$gasLimit")
-        
         val result = gasPayerServiceClient.processTransactionWithGasTransfer(
             userWalletAddress,
             signedTransactionHex,
-            "transferUSDC",
+            "approveToken",
             gasLimit
         )
-        
-        // For transferUSDC, we're transferring tokens between wallets
+
+        // For approveToken, we're approving the token contract to spend tokens on behalf of the escrow contract
+        // This doesn't directly change contract state, but we might want to invalidate cache for related contracts
+        // For now, we'll skip cache invalidation for approve operations as they don't change escrow contract state
+
+        return result
+    }
+
+    suspend fun transferTokenWithGasTransfer(userWalletAddress: String, signedTransactionHex: String): TransactionResult {
+        val gasLimit = BigInteger.valueOf((limitApproveToken * gasMultiplier).toLong()) // Using same gas limit as approve since it's a similar ERC20 operation
+        logger.debug("transferToken gas calculation: baseLimit=$limitApproveToken, multiplier=$gasMultiplier, finalLimit=$gasLimit")
+
+        val result = gasPayerServiceClient.processTransactionWithGasTransfer(
+            userWalletAddress,
+            signedTransactionHex,
+            "transferToken",
+            gasLimit
+        )
+
+        // For transferToken, we're transferring tokens between wallets
         // This doesn't affect escrow contract state, so no cache invalidation needed
-        
+
         return result
     }
 
@@ -732,6 +731,52 @@ class EscrowTransactionService(
     }
 
     /**
+     * Queries the token address from an escrow contract
+     * This allows supporting multiple tokens (USDC, USDT, etc.) dynamically
+     */
+    fun getTokenAddressFromContract(contractAddress: String): String {
+        return try {
+            logger.debug("Querying token address from escrow contract: $contractAddress")
+
+            // Create function call for tokenAddress() view function
+            val function = Function(
+                "tokenAddress",
+                emptyList(),
+                listOf(object : org.web3j.abi.TypeReference<Address>() {})
+            )
+
+            val encodedFunction = FunctionEncoder.encode(function)
+            val ethCall = web3j.ethCall(
+                org.web3j.protocol.core.methods.request.Transaction.createEthCallTransaction(
+                    null,
+                    contractAddress,
+                    encodedFunction
+                ),
+                DefaultBlockParameterName.LATEST
+            ).send()
+
+            if (ethCall.hasError()) {
+                logger.error("Error querying token address from contract $contractAddress: ${ethCall.error.message}")
+                throw IllegalStateException("Failed to query token address: ${ethCall.error.message}")
+            }
+
+            // Decode the response
+            val result = ethCall.value
+            if (result == null || result == "0x") {
+                throw IllegalStateException("No token address returned from contract")
+            }
+
+            // Parse address from result (last 20 bytes)
+            val tokenAddress = "0x" + result.substring(result.length - 40)
+            logger.info("Escrow contract $contractAddress uses token: $tokenAddress")
+            tokenAddress
+        } catch (e: Exception) {
+            logger.error("Failed to query token address from escrow contract $contractAddress", e)
+            throw IllegalStateException("Could not determine token address for contract $contractAddress: ${e.message}", e)
+        }
+    }
+
+    /**
      * Verifies a blockchain transaction for WordPress webhook integration
      * Validates transaction details and returns verification result
      */
@@ -744,6 +789,10 @@ class EscrowTransactionService(
     ): TransactionVerificationResult {
         return try {
             logger.info("Verifying transaction $transactionHash for webhook integration")
+
+            // Query the token address from the escrow contract
+            val tokenAddress = getTokenAddressFromContract(contractAddress)
+            logger.info("Contract $contractAddress uses token $tokenAddress")
 
             // Get transaction details from blockchain
             val transaction = web3j.ethGetTransactionByHash(transactionHash).send()
@@ -795,19 +844,19 @@ class EscrowTransactionService(
                 )
             }
 
-            // Parse USDC transfer amount from transaction receipt logs (ERC-20 Transfer events)
-            val usdcTransferResult = parseUSDCTransferFromLogs(txReceipt, expectedAmount, expectedRecipient, merchantWallet)
-            if (!usdcTransferResult.verified) {
-                return usdcTransferResult
+            // Parse token transfer amount from transaction receipt logs (ERC-20 Transfer events)
+            val tokenTransferResult = parseTokenTransferFromLogs(txReceipt, expectedAmount, expectedRecipient, merchantWallet, tokenAddress)
+            if (!tokenTransferResult.verified) {
+                return tokenTransferResult
             }
 
-            logger.info("Transaction $transactionHash successfully verified for webhook with USDC amount: ${usdcTransferResult.actualAmount}")
+            logger.info("Transaction $transactionHash successfully verified for webhook with amount: ${tokenTransferResult.actualAmount}")
             TransactionVerificationResult(
                 verified = true,
                 transactionHash = transactionHash,
                 contractAddress = contractAddress,
                 amount = expectedAmount,
-                actualAmount = usdcTransferResult.actualAmount,
+                actualAmount = tokenTransferResult.actualAmount,
                 recipient = actualRecipient ?: expectedRecipient
             )
 
@@ -821,28 +870,30 @@ class EscrowTransactionService(
     }
 
     /**
-     * Parses USDC transfer amount from transaction receipt logs (ERC-20 Transfer events)
-     * This handles escrow contract transactions where USDC transfers are recorded as events
+     * Parses token transfer amount from transaction receipt logs (ERC-20 Transfer events)
+     * This handles escrow contract transactions where token transfers are recorded as events
+     * Supports any ERC20 token (USDC, USDT, etc.) by accepting token address parameter
      */
-    private fun parseUSDCTransferFromLogs(
+    private fun parseTokenTransferFromLogs(
         txReceipt: TransactionReceipt,
         expectedAmount: Double,
         expectedRecipient: String,
-        merchantWallet: String
+        merchantWallet: String,
+        tokenAddress: String
     ): TransactionVerificationResult {
         return try {
-            logger.debug("Parsing USDC transfer from ${txReceipt.logs.size} logs in transaction receipt")
+            logger.debug("Parsing token transfer from ${txReceipt.logs.size} logs in transaction receipt for token $tokenAddress")
 
             // ERC-20 Transfer event signature: Transfer(address indexed from, address indexed to, uint256 value)
             val transferEventSignature = "0x" + org.web3j.crypto.Hash.sha3String("Transfer(address,address,uint256)").substring(2)
             logger.debug("Looking for Transfer event signature: $transferEventSignature")
 
-            var totalUSDCTransferred = 0.0
+            var totalTokenTransferred = 0.0
             var foundValidTransfer = false
 
             for (log in txReceipt.logs) {
-                // Check if this log is from the USDC contract
-                if (!log.address.equals(usdcContractAddress, ignoreCase = true)) {
+                // Check if this log is from the specified token contract
+                if (!log.address.equals(tokenAddress, ignoreCase = true)) {
                     continue
                 }
 
@@ -851,7 +902,7 @@ class EscrowTransactionService(
                     continue
                 }
 
-                logger.debug("Found USDC Transfer event: topics=${log.topics.size}, data=${log.data}")
+                logger.debug("Found Token Transfer event: topics=${log.topics.size}, data=${log.data}")
 
                 try {
                     // Extract recipient address from indexed parameter (topic[2] - 'to' address)
@@ -878,9 +929,9 @@ class EscrowTransactionService(
                     val merchantWalletLower = merchantWallet.lowercase()
 
                     if (toAddress == expectedRecipientLower || toAddress == merchantWalletLower) {
-                        totalUSDCTransferred += transferAmount
+                        totalTokenTransferred += transferAmount
                         foundValidTransfer = true
-                        logger.debug("Valid USDC transfer found: $transferAmount USDC to $toAddress")
+                        logger.debug("Valid token transfer found: $transferAmount to $toAddress")
                     }
 
                 } catch (e: Exception) {
@@ -892,38 +943,39 @@ class EscrowTransactionService(
             if (!foundValidTransfer) {
                 return TransactionVerificationResult(
                     verified = false,
-                    error = "No USDC Transfer event found to expected recipient"
+                    error = "No token Transfer event found to expected recipient"
                 )
             }
 
-            logger.info("Total USDC transferred: $totalUSDCTransferred, expected: $expectedAmount")
+            logger.info("Total tokens transferred: $totalTokenTransferred, expected: $expectedAmount")
 
             // Verify the transfer amount meets the expected minimum
-            if (totalUSDCTransferred < expectedAmount) {
+            if (totalTokenTransferred < expectedAmount) {
                 return TransactionVerificationResult(
                     verified = false,
-                    error = "USDC transfer amount ($totalUSDCTransferred) is less than expected amount ($expectedAmount)"
+                    error = "Token transfer amount ($totalTokenTransferred) is less than expected amount ($expectedAmount)"
                 )
             }
 
             TransactionVerificationResult(
                 verified = true,
-                actualAmount = totalUSDCTransferred
+                actualAmount = totalTokenTransferred
             )
 
         } catch (e: Exception) {
-            logger.error("Error parsing USDC transfer from logs", e)
+            logger.error("Error parsing token transfer from logs", e)
             TransactionVerificationResult(
                 verified = false,
-                error = "Failed to parse USDC transfer from transaction logs: ${e.message}"
+                error = "Failed to parse token transfer from transaction logs: ${e.message}"
             )
         }
     }
 
     /**
-     * Verifies USDC token transfer by parsing transaction data
+     * Verifies token transfer by parsing transaction data
+     * This is an alternative verification method that checks the transaction input directly
      */
-    private fun verifyUSDCTransfer(
+    private fun verifyTokenTransfer(
         transaction: org.web3j.protocol.core.methods.response.Transaction,
         expectedAmount: Double,
         expectedRecipient: String,
@@ -934,16 +986,16 @@ class EscrowTransactionService(
             if (input.isNullOrEmpty() || input == "0x") {
                 return TransactionVerificationResult(
                     verified = false,
-                    error = "No transaction data found for USDC transfer"
+                    error = "No transaction data found for token transfer"
                 )
             }
 
-            // Parse USDC transfer function call
+            // Parse ERC20 transfer function call
             // transfer(address to, uint256 amount) has function selector 0xa9059cbb
             if (!input.startsWith("0xa9059cbb")) {
                 return TransactionVerificationResult(
                     verified = false,
-                    error = "Transaction is not a USDC transfer"
+                    error = "Transaction is not a token transfer"
                 )
             }
 
@@ -952,7 +1004,7 @@ class EscrowTransactionService(
             if (data.length < 128) {
                 return TransactionVerificationResult(
                     verified = false,
-                    error = "Invalid USDC transfer data length"
+                    error = "Invalid token transfer data length"
                 )
             }
 
@@ -972,7 +1024,7 @@ class EscrowTransactionService(
             if (actualRecipient != expectedRecipientLower && actualRecipient != merchantWalletLower) {
                 return TransactionVerificationResult(
                     verified = false,
-                    error = "USDC transfer recipient does not match expected merchant wallet"
+                    error = "Token transfer recipient does not match expected merchant wallet"
                 )
             }
 
@@ -980,7 +1032,7 @@ class EscrowTransactionService(
             if (actualAmount < expectedAmount) {
                 return TransactionVerificationResult(
                     verified = false,
-                    error = "USDC transfer amount ($actualAmount) is less than expected amount ($expectedAmount)"
+                    error = "Token transfer amount ($actualAmount) is less than expected amount ($expectedAmount)"
                 )
             }
 
@@ -991,10 +1043,10 @@ class EscrowTransactionService(
             )
 
         } catch (e: Exception) {
-            logger.error("Error parsing USDC transfer data", e)
+            logger.error("Error parsing token transfer data", e)
             TransactionVerificationResult(
                 verified = false,
-                error = "Failed to parse USDC transfer data: ${e.message}"
+                error = "Failed to parse token transfer data: ${e.message}"
             )
         }
     }

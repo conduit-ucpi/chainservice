@@ -98,8 +98,8 @@ class TransactionRelayService(
     fun getOperationGasCosts(): List<OperationGasCost> {
         val operations = listOf(
             "createContract" to "createContract",
-            "approveUSDC" to "approveUSDC",
-            "depositFunds" to "depositFunds", 
+            "approveToken" to "approveToken",
+            "depositFunds" to "depositFunds",
             "raiseDispute" to "raiseDispute",
             "claimFunds" to "claimFunds",
             "resolveDispute" to "resolveDispute"
@@ -129,13 +129,19 @@ class TransactionRelayService(
         )
     }
 
-    suspend fun approveUSDCWithGasTransfer(userWalletAddress: String, signedTransactionHex: String): TransactionResult {
-        val genericResult = escrowTransactionService.approveUSDCWithGasTransfer(userWalletAddress, signedTransactionHex)
+    suspend fun approveTokenWithGasTransfer(userWalletAddress: String, signedTransactionHex: String): TransactionResult {
+        val genericResult = escrowTransactionService.approveTokenWithGasTransfer(userWalletAddress, signedTransactionHex)
         return TransactionResult(
             success = genericResult.success,
             transactionHash = genericResult.transactionHash,
             error = genericResult.error
         )
+    }
+
+    // Deprecated: Use approveTokenWithGasTransfer instead
+    @Deprecated("Use approveTokenWithGasTransfer instead", ReplaceWith("approveTokenWithGasTransfer(userWalletAddress, signedTransactionHex)"))
+    suspend fun approveUSDCWithGasTransfer(userWalletAddress: String, signedTransactionHex: String): TransactionResult {
+        return approveTokenWithGasTransfer(userWalletAddress, signedTransactionHex)
     }
 
     suspend fun claimFundsWithGasTransfer(userWalletAddress: String, signedTransactionHex: String): TransactionResult {

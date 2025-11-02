@@ -29,7 +29,6 @@ blockchain:
     max-gas-price-multiplier: ${MAX_GAS_PRICE_MULTIPLIER:3}
 
 escrow:
-  usdc-contract-address: ${USDC_CONTRACT_ADDRESS}
   contract-factory-address: ${CONTRACT_FACTORY_ADDRESS}
   min-creator-fee: ${MIN_CREATOR_FEE_USDC_X_1M}
   # gas limits calculated from foundry
@@ -38,7 +37,7 @@ escrow:
   limit-dispute: ${GAS_LIMIT_DISPUTE:8800}
   limit-claim: ${GAS_LIMIT_CLAIM:40800}
   limit-resolve: ${GAS_LIMIT_RESOLVE:68000}
-  limit-approve-usdc: ${GAS_LIMIT_APPROVE_USDC:60000}
+  limit-approve-token: ${GAS_LIMIT_APPROVE_TOKEN:60000}
   gas-multiplier: ${GAS_MULTIPLIER:1.11}
 
 auth:

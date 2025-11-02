@@ -77,7 +77,7 @@ class Web3Config(
                     "raiseDispute" -> BigInteger.valueOf(escrowProperties.limitDispute)
                     "claimFunds" -> BigInteger.valueOf(escrowProperties.limitClaim)
                     "resolveDispute" -> BigInteger.valueOf(escrowProperties.limitResolve)
-                    "approveUSDC" -> BigInteger.valueOf(escrowProperties.limitApproveUsdc)
+                    "approveToken" -> BigInteger.valueOf(escrowProperties.limitApproveToken)
                     else -> DefaultGasProvider.GAS_LIMIT
                 }
             }

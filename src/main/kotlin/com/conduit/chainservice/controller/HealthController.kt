@@ -107,7 +107,6 @@ class HealthController(
                 ),
                 "blockchain" to mapOf(
                     "network" to blockchainProperties.rpcUrl,
-                    "usdcContract" to escrowProperties.usdcContractAddress,
                     "factoryContract" to escrowProperties.contractFactoryAddress
                 ),
                 "build" to mapOf(

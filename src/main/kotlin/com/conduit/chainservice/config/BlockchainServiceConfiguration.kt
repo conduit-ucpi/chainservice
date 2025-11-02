@@ -28,14 +28,10 @@ class BlockchainServiceConfiguration(
         "raiseDispute" to escrowProperties.limitDispute,
         "claimFunds" to escrowProperties.limitClaim,
         "resolveDispute" to escrowProperties.limitResolve,
-        "approveUSDC" to escrowProperties.limitApproveUsdc
+        "approveToken" to escrowProperties.limitApproveToken
     )
 
     // Additional escrow-specific properties
-    @Bean
-    @Qualifier("usdcContractAddress")
-    fun usdcContractAddress(): String = escrowProperties.usdcContractAddress
-
     @Bean
     @Qualifier("contractFactoryAddress")
     fun contractFactoryAddress(): String = escrowProperties.contractFactoryAddress

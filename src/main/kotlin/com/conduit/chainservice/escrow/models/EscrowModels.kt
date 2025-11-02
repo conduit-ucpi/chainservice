@@ -110,24 +110,24 @@ data class ResolveDisputeRequest(
     val buyerActualAmount: String? = null
 )
 
-data class ApproveUSDCRequest(
+data class ApproveTokenRequest(
     @field:NotBlank(message = "User wallet address is required")
     val userWalletAddress: String,
-    
+
     @field:NotBlank(message = "Signed transaction is required")
     val signedTransaction: String
 )
 
-data class TransferUSDCRequest(
+data class TransferTokenRequest(
     @field:NotBlank(message = "Recipient address is required")
     val recipientAddress: String,
-    
+
     @field:NotBlank(message = "Amount is required")
     val amount: String,
-    
+
     @field:NotBlank(message = "User wallet address is required")
     val userWalletAddress: String,
-    
+
     @field:NotBlank(message = "Signed transaction is required")
     val signedTransaction: String
 )
@@ -178,13 +178,13 @@ data class ResolveDisputeResponse(
     val error: String? = null
 )
 
-data class ApproveUSDCResponse(
+data class ApproveTokenResponse(
     val success: Boolean,
     val transactionHash: String?,
     val error: String? = null
 )
 
-data class TransferUSDCResponse(
+data class TransferTokenResponse(
     val success: Boolean,
     val transactionHash: String?,
     val message: String,

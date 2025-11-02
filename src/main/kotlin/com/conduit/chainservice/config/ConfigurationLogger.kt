@@ -29,7 +29,6 @@ class ConfigurationLogger(
         logger.info("  - Max gas price multiplier: ${blockchainProperties.gas.maxGasPriceMultiplier}")
         
         logger.info("Loaded escrow configuration:")
-        logger.info("  - USDC contract: ${escrowProperties.usdcContractAddress}")
         logger.info("  - Factory contract: ${escrowProperties.contractFactoryAddress}")
         logger.info("  - Minimum creator fee: ${escrowProperties.minCreatorFee}")
         logger.info("  - Gas limits:")
@@ -38,7 +37,7 @@ class ConfigurationLogger(
         logger.info("    - Dispute: ${escrowProperties.limitDispute}")
         logger.info("    - Claim: ${escrowProperties.limitClaim}")
         logger.info("    - Resolve: ${escrowProperties.limitResolve}")
-        logger.info("    - Approve USDC: ${escrowProperties.limitApproveUsdc}")
+        logger.info("    - Approve Token: ${escrowProperties.limitApproveToken}")
         logger.info("  - Gas multiplier: ${escrowProperties.gasMultiplier}")
     }
 }

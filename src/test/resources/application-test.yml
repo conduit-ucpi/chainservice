@@ -14,16 +14,15 @@ blockchain:
     minimum-gas-price-wei: 6
 
 escrow:
-  usdc-contract-address: "0x5425890298aed601595a70AB815c96711a31Bc65"
   contract-factory-address: "0x1234567890123456789012345678901234567890"
   min-creator-fee: 1000000  # 1 USDC in micro USDC
-  gas:
-    limit-create-contract: 500000
-    limit-deposit: 74161
-    limit-dispute: 9633
-    limit-claim: 51702
-    limit-resolve: 200000
-    limit-approve-usdc: 60000
+  limit-create-contract: 500000
+  limit-deposit: 74161
+  limit-dispute: 9633
+  limit-claim: 51702
+  limit-resolve: 200000
+  limit-approve-token: 60000
+  gas-multiplier: 1.2
 
 auth:
   user-service-url: "http://localhost:8080"
