@@ -55,3 +55,6 @@ replay_pid*
 # Temporary files
 *.tmp
 *.temp
+
+# Claude AI files
+.claude/

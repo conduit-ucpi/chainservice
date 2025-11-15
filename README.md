@@ -287,3 +287,15 @@ The service provides metrics and logging for:
 ## Support
 
 For issues and questions, check the logs at the INFO level for transaction details and ERROR level for failures. The health endpoint provides real-time status of critical dependencies.
+
+## Contributing
+
+Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+## Security
+
+For security concerns, please see our [Security Policy](SECURITY.md).
+
+## License
+
+MIT License - see [LICENSE](LICENSE) file for details
