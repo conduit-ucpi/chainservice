@@ -473,7 +473,13 @@ class ContractQueryService(
             if (contractAddresses.isNotEmpty()) {
                 val maxBatchSize = 10 // Conservative batch size to avoid gas limits
 
-                if (contractAddresses.size <= maxBatchSize) {
+                if (contractAddresses.size == 1) {
+                    // Single contract - skip multicall3 overhead and query directly
+                    logger.debug("Single contract query, bypassing multicall3")
+                    val contractAddress = contractAddresses.first()
+                    val contractData = callGetContractInfo(contractAddress)
+                    results[contractAddress] = contractData
+                } else if (contractAddresses.size <= maxBatchSize) {
                     // Small batch - try direct multicall3
                     logger.debug("Small batch (${contractAddresses.size} contracts), using single multicall3")
                     val multicallResults = executeMulticall3(multicall3Address, contractAddresses)
@@ -505,7 +511,6 @@ class ContractQueryService(
             
         } catch (e: Exception) {
             logger.warn("Multicall3 batch failed (${e.message}), falling back to parallel queries")
-            logger.debug("Multicall3 failure details:", e)
             // Fallback to parallel queries if multicall fails
             val batchCalls = contractAddresses.map { contractAddress ->
                 async {
