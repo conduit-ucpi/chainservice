@@ -139,7 +139,8 @@ class ContractQueryService(
             val description = contractData["description"] as String
             val funded = contractData["funded"] as Boolean
             val createdAt = contractData["createdAt"] as Long
-            val tokenAddress = contractData["tokenAddress"] as String
+            // For backward compatibility, default to USDC for old contracts without tokenAddress
+            val tokenAddress = (contractData["tokenAddress"] as? String) ?: blockchainProperties.usdcContractAddress
 
             val status = getContractStatus(contractAddress)
 
@@ -215,7 +216,8 @@ class ContractQueryService(
             val description = contractData["description"] as String
             val funded = contractData["funded"] as Boolean
             val createdAt = contractData["createdAt"] as Long
-            val tokenAddress = contractData["tokenAddress"] as String
+            // For backward compatibility, default to USDC for old contracts without tokenAddress
+            val tokenAddress = (contractData["tokenAddress"] as? String) ?: blockchainProperties.usdcContractAddress
 
             if (userType == "admin" ||
                 buyer.equals(participantAddress, ignoreCase = true) ||
@@ -271,7 +273,7 @@ class ContractQueryService(
                 "resolved" to contractInfo["resolved"]!!,
                 "claimed" to contractInfo["claimed"]!!,
                 "createdAt" to contractInfo["createdAt"]!!,
-                "tokenAddress" to contractInfo["tokenAddress"]!!
+                "tokenAddress" to (contractInfo["tokenAddress"] ?: blockchainProperties.usdcContractAddress)
             )
 
         } catch (e: Exception) {
