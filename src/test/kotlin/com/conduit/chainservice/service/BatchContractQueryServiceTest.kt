@@ -1,6 +1,7 @@
 package com.conduit.chainservice.service
 
 import com.conduit.chainservice.config.EscrowProperties
+import com.conduit.chainservice.config.BlockchainProperties
 import com.conduit.chainservice.escrow.models.ContractInfo
 import com.conduit.chainservice.escrow.models.ContractStatus
 import com.conduit.chainservice.escrow.models.ContractInfoResult
@@ -24,6 +25,9 @@ class BatchContractQueryServiceTest {
     private lateinit var escrowProperties: EscrowProperties
 
     @Mock
+    private lateinit var blockchainProperties: BlockchainProperties
+
+    @Mock
     private lateinit var eventParsingService: EventParsingService
 
     private lateinit var contractQueryService: ContractQueryService
@@ -35,7 +39,8 @@ class BatchContractQueryServiceTest {
     @BeforeEach
     fun setUp() {
         MockitoAnnotations.openMocks(this)
-        contractQueryService = spy(ContractQueryService(web3j, escrowProperties, eventParsingService))
+        whenever(blockchainProperties.usdcContractAddress).thenReturn("0x5425890298aed601595a70AB815c96711a31Bc65")
+        contractQueryService = spy(ContractQueryService(web3j, escrowProperties, blockchainProperties, eventParsingService))
     }
 
     @Test

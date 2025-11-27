@@ -1,6 +1,7 @@
 package com.conduit.chainservice.service
 
 import com.conduit.chainservice.config.EscrowProperties
+import com.conduit.chainservice.config.BlockchainProperties
 import com.conduit.chainservice.escrow.models.ContractInfo
 import com.conduit.chainservice.escrow.models.ContractStatus
 import com.conduit.chainservice.escrow.models.ContractInfoResult
@@ -41,6 +42,7 @@ import kotlinx.coroutines.CoroutineScope
 class ContractQueryService(
     private val web3j: Web3j,
     private val escrowProperties: EscrowProperties,
+    private val blockchainProperties: BlockchainProperties,
     private val eventParsingService: EventParsingService
 ) : ContractQueryServiceInterface {
 
@@ -834,7 +836,8 @@ class ContractQueryService(
                     val description = contractData["description"] as String
                     val funded = contractData["funded"] as Boolean
                     val createdAt = contractData["createdAt"] as Long
-                    val tokenAddress = contractData["tokenAddress"] as String
+                    // For backward compatibility, default to USDC for old contracts without tokenAddress
+                    val tokenAddress = (contractData["tokenAddress"] as? String) ?: blockchainProperties.usdcContractAddress
 
                     // Calculate status from contract data
                     val status = calculateContractStatus(contractData)

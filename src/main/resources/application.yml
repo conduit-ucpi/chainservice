@@ -11,6 +11,7 @@ spring:
 blockchain:
   rpc-url: ${RPC_URL}
   chain-id: ${CHAIN_ID:43113}
+  usdc-contract-address: ${USDC_CONTRACT_ADDRESS}
   relayer:
     wallet-address: ${RELAYER_WALLET_ADDRESS}
     gas-payer-contract-address: ${GAS_PAYER_CONTRACT_ADDRESS:0x0000000000000000000000000000000000000000}
