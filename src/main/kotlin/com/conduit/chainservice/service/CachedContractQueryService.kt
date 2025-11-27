@@ -268,7 +268,8 @@ class CachedContractQueryService(
             
             // Get createdAt directly from contract state
             val createdAt = contractState["createdAt"] as? Long ?: 0L
-            
+            val tokenAddress = contractState["tokenAddress"] as? String ?: ""
+
             ContractInfo(
                 contractAddress = contractAddress,
                 buyer = buyer,
@@ -279,6 +280,7 @@ class CachedContractQueryService(
                 funded = funded,
                 status = status,
                 createdAt = Instant.ofEpochSecond(createdAt),
+                tokenAddress = tokenAddress,
                 fundedAt = null,
                 disputedAt = null,
                 resolvedAt = null,

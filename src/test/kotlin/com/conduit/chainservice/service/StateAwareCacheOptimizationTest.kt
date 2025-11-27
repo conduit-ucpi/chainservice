@@ -271,6 +271,7 @@ class StateAwareCacheOptimizationTest {
             funded = status != ContractStatus.CREATED,
             status = status,
             createdAt = Instant.now(),
+                tokenAddress = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
             fundedAt = if (status != ContractStatus.CREATED) Instant.now() else null,
             disputedAt = if (status == ContractStatus.DISPUTED) Instant.now() else null,
             resolvedAt = if (status == ContractStatus.RESOLVED) Instant.now() else null,

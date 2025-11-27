@@ -137,7 +137,8 @@ class ContractQueryService(
             val description = contractData["description"] as String
             val funded = contractData["funded"] as Boolean
             val createdAt = contractData["createdAt"] as Long
-            
+            val tokenAddress = contractData["tokenAddress"] as String
+
             val status = getContractStatus(contractAddress)
 
             ContractInfo(
@@ -150,6 +151,7 @@ class ContractQueryService(
                 funded = funded,
                 status = status,
                 createdAt = Instant.ofEpochSecond(createdAt),
+                tokenAddress = tokenAddress,
                 fundedAt = null,
                 disputedAt = null,
                 resolvedAt = null,
@@ -211,11 +213,12 @@ class ContractQueryService(
             val description = contractData["description"] as String
             val funded = contractData["funded"] as Boolean
             val createdAt = contractData["createdAt"] as Long
-            
-            if (userType == "admin" || 
-                buyer.equals(participantAddress, ignoreCase = true) || 
+            val tokenAddress = contractData["tokenAddress"] as String
+
+            if (userType == "admin" ||
+                buyer.equals(participantAddress, ignoreCase = true) ||
                 seller.equals(participantAddress, ignoreCase = true)) {
-                
+
                 val status = getContractStatus(contractAddress)
 
                 ContractInfo(
@@ -228,6 +231,7 @@ class ContractQueryService(
                     funded = funded,
                     status = status,
                     createdAt = Instant.ofEpochSecond(createdAt),
+                    tokenAddress = tokenAddress,
                     fundedAt = null,
                     disputedAt = null,
                     resolvedAt = null,
@@ -264,7 +268,8 @@ class ContractQueryService(
                 "disputed" to contractInfo["disputed"]!!,
                 "resolved" to contractInfo["resolved"]!!,
                 "claimed" to contractInfo["claimed"]!!,
-                "createdAt" to contractInfo["createdAt"]!!
+                "createdAt" to contractInfo["createdAt"]!!,
+                "tokenAddress" to contractInfo["tokenAddress"]!!
             )
 
         } catch (e: Exception) {
@@ -294,7 +299,8 @@ class ContractQueryService(
                     org.web3j.abi.TypeReference.create(org.web3j.abi.datatypes.generated.Uint8::class.java),   // currentState
                     org.web3j.abi.TypeReference.create(Uint256::class.java),     // currentTimestamp
                     org.web3j.abi.TypeReference.create(Uint256::class.java),     // creatorFee
-                    org.web3j.abi.TypeReference.create(Uint256::class.java)      // createdAt
+                    org.web3j.abi.TypeReference.create(Uint256::class.java),     // createdAt
+                    org.web3j.abi.TypeReference.create(Address::class.java)      // tokenAddress (NEW)
                 )
             )
             
@@ -688,24 +694,49 @@ class ContractQueryService(
     
     /**
      * Decode the result from getContractInfo function call
+     * Supports both old contracts (9 fields) and new contracts (10 fields with tokenAddress)
      */
     private fun decodeContractInfoResult(hexData: String): Map<String, Any> {
         try {
-            val outputTypes = listOf(
+            // First try to decode with all 10 fields (new contracts with tokenAddress)
+            val outputTypesNew = listOf(
                 TypeReference.create(Address::class.java),     // buyer
-                TypeReference.create(Address::class.java),     // seller  
+                TypeReference.create(Address::class.java),     // seller
                 TypeReference.create(Uint256::class.java),     // amount
                 TypeReference.create(Uint256::class.java),     // expiryTimestamp
                 TypeReference.create(Utf8String::class.java),  // description
                 TypeReference.create(org.web3j.abi.datatypes.generated.Uint8::class.java),   // currentState
                 TypeReference.create(Uint256::class.java),     // currentTimestamp
                 TypeReference.create(Uint256::class.java),     // creatorFee
-                TypeReference.create(Uint256::class.java)      // createdAt
+                TypeReference.create(Uint256::class.java),     // createdAt
+                TypeReference.create(Address::class.java)      // tokenAddress (NEW)
             )
-            
-            val decodedOutput = FunctionReturnDecoder.decode(hexData, outputTypes as List<TypeReference<Type<Any>>>)
-            
-            if (decodedOutput.size >= 9) {
+
+            var decodedOutput = try {
+                FunctionReturnDecoder.decode(hexData, outputTypesNew as List<TypeReference<Type<Any>>>)
+            } catch (e: Exception) {
+                // If decoding with 10 fields fails, try with 9 fields (old contracts)
+                logger.debug("Failed to decode with 10 fields, trying 9 fields (old contract)")
+                null
+            }
+
+            // Fallback to 9 fields if 10-field decoding failed
+            if (decodedOutput == null || decodedOutput.size < 9) {
+                val outputTypesOld = listOf(
+                    TypeReference.create(Address::class.java),     // buyer
+                    TypeReference.create(Address::class.java),     // seller
+                    TypeReference.create(Uint256::class.java),     // amount
+                    TypeReference.create(Uint256::class.java),     // expiryTimestamp
+                    TypeReference.create(Utf8String::class.java),  // description
+                    TypeReference.create(org.web3j.abi.datatypes.generated.Uint8::class.java),   // currentState
+                    TypeReference.create(Uint256::class.java),     // currentTimestamp
+                    TypeReference.create(Uint256::class.java),     // creatorFee
+                    TypeReference.create(Uint256::class.java)      // createdAt
+                )
+                decodedOutput = FunctionReturnDecoder.decode(hexData, outputTypesOld as List<TypeReference<Type<Any>>>)
+            }
+
+            if (decodedOutput != null && decodedOutput.size >= 9) {
                 val buyer = (decodedOutput[0] as Address).value
                 val seller = (decodedOutput[1] as Address).value
                 val amount = (decodedOutput[2] as Uint256).value
@@ -715,13 +746,21 @@ class ContractQueryService(
                 val currentTimestamp = (decodedOutput[6] as Uint256).value.toLong()
                 val creatorFee = (decodedOutput[7] as Uint256).value
                 val createdAt = (decodedOutput[8] as Uint256).value.toLong()
-                
+
+                // Extract tokenAddress if available (10th field), otherwise assume USDC
+                val tokenAddress = if (decodedOutput.size >= 10) {
+                    (decodedOutput[9] as Address).value
+                } else {
+                    // Old contract - assume USDC as default (Base USDC address)
+                    "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
+                }
+
                 // Determine boolean states from currentState enum
                 val funded = currentState >= 1
                 val disputed = currentState == 2
                 val resolved = currentState == 3
                 val claimed = currentState == 4 || currentState == 5
-                
+
                 return mapOf(
                     "buyer" to buyer,
                     "seller" to seller,
@@ -735,13 +774,14 @@ class ContractQueryService(
                     "createdAt" to createdAt,
                     "currentState" to currentState,
                     "currentTimestamp" to currentTimestamp,
-                    "creatorFee" to creatorFee
+                    "creatorFee" to creatorFee,
+                    "tokenAddress" to tokenAddress
                 )
             }
         } catch (e: Exception) {
             logger.debug("Failed to decode contract info result: ${e.message}")
         }
-        
+
         return getEmptyContractState()
     }
     
@@ -759,7 +799,8 @@ class ContractQueryService(
             "disputed" to false,
             "resolved" to false,
             "claimed" to false,
-            "createdAt" to 0L
+            "createdAt" to 0L,
+            "tokenAddress" to "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"  // Default to USDC for empty/failed states (Base USDC address)
         )
     }
     
@@ -793,10 +834,11 @@ class ContractQueryService(
                     val description = contractData["description"] as String
                     val funded = contractData["funded"] as Boolean
                     val createdAt = contractData["createdAt"] as Long
-                    
+                    val tokenAddress = contractData["tokenAddress"] as String
+
                     // Calculate status from contract data
                     val status = calculateContractStatus(contractData)
-                    
+
                     val contractInfo = ContractInfo(
                         contractAddress = contractAddress,
                         buyer = buyer,
@@ -807,6 +849,7 @@ class ContractQueryService(
                         funded = funded,
                         status = status,
                         createdAt = Instant.ofEpochSecond(createdAt),
+                        tokenAddress = tokenAddress,
                         fundedAt = null,
                         disputedAt = null,
                         resolvedAt = null,

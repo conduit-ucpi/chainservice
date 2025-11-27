@@ -14,6 +14,7 @@ data class ContractInfo(
     val funded: Boolean,
     val status: ContractStatus,
     val createdAt: Instant,
+    val tokenAddress: String,  // ERC20 token address (USDC, USDT, etc.)
     val fundedAt: Instant? = null,
     val disputedAt: Instant? = null,
     val resolvedAt: Instant? = null,

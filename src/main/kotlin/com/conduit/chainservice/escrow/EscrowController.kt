@@ -1265,13 +1265,9 @@ class EscrowController(
             filteredResults.forEach { (contractAddress, result) ->
                 if (result.success && result.contractInfo != null) {
                     val contract = result.contractInfo!!
-                    // Query the token address from each contract dynamically
-                    val tokenAddress = try {
-                        escrowTransactionService.getTokenAddressFromContract(contractAddress)
-                    } catch (e: Exception) {
-                        logger.warn("Failed to query token address for contract $contractAddress: ${e.message}")
-                        "0x0000000000000000000000000000000000000000" // Fallback to zero address if query fails
-                    }
+                    // Use token address from contract info (no separate query needed)
+                    // For old contracts without tokenAddress field, the decoder will default to USDC
+                    val tokenAddress = contract.tokenAddress
 
                     contractsMap[contractAddress] = ContractInfoJson(
                         contractAddress = contractAddress,

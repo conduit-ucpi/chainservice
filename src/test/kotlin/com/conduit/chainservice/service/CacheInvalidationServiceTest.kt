@@ -502,6 +502,7 @@ class CacheInvalidationServiceTest {
             funded = true,
             status = ContractStatus.ACTIVE,
             createdAt = Instant.now(),
+                tokenAddress = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
             fundedAt = Instant.now()
         )
     }
