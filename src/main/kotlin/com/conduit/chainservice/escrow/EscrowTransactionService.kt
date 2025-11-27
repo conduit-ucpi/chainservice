@@ -756,7 +756,7 @@ class EscrowTransactionService(
             ).send()
 
             if (ethCall.hasError()) {
-                logger.error("Error querying token address from contract $contractAddress: ${ethCall.error.message}")
+                logger.debug("Contract $contractAddress does not support tokenAddress() function: ${ethCall.error.message}")
                 throw IllegalStateException("Failed to query token address: ${ethCall.error.message}")
             }
 
@@ -771,7 +771,7 @@ class EscrowTransactionService(
             logger.info("Escrow contract $contractAddress uses token: $tokenAddress")
             tokenAddress
         } catch (e: Exception) {
-            logger.error("Failed to query token address from escrow contract $contractAddress", e)
+            logger.debug("Contract $contractAddress does not support tokenAddress() function (likely an older contract): ${e.message}")
             throw IllegalStateException("Could not determine token address for contract $contractAddress: ${e.message}", e)
         }
     }
