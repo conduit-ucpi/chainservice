@@ -146,6 +146,12 @@ data class ClaimFundsAsGasPayerRequest(
     val contractAddress: String
 )
 
+data class FundApprovedContractRequest(
+    @field:NotBlank(message = "Contract address is required")
+    @field:Pattern(regexp = "^0x[a-fA-F0-9]{40}$", message = "Invalid contract address format")
+    val contractHash: String
+)
+
 // Response models
 data class CreateContractResponse(
     val success: Boolean,

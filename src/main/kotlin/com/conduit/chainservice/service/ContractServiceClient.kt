@@ -331,12 +331,12 @@ class ContractServiceClient(
                 request.getHeader(HttpHeaders.AUTHORIZATION)?.let {
                     headers.set(HttpHeaders.AUTHORIZATION, it)
                 }
-                
+
                 // Forward cookies including AUTH-TOKEN and session
                 request.getHeader(HttpHeaders.COOKIE)?.let {
                     headers.set(HttpHeaders.COOKIE, it)
                 }
-                
+
                 // Add any custom headers that might be needed
                 headers.set("X-Forwarded-For", request.remoteAddr)
                 headers.set("X-Original-URI", request.requestURI)
@@ -355,6 +355,58 @@ class ContractServiceClient(
                     }
                     else -> {
                         logger.error("Failed to notify contract service of contract creation", error)
+                        Mono.error<Map<String, Any>>(error)
+                    }
+                }
+            }
+    }
+
+    fun notifyDeposit(
+        contractHash: String,
+        request: HttpServletRequest
+    ): Mono<Map<String, Any>> {
+        if (!enabled) {
+            logger.info("Contract service integration disabled, skipping deposit notification")
+            return Mono.just(mapOf("status" to "skipped"))
+        }
+
+        val notificationRequest = mapOf(
+            "contractHash" to contractHash
+        )
+
+        logger.info("Notifying contract service of deposit: contractHash=$contractHash")
+
+        return webClient.post()
+            .uri("/api/contracts/deposit-notification")
+            .headers { headers ->
+                // Forward authentication headers
+                request.getHeader(HttpHeaders.AUTHORIZATION)?.let {
+                    headers.set(HttpHeaders.AUTHORIZATION, it)
+                }
+
+                // Forward cookies including AUTH-TOKEN and session
+                request.getHeader(HttpHeaders.COOKIE)?.let {
+                    headers.set(HttpHeaders.COOKIE, it)
+                }
+
+                // Add any custom headers that might be needed
+                headers.set("X-Forwarded-For", request.remoteAddr)
+                headers.set("X-Original-URI", request.requestURI)
+            }
+            .bodyValue(notificationRequest)
+            .retrieve()
+            .bodyToMono(object : org.springframework.core.ParameterizedTypeReference<Map<String, Any>>() {})
+            .doOnSuccess { response ->
+                logger.info("Successfully notified contract service of deposit for contractHash: $contractHash")
+            }
+            .onErrorResume { error ->
+                when (error) {
+                    is WebClientResponseException -> {
+                        logger.error("Contract service returned error for deposit notification: ${error.statusCode} - ${error.responseBodyAsString}")
+                        Mono.error<Map<String, Any>>(error)
+                    }
+                    else -> {
+                        logger.error("Failed to notify contract service of deposit", error)
                         Mono.error<Map<String, Any>>(error)
                     }
                 }

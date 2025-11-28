@@ -731,6 +731,104 @@ class EscrowTransactionService(
     }
 
     /**
+     * Deposits funds into an approved escrow contract as the gas payer
+     * This allows the platform to fund contracts on behalf of buyers when approval is already granted
+     */
+    suspend fun depositFundsAsGasPayer(contractAddress: String): TransactionResult {
+        return try {
+            logger.info("Depositing funds as gas payer for contract: $contractAddress")
+
+            val nonce = web3j.ethGetTransactionCount(
+                relayerCredentials.address,
+                DefaultBlockParameterName.PENDING
+            ).send().transactionCount
+
+            val gasPrice = gasProvider.getGasPrice("depositFunds")
+
+            val function = Function(
+                "depositFunds",
+                emptyList(),
+                emptyList()
+            )
+            val functionData = FunctionEncoder.encode(function)
+
+            // Estimate gas for the deposit funds transaction
+            val gasLimit = estimateGasWithBuffer(
+                relayerCredentials.address,
+                contractAddress,
+                functionData,
+                "depositFunds"
+            )
+
+            val rawTransaction = RawTransaction.createTransaction(
+                nonce,
+                gasPrice,
+                gasLimit,
+                contractAddress,
+                BigInteger.ZERO,
+                functionData
+            )
+
+            val signedTransaction = org.web3j.crypto.TransactionEncoder.signMessage(
+                rawTransaction,
+                chainId,
+                relayerCredentials
+            )
+
+            // Send the signed transaction to gas-payer-service
+            val signedTransactionHex = Numeric.toHexString(signedTransaction)
+            val gasPayerResult = gasPayerServiceClient.processTransactionWithGasTransfer(
+                relayerCredentials.address, // Use relayer address as userWalletAddress since we're paying our own gas
+                signedTransactionHex,
+                "depositFundsAsGasPayer",
+                gasLimit
+            )
+
+            if (!gasPayerResult.success) {
+                logger.error("Deposit funds as gas payer failed via gas-payer-service: ${gasPayerResult.error}")
+                return TransactionResult(
+                    success = false,
+                    transactionHash = gasPayerResult.transactionHash,
+                    error = gasPayerResult.error
+                )
+            }
+
+            val txHash = gasPayerResult.transactionHash!!
+            logger.info("Deposit funds as gas payer transaction sent via gas-payer-service: $txHash")
+
+            val receipt = waitForTransactionReceipt(txHash)
+            if (receipt != null && receipt.isStatusOK) {
+                // Invalidate cache for the contract whose funds were deposited
+                cacheInvalidationService.invalidateContractCacheIntelligently(
+                    contractAddress = contractAddress,
+                    operationType = "depositFundsAsGasPayer",
+                    newStatus = com.conduit.chainservice.escrow.models.ContractStatus.ACTIVE,
+                    transactionHash = txHash
+                )
+
+                TransactionResult(
+                    success = true,
+                    transactionHash = txHash
+                )
+            } else {
+                TransactionResult(
+                    success = false,
+                    transactionHash = txHash,
+                    error = "Deposit funds transaction failed"
+                )
+            }
+
+        } catch (e: Exception) {
+            logger.error("Error depositing funds as gas payer for contract: $contractAddress", e)
+            TransactionResult(
+                success = false,
+                transactionHash = null,
+                error = e.message ?: "Failed to deposit funds as gas payer"
+            )
+        }
+    }
+
+    /**
      * Queries the token address from an escrow contract
      * This allows supporting multiple tokens (USDC, USDT, etc.) dynamically
      */

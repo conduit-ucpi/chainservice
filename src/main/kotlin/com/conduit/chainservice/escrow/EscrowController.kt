@@ -328,7 +328,7 @@ class EscrowController(
     ): ResponseEntity<ClaimFundsResponse> {
         return try {
             logger.info("Claim funds as gas payer request received for contract: ${request.contractAddress}")
-            
+
             val result = runBlocking {
                 escrowTransactionService.claimFundsAsGasPayer(request.contractAddress)
             }
@@ -350,6 +350,88 @@ class EscrowController(
         } catch (e: Exception) {
             logger.error("Error in claim funds as gas payer endpoint", e)
             val response = ClaimFundsResponse(
+                success = false,
+                transactionHash = null,
+                error = e.message ?: "Internal server error"
+            )
+            ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response)
+        }
+    }
+
+    @PostMapping("/fund-approved-contract")
+    @Operation(
+        summary = "Fund Approved Contract",
+        description = "Deposits funds into an escrow contract that has already been approved by the buyer. The platform pays gas fees and executes the deposit using the gas payer's credentials. The buyer must have previously approved the contract to spend their tokens. After successful deposit, the contract service is notified."
+    )
+    @ApiResponses(value = [
+        ApiResponse(
+            responseCode = "200",
+            description = "Funds deposited successfully",
+            content = [Content(schema = Schema(implementation = DepositFundsResponse::class))]
+        ),
+        ApiResponse(
+            responseCode = "400",
+            description = "Invalid request or transaction failed",
+            content = [Content(schema = Schema(implementation = DepositFundsResponse::class))]
+        ),
+        ApiResponse(
+            responseCode = "500",
+            description = "Internal server error",
+            content = [Content(schema = Schema(implementation = DepositFundsResponse::class))]
+        )
+    ])
+    fun fundApprovedContract(
+        @Valid @RequestBody
+        @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            content = [Content(
+                examples = [ExampleObject(
+                    name = "Fund Approved Contract Example",
+                    value = """{"contractHash": "0x1234567890abcdef1234567890abcdef12345678"}"""
+                )]
+            )]
+        )
+        request: FundApprovedContractRequest,
+        httpRequest: HttpServletRequest
+    ): ResponseEntity<DepositFundsResponse> {
+        return try {
+            logger.info("Fund approved contract request received for contract: ${request.contractHash}")
+
+            val result = runBlocking {
+                escrowTransactionService.depositFundsAsGasPayer(request.contractHash)
+            }
+
+            val response = DepositFundsResponse(
+                success = result.success,
+                transactionHash = result.transactionHash,
+                error = result.error
+            )
+
+            if (result.success) {
+                logger.info("Contract funded successfully: ${result.transactionHash}")
+
+                // Notify contract service about the deposit
+                try {
+                    runBlocking {
+                        contractServiceClient.notifyDeposit(
+                            contractHash = request.contractHash,
+                            request = httpRequest
+                        ).block()
+                    }
+                    logger.info("Contract service notified of deposit for contractHash: ${request.contractHash}")
+                } catch (e: Exception) {
+                    // Log the error but don't fail the response since the blockchain transaction succeeded
+                    logger.error("Failed to notify contract service of deposit for contractHash: ${request.contractHash}", e)
+                }
+
+                ResponseEntity.ok(response)
+            } else {
+                logger.error("Contract funding failed: ${result.error}")
+                ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response)
+            }
+
+        } catch (e: Exception) {
+            logger.error("Error in fund approved contract endpoint", e)
+            val response = DepositFundsResponse(
                 success = false,
                 transactionHash = null,
                 error = e.message ?: "Internal server error"
