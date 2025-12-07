@@ -41,16 +41,17 @@ class ContractServiceClientNotificationTest {
         whenever(mockRequest.requestURI).thenReturn("/api/chain/create-contract")
     }
 
-    @Test 
+    @Test
     fun `should create notification request with correct parameters`() {
         // This test verifies the method exists and accepts the correct parameters
         val contractId = "507f1f77bcf86cd799439011"
         val contractHash = "0x1234567890abcdef1234567890abcdef12345678"
-        
+        val buyerAddress = "0x20e00e24101D8D7a330bA3A6AAA655d7766e7C1B"
+
         // Since we can't easily mock WebClient in this setup, we'll just verify the method signature
         // and the enabled check works
-        val result = contractServiceClient.notifyContractCreation(contractId, contractHash, mockRequest)
-        
+        val result = contractServiceClient.notifyContractCreation(contractId, contractHash, buyerAddress, mockRequest)
+
         // The method should exist and return a Mono (even if it errors due to no actual server)
         assert(result is Mono<*>)
     }
@@ -60,14 +61,15 @@ class ContractServiceClientNotificationTest {
         // Arrange
         val contractId = "507f1f77bcf86cd799439011"
         val contractHash = "0x1234567890abcdef1234567890abcdef12345678"
-        
+        val buyerAddress = "0x20e00e24101D8D7a330bA3A6AAA655d7766e7C1B"
+
         // Disable the service
         val enabledField = ContractServiceClient::class.java.getDeclaredField("enabled")
         enabledField.isAccessible = true
         enabledField.set(contractServiceClient, false)
 
         // Act
-        val result = contractServiceClient.notifyContractCreation(contractId, contractHash, mockRequest)
+        val result = contractServiceClient.notifyContractCreation(contractId, contractHash, buyerAddress, mockRequest)
 
         // Assert
         StepVerifier.create(result)

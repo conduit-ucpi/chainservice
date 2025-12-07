@@ -117,6 +117,7 @@ class EscrowController(
                             contractServiceClient.notifyContractCreation(
                                 contractId = request.contractserviceId,
                                 contractHash = result.contractAddress,
+                                buyerAddress = request.buyer,
                                 request = httpRequest
                             ).block()
                         }

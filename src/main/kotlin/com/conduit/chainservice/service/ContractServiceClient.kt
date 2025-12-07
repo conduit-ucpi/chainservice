@@ -310,6 +310,7 @@ class ContractServiceClient(
     fun notifyContractCreation(
         contractId: String,
         contractHash: String,
+        buyerAddress: String,
         request: HttpServletRequest
     ): Mono<Map<String, Any>> {
         if (!enabled) {
@@ -319,10 +320,11 @@ class ContractServiceClient(
 
         val notificationRequest = mapOf(
             "contractId" to contractId,
-            "contractHash" to contractHash
+            "contractHash" to contractHash,
+            "buyerAddress" to buyerAddress
         )
 
-        logger.info("Notifying contract service of contract creation: contractId=$contractId, contractHash=$contractHash")
+        logger.info("Notifying contract service of contract creation: contractId=$contractId, contractHash=$contractHash, buyerAddress=$buyerAddress")
 
         return webClient.post()
             .uri("/api/contracts/create-notification")
