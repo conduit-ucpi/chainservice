@@ -5,11 +5,12 @@ on:
     tags:
       - 'v*'
       - 'test*'
+      - 'cherry*'
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    environment: ${{ startsWith(github.ref, 'refs/tags/v') && 'production' || 'test' }}
+    environment: ${{ startsWith(github.ref, 'refs/tags/v') && 'production' || (contains(github.ref, 'cherry') && 'cherry' || 'test') }}
     permissions:
       contents: read
       packages: write
@@ -53,6 +54,7 @@ jobs:
           context: .
           file: ./Dockerfile
           push: true
+          platforms: linux/amd64,linux/arm64
           tags: |
             ghcr.io/${{ env.REPO_LOWER }}:latest
             ghcr.io/${{ env.REPO_LOWER }}:${{ env.GIT_SHA }}
@@ -62,8 +64,8 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
-    environment: ${{ startsWith(github.ref, 'refs/tags/v') && 'production' || 'test' }}
-    
+    environment: ${{ startsWith(github.ref, 'refs/tags/v') && 'production' || (contains(github.ref, 'cherry') && 'cherry' || 'test') }}
+
     steps:
       - name: Lowercase the repo name
         run: |
