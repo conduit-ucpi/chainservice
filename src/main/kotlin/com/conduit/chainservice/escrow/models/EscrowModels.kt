@@ -372,3 +372,20 @@ data class VerifyWebhookResponse(
     val webhook_sent: Boolean? = null,
     val error: String? = null
 )
+
+// Vote submission models for 2-of-3 voting resolution
+data class VoteSubmitRequest(
+    @field:NotBlank(message = "Contract address is required")
+    @field:Pattern(regexp = "^0x[a-fA-F0-9]{40}$", message = "Invalid contract address format")
+    val contractAddress: String,
+
+    @field:NotNull(message = "Buyer percentage is required")
+    val buyerPercentage: Int
+)
+
+data class VoteResponse(
+    val success: Boolean,
+    val transactionHash: String?,
+    val votedPercentage: Int? = null,
+    val error: String? = null
+)

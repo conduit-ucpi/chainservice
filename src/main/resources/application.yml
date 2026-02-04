@@ -48,6 +48,7 @@ auth:
 contract-service:
   url: ${CONTRACT_SERVICE_URL:http://localhost:8080}
   enabled: ${CONTRACT_SERVICE_ENABLED:true}
+  api-key: ${CONTRACT_SERVICE_API_KEY:}
 
 email-service:
   url: ${EMAIL_SERVICE_URL:http://localhost:8979}
