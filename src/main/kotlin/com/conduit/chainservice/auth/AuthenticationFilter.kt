@@ -83,12 +83,14 @@ class AuthenticationFilter(
     private fun shouldSkipAuthentication(uri: String): Boolean {
         val publicPaths = listOf(
             "/actuator/health",
-            "/actuator/info", 
+            "/actuator/info",
             "/swagger-ui",
             "/api-docs",
             "/v3/api-docs",
             "/api/chain/claim-funds-as-gas-payer",
-            "/api/chain/contracts/batch-info"
+            "/api/chain/contracts/batch-info",
+            "/api/chain/verify-and-webhook",
+            "/api/chain/addresses"
         )
         return publicPaths.any { uri.startsWith(it) }
     }
