@@ -10,6 +10,7 @@ spring:
 
 blockchain:
   rpc-url: ${RPC_URL}
+  gas-price-rpc-url: ${GAS_PRICE_RPC_URL:${RPC_URL}}
   chain-id: ${CHAIN_ID:43113}
   usdc-contract-address: ${USDC_CONTRACT_ADDRESS}
   relayer:

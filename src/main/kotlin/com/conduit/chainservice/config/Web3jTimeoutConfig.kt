@@ -18,6 +18,9 @@ class Web3jTimeoutConfig {
     @Value("\${blockchain.rpc-url}")
     private lateinit var rpcUrl: String
 
+    @Value("\${blockchain.gas-price-rpc-url}")
+    private lateinit var gasPriceRpcUrl: String
+
     @Value("\${blockchain.timeout.connect-seconds:30}")
     private var connectTimeoutSeconds: Long = 30
 
@@ -31,6 +34,7 @@ class Web3jTimeoutConfig {
     @Primary
     fun web3jWithTimeout(): Web3j {
         logger.info("Configuring Web3j with enhanced timeouts: connect=${connectTimeoutSeconds}s, read=${readTimeoutSeconds}s, write=${writeTimeoutSeconds}s")
+        logger.info("Using RPC endpoint: $rpcUrl")
 
         val httpClient = OkHttpClient.Builder()
             .connectTimeout(connectTimeoutSeconds, TimeUnit.SECONDS)
@@ -42,7 +46,26 @@ class Web3jTimeoutConfig {
             .build()
 
         val httpService = HttpService(rpcUrl, httpClient)
-        
+
+        return Web3j.build(httpService)
+    }
+
+    @Bean("gasPriceWeb3j")
+    fun gasPriceWeb3j(): Web3j {
+        logger.info("Configuring gasPriceWeb3j for accurate gas price queries")
+        logger.info("Using Gas Price RPC endpoint: $gasPriceRpcUrl")
+
+        val httpClient = OkHttpClient.Builder()
+            .connectTimeout(connectTimeoutSeconds, TimeUnit.SECONDS)
+            .readTimeout(readTimeoutSeconds, TimeUnit.SECONDS)
+            .writeTimeout(writeTimeoutSeconds, TimeUnit.SECONDS)
+            .retryOnConnectionFailure(true)
+            .followRedirects(true)
+            .followSslRedirects(true)
+            .build()
+
+        val httpService = HttpService(gasPriceRpcUrl, httpClient)
+
         return Web3j.build(httpService)
     }
 }

@@ -5,6 +5,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties
 @ConfigurationProperties(prefix = "blockchain")
 data class BlockchainProperties(
     var rpcUrl: String = "",
+    var gasPriceRpcUrl: String = "",
     var chainId: Long = 43113,
     var usdcContractAddress: String = "",
     var relayer: RelayerProperties = RelayerProperties(),

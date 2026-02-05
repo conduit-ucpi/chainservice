@@ -105,6 +105,7 @@ jobs:
           # Add required environment variables
           cat >> /tmp/docker_run.sh << 'EOF'
             -e RPC_URL=${{ vars.RPC_URL }} \
+            -e GAS_PRICE_RPC_URL=${{ secrets.GAS_PRICE_RPC_URL }} \
             -e USDC_CONTRACT_ADDRESS=${{ vars.USDC_CONTRACT_ADDRESS }} \
             -e CONTRACT_FACTORY_ADDRESS=${{ vars.CONTRACT_FACTORY_ADDRESS }} \
             -e ESCROW_IMPLEMENTATION_ADDRESS=${{ vars.ESCROW_IMPLEMENTATION_ADDRESS }} \

@@ -48,15 +48,15 @@ class Web3Config(
 
     @Bean
     @Primary
-    fun escrowGasProvider(web3j: Web3j): ContractGasProvider {
+    fun escrowGasProvider(gasPriceWeb3j: Web3j): ContractGasProvider {
         return object : ContractGasProvider {
             override fun getGasPrice(contractFunc: String?): BigInteger {
                 return try {
-                    val networkGasPrice = web3j.ethGasPrice().send().gasPrice
+                    val networkGasPrice = gasPriceWeb3j.ethGasPrice().send().gasPrice
                     val multipliedPrice = networkGasPrice.multiply(
                         BigInteger.valueOf((blockchainProperties.gas.priceMultiplier * 100).toLong())
                     ).divide(BigInteger.valueOf(100))
-                    
+
                     // Enforce minimum gas price
                     val minimumPrice = BigInteger.valueOf(blockchainProperties.gas.minimumGasPriceWei)
                     val finalPrice = maxOf(multipliedPrice, minimumPrice)
