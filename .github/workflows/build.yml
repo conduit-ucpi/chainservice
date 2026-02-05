@@ -78,90 +78,57 @@ jobs:
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H ${{ vars.VM_IP }} >> ~/.ssh/known_hosts
-          
-          # Create deployment script in memory
-          cat > /tmp/deploy_commands.sh << 'DEPLOY_SCRIPT'
-          #!/bin/bash
+
+          # Create deployment script with all values populated
+          cat > /tmp/deploy_script.sh << EOF
           set -e
           echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
           docker pull ghcr.io/${{ env.REPO_LOWER }}:${{ env.GIT_SHA }}
           docker stop ${{ vars.SERVICE_NAME }} || true
           docker rm ${{ vars.SERVICE_NAME }} || true
-          
-          # Create docker run script
-          cat > /tmp/docker_run.sh << 'EOF'
-          #!/bin/bash
-          set -e
-          
-          # Base docker run command
-          docker run -d \
-            --name ${{ vars.SERVICE_NAME }} \
-            --network ${{ vars.DOCKER_NETWORK }} \
-            --restart unless-stopped \
+          docker run -d \\
+            --name ${{ vars.SERVICE_NAME }} \\
+            --network ${{ vars.DOCKER_NETWORK }} \\
+            --restart unless-stopped \\
+            -e RPC_URL="${{ vars.RPC_URL }}" \\
+            -e USDC_CONTRACT_ADDRESS="${{ vars.USDC_CONTRACT_ADDRESS }}" \\
+            -e CONTRACT_FACTORY_ADDRESS="${{ vars.CONTRACT_FACTORY_ADDRESS }}" \\
+            -e ESCROW_IMPLEMENTATION_ADDRESS="${{ vars.ESCROW_IMPLEMENTATION_ADDRESS }}" \\
+            -e RELAYER_WALLET_ADDRESS="${{ vars.RELAYER_WALLET_ADDRESS }}" \\
+            -e RELAYER_PRIVATE_KEY="${{ secrets.RELAYER_PRIVATE_KEY }}" \\
+            -e MIN_CREATOR_FEE_USDC_X_1M="${{ vars.MIN_CREATOR_FEE_USDC_X_1M }}" \\
+            -e USER_SERVICE_URL="${{ vars.USER_SERVICE_URL }}" \\
+            -e CONTRACT_SERVICE_URL="${{ vars.CONTRACT_SERVICE_URL }}" \\
+            -e EMAIL_SERVICE_URL="${{ vars.EMAIL_SERVICE_URL }}" \\
+            -e GAS_PAYER_SERVICE="${{ vars.GAS_PAYER_SERVICE }}" \\
+            -e GAS_PAYER_API_KEY="${{ secrets.GAS_PAYER_API_KEY }}" \\
+            -e SERVICE_LINK="${{ vars.SERVICE_LINK }}" \\
+            -e CONTRACT_SERVICE_API_KEY="${{ secrets.CONTRACT_SERVICE_API_KEY }}" \\
+            -e LOG_LEVEL="${{ vars.LOG_LEVEL }}" \\
+            -e SERVER_PORT="${{ vars.SERVER_PORT }}" \\
+            -e CHAIN_ID="${{ vars.CHAIN_ID }}" \\
+            -e GAS_PAYER_CONTRACT_ADDRESS="${{ vars.GAS_PAYER_CONTRACT_ADDRESS }}" \\
+            -e BLOCKCHAIN_CONNECT_TIMEOUT="${{ vars.BLOCKCHAIN_CONNECT_TIMEOUT }}" \\
+            -e BLOCKCHAIN_READ_TIMEOUT="${{ vars.BLOCKCHAIN_READ_TIMEOUT }}" \\
+            -e BLOCKCHAIN_WRITE_TIMEOUT="${{ vars.BLOCKCHAIN_WRITE_TIMEOUT }}" \\
+            -e PRICE_MULTIPLIER="${{ vars.PRICE_MULTIPLIER }}" \\
+            -e MIN_GAS_WEI="${{ vars.MIN_GAS_WEI }}" \\
+            -e MAX_GAS_LIMIT="${{ vars.MAX_GAS_LIMIT }}" \\
+            -e MAX_GAS_COST_WEI="${{ vars.MAX_GAS_COST_WEI }}" \\
+            -e GAS_MULTIPLIER="${{ vars.GAS_MULTIPLIER }}" \\
+            -e MAX_GAS_PRICE_MULTIPLIER="${{ vars.MAX_GAS_PRICE_MULTIPLIER }}" \\
+            -e GAS_LIMIT_CREATE_CONTRACT="${{ vars.GAS_LIMIT_CREATE_CONTRACT }}" \\
+            -e GAS_LIMIT_DEPOSIT="${{ vars.GAS_LIMIT_DEPOSIT }}" \\
+            -e GAS_LIMIT_DISPUTE="${{ vars.GAS_LIMIT_DISPUTE }}" \\
+            -e GAS_LIMIT_CLAIM="${{ vars.GAS_LIMIT_CLAIM }}" \\
+            -e GAS_LIMIT_RESOLVE="${{ vars.GAS_LIMIT_RESOLVE }}" \\
+            -e GAS_LIMIT_APPROVE_USDC="${{ vars.GAS_LIMIT_APPROVE_USDC }}" \\
+            -e AUTH_ENABLED="${{ vars.AUTH_ENABLED }}" \\
+            -e CONTRACT_SERVICE_ENABLED="${{ vars.CONTRACT_SERVICE_ENABLED }}" \\
+            -e EMAIL_SERVICE_ENABLED="${{ vars.EMAIL_SERVICE_ENABLED }}" \\
+            ghcr.io/${{ env.REPO_LOWER }}:${{ env.GIT_SHA }}
           EOF
-          
-          # Volume mounts removed - using environment variables instead
-          
-          # Add required environment variables
-          cat >> /tmp/docker_run.sh << 'EOF'
-            -e RPC_URL=${{ vars.RPC_URL }} \
-            -e USDC_CONTRACT_ADDRESS=${{ vars.USDC_CONTRACT_ADDRESS }} \
-            -e CONTRACT_FACTORY_ADDRESS=${{ vars.CONTRACT_FACTORY_ADDRESS }} \
-            -e ESCROW_IMPLEMENTATION_ADDRESS=${{ vars.ESCROW_IMPLEMENTATION_ADDRESS }} \
-            -e RELAYER_WALLET_ADDRESS=${{ vars.RELAYER_WALLET_ADDRESS }} \
-            -e RELAYER_PRIVATE_KEY=${{ secrets.RELAYER_PRIVATE_KEY }} \
-            -e MIN_CREATOR_FEE_USDC_X_1M=${{ vars.MIN_CREATOR_FEE_USDC_X_1M }} \
-            -e USER_SERVICE_URL=${{ vars.USER_SERVICE_URL }} \
-            -e CONTRACT_SERVICE_URL=${{ vars.CONTRACT_SERVICE_URL }} \
-            -e EMAIL_SERVICE_URL=${{ vars.EMAIL_SERVICE_URL }} \
-            -e GAS_PAYER_SERVICE=${{ vars.GAS_PAYER_SERVICE }} \
-            -e GAS_PAYER_API_KEY=${{ secrets.GAS_PAYER_API_KEY }} \
-            -e SERVICE_LINK=${{ vars.SERVICE_LINK }} \
-            -e CONTRACT_SERVICE_API_KEY=${{ secrets.CONTRACT_SERVICE_API_KEY }} \
-          EOF
-          
-          # Add optional environment variables only if they are defined
-          [ -n "${{ vars.LOG_LEVEL }}" ] && echo '  -e LOG_LEVEL=${{ vars.LOG_LEVEL }} \' >> /tmp/docker_run.sh
-          [ -n "${{ vars.SERVER_PORT }}" ] && echo '  -e SERVER_PORT=${{ vars.SERVER_PORT }} \' >> /tmp/docker_run.sh
-          [ -n "${{ vars.CHAIN_ID }}" ] && echo '  -e CHAIN_ID=${{ vars.CHAIN_ID }} \' >> /tmp/docker_run.sh
-          [ -n "${{ vars.GAS_PAYER_CONTRACT_ADDRESS }}" ] && echo '  -e GAS_PAYER_CONTRACT_ADDRESS=${{ vars.GAS_PAYER_CONTRACT_ADDRESS }} \' >> /tmp/docker_run.sh
-          [ -n "${{ vars.BLOCKCHAIN_CONNECT_TIMEOUT }}" ] && echo '  -e BLOCKCHAIN_CONNECT_TIMEOUT=${{ vars.BLOCKCHAIN_CONNECT_TIMEOUT }} \' >> /tmp/docker_run.sh
-          [ -n "${{ vars.BLOCKCHAIN_READ_TIMEOUT }}" ] && echo '  -e BLOCKCHAIN_READ_TIMEOUT=${{ vars.BLOCKCHAIN_READ_TIMEOUT }} \' >> /tmp/docker_run.sh
-          [ -n "${{ vars.BLOCKCHAIN_WRITE_TIMEOUT }}" ] && echo '  -e BLOCKCHAIN_WRITE_TIMEOUT=${{ vars.BLOCKCHAIN_WRITE_TIMEOUT }} \' >> /tmp/docker_run.sh
-          [ -n "${{ vars.PRICE_MULTIPLIER }}" ] && echo '  -e PRICE_MULTIPLIER=${{ vars.PRICE_MULTIPLIER }} \' >> /tmp/docker_run.sh
-          [ -n "${{ vars.MIN_GAS_WEI }}" ] && echo '  -e MIN_GAS_WEI=${{ vars.MIN_GAS_WEI }} \' >> /tmp/docker_run.sh
-          [ -n "${{ vars.MAX_GAS_LIMIT }}" ] && echo '  -e MAX_GAS_LIMIT=${{ vars.MAX_GAS_LIMIT }} \' >> /tmp/docker_run.sh
-          [ -n "${{ vars.MAX_GAS_COST_WEI }}" ] && echo '  -e MAX_GAS_COST_WEI=${{ vars.MAX_GAS_COST_WEI }} \' >> /tmp/docker_run.sh
-          [ -n "${{ vars.GAS_MULTIPLIER }}" ] && echo '  -e GAS_MULTIPLIER=${{ vars.GAS_MULTIPLIER }} \' >> /tmp/docker_run.sh
-          [ -n "${{ vars.MAX_GAS_PRICE_MULTIPLIER }}" ] && echo '  -e MAX_GAS_PRICE_MULTIPLIER=${{ vars.MAX_GAS_PRICE_MULTIPLIER }} \' >> /tmp/docker_run.sh
-          [ -n "${{ vars.GAS_LIMIT_CREATE_CONTRACT }}" ] && echo '  -e GAS_LIMIT_CREATE_CONTRACT=${{ vars.GAS_LIMIT_CREATE_CONTRACT }} \' >> /tmp/docker_run.sh
-          [ -n "${{ vars.GAS_LIMIT_DEPOSIT }}" ] && echo '  -e GAS_LIMIT_DEPOSIT=${{ vars.GAS_LIMIT_DEPOSIT }} \' >> /tmp/docker_run.sh
-          [ -n "${{ vars.GAS_LIMIT_DISPUTE }}" ] && echo '  -e GAS_LIMIT_DISPUTE=${{ vars.GAS_LIMIT_DISPUTE }} \' >> /tmp/docker_run.sh
-          [ -n "${{ vars.GAS_LIMIT_CLAIM }}" ] && echo '  -e GAS_LIMIT_CLAIM=${{ vars.GAS_LIMIT_CLAIM }} \' >> /tmp/docker_run.sh
-          [ -n "${{ vars.GAS_LIMIT_RESOLVE }}" ] && echo '  -e GAS_LIMIT_RESOLVE=${{ vars.GAS_LIMIT_RESOLVE }} \' >> /tmp/docker_run.sh
-          [ -n "${{ vars.GAS_LIMIT_APPROVE_USDC }}" ] && echo '  -e GAS_LIMIT_APPROVE_USDC=${{ vars.GAS_LIMIT_APPROVE_USDC }} \' >> /tmp/docker_run.sh
-          [ -n "${{ vars.AUTH_ENABLED }}" ] && echo '  -e AUTH_ENABLED=${{ vars.AUTH_ENABLED }} \' >> /tmp/docker_run.sh
-          [ -n "${{ vars.CONTRACT_SERVICE_ENABLED }}" ] && echo '  -e CONTRACT_SERVICE_ENABLED=${{ vars.CONTRACT_SERVICE_ENABLED }} \' >> /tmp/docker_run.sh
-          [ -n "${{ vars.EMAIL_SERVICE_ENABLED }}" ] && echo '  -e EMAIL_SERVICE_ENABLED=${{ vars.EMAIL_SERVICE_ENABLED }} \' >> /tmp/docker_run.sh
-          
-          # Add the image name (last line, no backslash)
-          echo '  ghcr.io/${{ env.REPO_LOWER }}:${{ env.GIT_SHA }}' >> /tmp/docker_run.sh
-          
-          # Execute the script
-          chmod +x /tmp/docker_run.sh
-          /tmp/docker_run.sh
-          DEPLOY_SCRIPT
-          
-          chmod +x /tmp/deploy_commands.sh
-          
-          # Transfer script to remote server's memory-only filesystem and execute
-          scp -i ~/.ssh/deploy_key /tmp/deploy_commands.sh gituser@${{ vars.VM_IP }}:/dev/shm/deploy_commands.sh
-          
-          ssh -i ~/.ssh/deploy_key -l gituser ${{ vars.VM_IP }} -vv '
-            chmod +x /dev/shm/deploy_commands.sh
-            /dev/shm/deploy_commands.sh
-            rm -f /dev/shm/deploy_commands.sh
-          '
-          
-          # Clean up local temporary file
-          rm -f /tmp/deploy_commands.sh
+
+          # Copy script to remote tmpfs and execute
+          scp -i ~/.ssh/deploy_key /tmp/deploy_script.sh gituser@${{ vars.VM_IP }}:/dev/shm/deploy_script.sh
+          ssh -i ~/.ssh/deploy_key -l gituser ${{ vars.VM_IP }} "chmod +x /dev/shm/deploy_script.sh && /dev/shm/deploy_script.sh && rm /dev/shm/deploy_script.sh"
