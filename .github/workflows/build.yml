@@ -107,6 +107,7 @@ jobs:
             -e RPC_URL=${{ vars.RPC_URL }} \
             -e USDC_CONTRACT_ADDRESS=${{ vars.USDC_CONTRACT_ADDRESS }} \
             -e CONTRACT_FACTORY_ADDRESS=${{ vars.CONTRACT_FACTORY_ADDRESS }} \
+            -e ESCROW_IMPLEMENTATION_ADDRESS=${{ vars.ESCROW_IMPLEMENTATION_ADDRESS }} \
             -e RELAYER_WALLET_ADDRESS=${{ vars.RELAYER_WALLET_ADDRESS }} \
             -e RELAYER_PRIVATE_KEY=${{ secrets.RELAYER_PRIVATE_KEY }} \
             -e MIN_CREATOR_FEE_USDC_X_1M=${{ vars.MIN_CREATOR_FEE_USDC_X_1M }} \

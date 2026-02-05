@@ -1513,6 +1513,49 @@ class EscrowController(
         }
     }
 
+    @GetMapping("/addresses")
+    @Operation(
+        summary = "Get Contract Addresses",
+        description = "Returns the factory contract address and implementation contract address."
+    )
+    @ApiResponses(value = [
+        ApiResponse(
+            responseCode = "200",
+            description = "Contract addresses retrieved successfully",
+            content = [Content(schema = Schema(implementation = ContractAddressesResponse::class))]
+        )
+    ])
+    fun getContractAddresses(): ResponseEntity<ContractAddressesResponse> {
+        return try {
+            logger.info("Contract addresses request received")
+
+            val response = ContractAddressesResponse(
+                factoryAddress = escrowProperties.contractFactoryAddress,
+                implementationAddress = escrowProperties.implementationAddress,
+                timestamp = Instant.now().toString()
+            )
+
+            logger.info("Contract addresses retrieved successfully")
+            ResponseEntity.ok(response)
+
+        } catch (e: Exception) {
+            logger.error("Error in contract addresses endpoint", e)
+            ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
+                ContractAddressesResponse(
+                    factoryAddress = "",
+                    implementationAddress = "",
+                    timestamp = Instant.now().toString()
+                )
+            )
+        }
+    }
+
+    data class ContractAddressesResponse(
+        val factoryAddress: String,
+        val implementationAddress: String,
+        val timestamp: String
+    )
+
     data class GasCostsResponse(
         val operations: List<OperationGasCost>,
         val timestamp: String

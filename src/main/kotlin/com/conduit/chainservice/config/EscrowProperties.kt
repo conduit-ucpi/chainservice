@@ -6,6 +6,7 @@ import java.math.BigInteger
 @ConfigurationProperties(prefix = "escrow")
 data class EscrowProperties(
     var contractFactoryAddress: String = "",
+    var implementationAddress: String = "",
     var minCreatorFee: BigInteger = BigInteger.ZERO,
     var limitCreateContract: Long = 0,
     var limitDeposit: Long = 0,
