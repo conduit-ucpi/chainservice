@@ -1,6 +1,7 @@
 package com.conduit.chainservice.service
 
 import com.conduit.chainservice.config.EscrowProperties
+import com.conduit.chainservice.config.AbiLoader
 import com.conduit.chainservice.model.ContractEvent
 import com.conduit.chainservice.model.ContractEventHistory
 import com.conduit.chainservice.model.EventType
@@ -31,7 +32,8 @@ import kotlinx.coroutines.coroutineScope
 class EventParsingService(
     private val web3j: Web3j,
     private val escrowProperties: EscrowProperties,
-    private val circuitBreaker: RpcCircuitBreaker
+    private val circuitBreaker: RpcCircuitBreaker,
+    private val abiLoader: AbiLoader
 ) {
 
     private val logger = LoggerFactory.getLogger(EventParsingService::class.java)
@@ -98,50 +100,47 @@ class EventParsingService(
         return null
     }
 
-    private val contractCreatedEvent = Event(
-        "ContractCreated",
-        listOf(
-            TypeReference.create(Address::class.java, true),  // indexed contractAddress
-            TypeReference.create(Address::class.java, true),  // indexed buyer
-            TypeReference.create(Address::class.java, true),  // indexed seller
-            TypeReference.create(Uint256::class.java, false), // amount
-            TypeReference.create(Uint256::class.java, false), // expiryTimestamp
-            TypeReference.create(Utf8String::class.java, false) // description
-        )
-    )
+    // Event definitions loaded from ABI at runtime
+    private val contractCreatedEvent: Event by lazy {
+        abiLoader.createEvent("ContractCreated", fromFactory = true)
+    }
 
-    private val disputeRaisedEvent = Event(
-        "DisputeRaised",
-        listOf(
-            TypeReference.create(Uint256::class.java, false)  // timestamp
-        )
-    )
+    private val disputeRaisedEvent: Event by lazy {
+        abiLoader.createEvent("DisputeRaised")
+    }
 
-    private val disputeResolvedEvent = Event(
-        "DisputeResolved", 
-        listOf(
-            TypeReference.create(Address::class.java, false), // recipient
-            TypeReference.create(Uint256::class.java, false)  // timestamp
-        )
-    )
+    private val disputeResolvedEvent: Event by lazy {
+        abiLoader.createEvent("DisputeResolved")
+    }
 
-    private val fundsDepositedEvent = Event(
-        "FundsDeposited",
-        listOf(
-            TypeReference.create(Address::class.java, false), // buyer
-            TypeReference.create(Uint256::class.java, false), // amount
-            TypeReference.create(Uint256::class.java, false)  // timestamp
-        )
-    )
+    private val fundsDepositedEvent: Event by lazy {
+        abiLoader.createEvent("FundsDeposited")
+    }
 
-    private val fundsClaimedEvent = Event(
-        "FundsClaimed",
-        listOf(
-            TypeReference.create(Address::class.java, false), // recipient
-            TypeReference.create(Uint256::class.java, false), // amount
-            TypeReference.create(Uint256::class.java, false)  // timestamp
-        )
-    )
+    private val fundsClaimedEvent: Event by lazy {
+        abiLoader.createEvent("FundsClaimed")
+    }
+
+    // Event parameter definitions for dynamic parsing
+    private val contractCreatedParams: List<AbiLoader.EventParameter> by lazy {
+        abiLoader.getEventDefinition("ContractCreated", fromFactory = true)
+    }
+
+    private val disputeRaisedParams: List<AbiLoader.EventParameter> by lazy {
+        abiLoader.getEventDefinition("DisputeRaised")
+    }
+
+    private val disputeResolvedParams: List<AbiLoader.EventParameter> by lazy {
+        abiLoader.getEventDefinition("DisputeResolved")
+    }
+
+    private val fundsDepositedParams: List<AbiLoader.EventParameter> by lazy {
+        abiLoader.getEventDefinition("FundsDeposited")
+    }
+
+    private val fundsClaimedParams: List<AbiLoader.EventParameter> by lazy {
+        abiLoader.getEventDefinition("FundsClaimed")
+    }
 
     suspend fun parseContractEvents(contractAddress: String): ContractEventHistory = coroutineScope {
         retryWithBackoff("parseContractEvents($contractAddress)") {
@@ -506,18 +505,37 @@ class EventParsingService(
 
     private fun parseContractCreatedEvent(log: Log): ContractEvent? {
         return try {
+            // Parse indexed parameters from topics
             val topics = log.topics
-            val contractAddress = "0x" + topics[1].substring(26)
-            val buyer = "0x" + topics[2].substring(26)
-            val seller = "0x" + topics[3].substring(26)
+            val indexedParams = contractCreatedParams.filter { it.indexed }
+            val indexedData = mutableMapOf<String, Any>()
 
+            indexedParams.forEachIndexed { index, param ->
+                // topics[0] is event signature, indexed params start at topics[1]
+                val topicValue = topics[index + 1]
+                val value = when (param.type) {
+                    "address" -> "0x" + topicValue.substring(26)
+                    else -> topicValue
+                }
+                indexedData[param.name] = value
+            }
+
+            // Parse non-indexed parameters from data
             val nonIndexedValues = FunctionReturnDecoder.decode(
                 log.data,
                 contractCreatedEvent.nonIndexedParameters
             )
 
-            val amount = (nonIndexedValues[0] as Uint256).value
-            val expiryTimestamp = (nonIndexedValues[1] as Uint256).value
+            val nonIndexedParams = contractCreatedParams.filter { !it.indexed }
+            nonIndexedParams.forEachIndexed { index, param ->
+                val value = when (param.type) {
+                    "address" -> (nonIndexedValues[index] as Address).value
+                    "uint256" -> (nonIndexedValues[index] as Uint256).value
+                    "string" -> (nonIndexedValues[index] as Utf8String).value
+                    else -> nonIndexedValues[index].value
+                }
+                indexedData[param.name] = value
+            }
 
             val timestampSeconds = blockTimestampCache.getOrPut(log.blockNumber) {
                 val blockInfo = web3j.ethGetBlockByNumber(
@@ -534,13 +552,7 @@ class EventParsingService(
                 timestamp = timestamp,
                 transactionHash = log.transactionHash,
                 blockNumber = log.blockNumber,
-                data = mapOf(
-                    "contractAddress" to contractAddress,
-                    "buyer" to buyer,
-                    "seller" to seller,
-                    "amount" to amount,
-                    "expiryTimestamp" to expiryTimestamp
-                )
+                data = indexedData
             )
 
         } catch (e: Exception) {
@@ -591,8 +603,19 @@ class EventParsingService(
                 disputeResolvedEvent.nonIndexedParameters
             )
 
-            val recipient = (nonIndexedValues[0] as Address).value
-            val eventTimestamp = (nonIndexedValues[1] as Uint256).value
+            // Dynamically parse based on ABI - should be buyerPercentage, sellerPercentage, timestamp
+            val nonIndexedParams = disputeResolvedParams.filter { !it.indexed }
+            val eventData = mutableMapOf<String, Any>()
+
+            nonIndexedParams.forEachIndexed { index, param ->
+                val value = when (param.type) {
+                    "address" -> (nonIndexedValues[index] as Address).value
+                    "uint256" -> (nonIndexedValues[index] as Uint256).value
+                    "uint8" -> (nonIndexedValues[index] as org.web3j.abi.datatypes.generated.Uint8).value
+                    else -> nonIndexedValues[index].value
+                }
+                eventData[param.name] = value
+            }
 
             val timestampSeconds = blockTimestampCache.getOrPut(log.blockNumber) {
                 val blockInfo = web3j.ethGetBlockByNumber(
@@ -609,10 +632,7 @@ class EventParsingService(
                 timestamp = timestamp,
                 transactionHash = log.transactionHash,
                 blockNumber = log.blockNumber,
-                data = mapOf(
-                    "recipient" to recipient,
-                    "eventTimestamp" to eventTimestamp
-                )
+                data = eventData
             )
 
         } catch (e: Exception) {

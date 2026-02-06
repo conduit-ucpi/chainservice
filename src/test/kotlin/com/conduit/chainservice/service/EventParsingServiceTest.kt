@@ -1,6 +1,7 @@
 package com.conduit.chainservice.service
 
 import com.conduit.chainservice.config.EscrowProperties
+import com.conduit.chainservice.config.AbiLoader
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -16,6 +17,7 @@ import org.web3j.abi.datatypes.Address
 import org.web3j.abi.datatypes.Event
 import org.web3j.abi.datatypes.Utf8String
 import org.web3j.abi.datatypes.generated.Uint256
+import org.web3j.abi.datatypes.generated.Uint8
 import org.web3j.protocol.Web3j
 import org.web3j.protocol.core.DefaultBlockParameter
 import org.web3j.protocol.core.Request
@@ -32,6 +34,9 @@ class EventParsingServiceTest {
 
     @Mock
     private lateinit var escrowProperties: EscrowProperties
+
+    @Mock
+    private lateinit var abiLoader: AbiLoader
 
     @Mock
     private lateinit var ethBlockNumberRequest: Request<*, EthBlockNumber>
@@ -56,16 +61,97 @@ class EventParsingServiceTest {
     @BeforeEach
     fun setUp() {
         MockitoAnnotations.openMocks(this)
-        
+
         whenever(escrowProperties.contractFactoryAddress).thenReturn(factoryAddress)
         whenever(web3j.ethBlockNumber()).thenReturn(ethBlockNumberRequest)
         whenever(ethBlockNumberRequest.send()).thenReturn(ethBlockNumber)
         whenever(ethBlockNumber.blockNumber).thenReturn(currentBlockNumber)
-        
+
         val circuitBreaker = mock<com.conduit.chainservice.service.RpcCircuitBreaker>()
         whenever(circuitBreaker.getCircuitStatus()).thenReturn(emptyMap())
-        
-        eventParsingService = EventParsingService(web3j, escrowProperties, circuitBreaker)
+
+        // Mock ABI loader to return event definitions
+        whenever(abiLoader.createEvent(eq("ContractCreated"), eq(true))).thenReturn(
+            Event("ContractCreated", listOf(
+                TypeReference.create(Address::class.java, true),  // contractAddress
+                TypeReference.create(Address::class.java, true),  // buyer
+                TypeReference.create(Address::class.java, true),  // seller
+                TypeReference.create(Uint256::class.java, false), // amount
+                TypeReference.create(Uint256::class.java, false)  // expiryTimestamp
+            ))
+        )
+
+        whenever(abiLoader.getEventDefinition(eq("ContractCreated"), eq(true))).thenReturn(
+            listOf(
+                AbiLoader.EventParameter("contractAddress", "address", true, TypeReference.create(Address::class.java, true)),
+                AbiLoader.EventParameter("buyer", "address", true, TypeReference.create(Address::class.java, true)),
+                AbiLoader.EventParameter("seller", "address", true, TypeReference.create(Address::class.java, true)),
+                AbiLoader.EventParameter("amount", "uint256", false, TypeReference.create(Uint256::class.java, false)),
+                AbiLoader.EventParameter("expiryTimestamp", "uint256", false, TypeReference.create(Uint256::class.java, false))
+            )
+        )
+
+        whenever(abiLoader.createEvent(eq("DisputeRaised"), eq(false))).thenReturn(
+            Event("DisputeRaised", listOf(
+                TypeReference.create(Uint256::class.java, false)  // timestamp
+            ))
+        )
+
+        whenever(abiLoader.getEventDefinition(eq("DisputeRaised"), eq(false))).thenReturn(
+            listOf(
+                AbiLoader.EventParameter("timestamp", "uint256", false, TypeReference.create(Uint256::class.java, false))
+            )
+        )
+
+        whenever(abiLoader.createEvent(eq("DisputeResolved"), eq(false))).thenReturn(
+            Event("DisputeResolved", listOf(
+                TypeReference.create(Uint256::class.java, false), // buyerPercentage
+                TypeReference.create(Uint256::class.java, false), // sellerPercentage
+                TypeReference.create(Uint256::class.java, false)  // timestamp
+            ))
+        )
+
+        whenever(abiLoader.getEventDefinition(eq("DisputeResolved"), eq(false))).thenReturn(
+            listOf(
+                AbiLoader.EventParameter("buyerPercentage", "uint256", false, TypeReference.create(Uint256::class.java, false)),
+                AbiLoader.EventParameter("sellerPercentage", "uint256", false, TypeReference.create(Uint256::class.java, false)),
+                AbiLoader.EventParameter("timestamp", "uint256", false, TypeReference.create(Uint256::class.java, false))
+            )
+        )
+
+        whenever(abiLoader.createEvent(eq("FundsDeposited"), eq(false))).thenReturn(
+            Event("FundsDeposited", listOf(
+                TypeReference.create(Address::class.java, false), // buyer
+                TypeReference.create(Uint256::class.java, false), // escrowAmount
+                TypeReference.create(Uint256::class.java, false)  // timestamp
+            ))
+        )
+
+        whenever(abiLoader.getEventDefinition(eq("FundsDeposited"), eq(false))).thenReturn(
+            listOf(
+                AbiLoader.EventParameter("buyer", "address", false, TypeReference.create(Address::class.java, false)),
+                AbiLoader.EventParameter("escrowAmount", "uint256", false, TypeReference.create(Uint256::class.java, false)),
+                AbiLoader.EventParameter("timestamp", "uint256", false, TypeReference.create(Uint256::class.java, false))
+            )
+        )
+
+        whenever(abiLoader.createEvent(eq("FundsClaimed"), eq(false))).thenReturn(
+            Event("FundsClaimed", listOf(
+                TypeReference.create(Address::class.java, false), // recipient
+                TypeReference.create(Uint256::class.java, false), // amount
+                TypeReference.create(Uint256::class.java, false)  // timestamp
+            ))
+        )
+
+        whenever(abiLoader.getEventDefinition(eq("FundsClaimed"), eq(false))).thenReturn(
+            listOf(
+                AbiLoader.EventParameter("recipient", "address", false, TypeReference.create(Address::class.java, false)),
+                AbiLoader.EventParameter("amount", "uint256", false, TypeReference.create(Uint256::class.java, false)),
+                AbiLoader.EventParameter("timestamp", "uint256", false, TypeReference.create(Uint256::class.java, false))
+            )
+        )
+
+        eventParsingService = EventParsingService(web3j, escrowProperties, circuitBreaker, abiLoader)
     }
 
     @Test

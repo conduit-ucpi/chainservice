@@ -150,6 +150,56 @@ class AbiLoader {
     }
 
     /**
+     * Represents an event parameter from ABI
+     */
+    data class EventParameter(
+        val name: String,
+        val type: String,
+        val indexed: Boolean,
+        val typeReference: TypeReference<out Type<*>>
+    )
+
+    /**
+     * Get event definition from ABI by name
+     */
+    fun getEventDefinition(eventName: String, fromFactory: Boolean = false): List<EventParameter> {
+        val abi = if (fromFactory) factoryContractAbi else escrowContractAbi
+        val event = getEventFromAbi(abi, eventName)
+            ?: throw IllegalStateException("Event $eventName not found in ABI")
+
+        val inputs = event.get("inputs") ?: return emptyList()
+
+        return inputs.map { input ->
+            val type = input.get("type")?.asText()
+                ?: throw IllegalStateException("No type in event input")
+            val name = input.get("name")?.asText() ?: ""
+            val indexed = input.get("indexed")?.asBoolean() ?: false
+
+            val typeReference = when (type) {
+                "address" -> TypeReference.create(Address::class.java, indexed)
+                "uint256" -> TypeReference.create(Uint256::class.java, indexed)
+                "uint8" -> TypeReference.create(org.web3j.abi.datatypes.generated.Uint8::class.java, indexed)
+                "string" -> TypeReference.create(Utf8String::class.java, indexed)
+                "bool" -> TypeReference.create(org.web3j.abi.datatypes.Bool::class.java, indexed)
+                else -> throw IllegalStateException("Unsupported type: $type")
+            }
+
+            EventParameter(name, type, indexed, typeReference)
+        }
+    }
+
+    /**
+     * Create Web3j Event object from ABI
+     */
+    fun createEvent(eventName: String, fromFactory: Boolean = false): org.web3j.abi.datatypes.Event {
+        val parameters = getEventDefinition(eventName, fromFactory)
+        return org.web3j.abi.datatypes.Event(
+            eventName,
+            parameters.map { it.typeReference }
+        )
+    }
+
+    /**
      * Get event topics for event parsing
      */
     fun getEventSignature(eventName: String): String {
