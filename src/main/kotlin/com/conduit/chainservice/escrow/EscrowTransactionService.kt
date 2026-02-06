@@ -597,8 +597,8 @@ class EscrowTransactionService(
         return try {
             logger.debug("Parsing contract address from receipt with ${receipt.logs.size} logs")
             
-            // Look for ContractCreated event signature: ContractCreated(address,address,address,uint256,uint256)
-            val contractCreatedSignature = "0x" + org.web3j.crypto.Hash.sha3String("ContractCreated(address,address,address,uint256,uint256)").substring(2)
+            // Look for ContractCreated event signature: ContractCreated(address,address,address,uint256,uint256,string)
+            val contractCreatedSignature = "0x" + org.web3j.crypto.Hash.sha3String("ContractCreated(address,address,address,uint256,uint256,string)").substring(2)
             logger.debug("Looking for ContractCreated event signature: $contractCreatedSignature")
             
             for (log in receipt.logs) {
@@ -610,7 +610,7 @@ class EscrowTransactionService(
                     
                     // Check if this is a ContractCreated event
                     if (eventSignature.equals(contractCreatedSignature, ignoreCase = true)) {
-                        // For ContractCreated(address indexed contractAddress, address indexed buyer, address indexed seller, uint256 amount, uint256 expiryTimestamp)
+                        // For ContractCreated(address indexed contractAddress, address indexed buyer, address indexed seller, uint256 amount, uint256 expiryTimestamp, string description)
                         // The contract address is the first indexed parameter (topic[1])
                         if (log.topics.size >= 2) {
                             val contractAddressTopic = log.topics[1]

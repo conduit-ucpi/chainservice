@@ -11,6 +11,7 @@ import org.web3j.abi.FunctionReturnDecoder
 import org.web3j.abi.TypeReference
 import org.web3j.abi.datatypes.Address
 import org.web3j.abi.datatypes.Event
+import org.web3j.abi.datatypes.Utf8String
 import org.web3j.abi.datatypes.generated.Bytes32
 import org.web3j.abi.datatypes.generated.Uint256
 import org.web3j.protocol.Web3j
@@ -104,7 +105,8 @@ class EventParsingService(
             TypeReference.create(Address::class.java, true),  // indexed buyer
             TypeReference.create(Address::class.java, true),  // indexed seller
             TypeReference.create(Uint256::class.java, false), // amount
-            TypeReference.create(Uint256::class.java, false)  // expiryTimestamp
+            TypeReference.create(Uint256::class.java, false), // expiryTimestamp
+            TypeReference.create(Utf8String::class.java, false) // description
         )
     )
 
