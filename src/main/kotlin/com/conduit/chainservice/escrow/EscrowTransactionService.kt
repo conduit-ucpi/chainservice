@@ -29,6 +29,7 @@ class EscrowTransactionService(
     private val relayerCredentials: Credentials,
     private val gasProvider: ContractGasProvider,
     private val chainId: Long,
+    private val abiLoader: com.conduit.chainservice.config.AbiLoader,
     @Value("\${escrow.contract-factory-address}") private val contractFactoryAddress: String,
     @Value("\${escrow.min-creator-fee}") private val minCreatorFee: String,
     @Value("\${escrow.limit-dispute}") private val limitDispute: Long,
@@ -142,18 +143,18 @@ class EscrowTransactionService(
 
             val gasPrice = gasProvider.getGasPrice("createContract")
 
-            // Build function call data for createEscrowContract (fee now hardcoded in factory)
-            val function = Function(
-                "createEscrowContract",
-                listOf(
+            // Build function call data for createEscrowContract using ABI
+            val function = abiLoader.buildFunction(
+                functionName = "createEscrowContract",
+                inputValues = listOf(
                     Address(tokenAddress),
                     Address(buyer),
-                    Address(seller), 
+                    Address(seller),
                     Uint256(amount),
                     Uint256(BigInteger.valueOf(expiryTimestamp)),
                     Utf8String(description)
                 ),
-                emptyList()
+                fromFactory = true // This is a factory function
             )
 
             val functionData = FunctionEncoder.encode(function)
@@ -260,103 +261,6 @@ class EscrowTransactionService(
         }
     }
 
-    suspend fun resolveDispute(contractAddress: String, recipient: String): TransactionResult {
-        return try {
-            logger.info("Resolving dispute for contract: $contractAddress, recipient: $recipient")
-
-            val nonce = web3j.ethGetTransactionCount(
-                relayerCredentials.address,
-                DefaultBlockParameterName.PENDING
-            ).send().transactionCount
-
-            val gasPrice = gasProvider.getGasPrice("resolveDispute")
-
-            val function = Function(
-                "resolveDispute",
-                listOf(Address(recipient)),
-                emptyList()
-            )
-
-            val functionData = FunctionEncoder.encode(function)
-            
-            // Estimate gas for the resolve dispute transaction
-            val gasLimit = estimateGasWithBuffer(
-                relayerCredentials.address,
-                contractAddress,
-                functionData,
-                "resolveDispute"
-            )
-
-            val rawTransaction = RawTransaction.createTransaction(
-                nonce,
-                gasPrice,
-                gasLimit,
-                contractAddress,
-                BigInteger.ZERO,
-                functionData
-            )
-
-            val signedTransaction = org.web3j.crypto.TransactionEncoder.signMessage(
-                rawTransaction,
-                chainId,
-                relayerCredentials
-            )
-
-            // Send the signed transaction to gas-payer-service
-            val signedTransactionHex = Numeric.toHexString(signedTransaction)
-            val gasPayerResult = gasPayerServiceClient.processTransactionWithGasTransfer(
-                relayerCredentials.address, // Use relayer address as userWalletAddress since we're paying our own gas
-                signedTransactionHex,
-                "resolveDispute",
-                gasLimit
-            )
-
-            if (!gasPayerResult.success) {
-                logger.error("Dispute resolution failed via gas-payer-service: ${gasPayerResult.error}")
-                return TransactionResult(
-                    success = false,
-                    transactionHash = gasPayerResult.transactionHash,
-                    error = gasPayerResult.error
-                )
-            }
-
-            val txHash = gasPayerResult.transactionHash!!
-            logger.info("Dispute resolution transaction sent via gas-payer-service: $txHash")
-
-            val receipt = waitForTransactionReceipt(txHash)
-            if (receipt?.isStatusOK == true) {
-                logger.info("Dispute resolved successfully")
-                
-                // Invalidate cache for the contract whose dispute was resolved
-                cacheInvalidationService.invalidateContractCacheIntelligently(
-                    contractAddress = contractAddress,
-                    operationType = "resolveDispute",
-                    newStatus = com.conduit.chainservice.escrow.models.ContractStatus.RESOLVED,
-                    transactionHash = txHash
-                )
-                
-                TransactionResult(
-                    success = true,
-                    transactionHash = txHash
-                )
-            } else {
-                TransactionResult(
-                    success = false,
-                    transactionHash = txHash,
-                    error = "Dispute resolution transaction failed"
-                )
-            }
-
-        } catch (e: Exception) {
-            logger.error("Error resolving dispute", e)
-            TransactionResult(
-                success = false,
-                transactionHash = null,
-                error = e.message ?: "Unknown error occurred"
-            )
-        }
-    }
-
     suspend fun resolveDisputeWithPercentages(contractAddress: String, buyerPercentage: Double, sellerPercentage: Double): TransactionResult {
         return try {
             logger.info("Resolving dispute with percentages for contract: $contractAddress, buyer: $buyerPercentage%, seller: $sellerPercentage%")
@@ -389,13 +293,14 @@ class EscrowTransactionService(
             val buyerPercentageInt = buyerPercentage.toBigDecimal().toBigInteger()
             val sellerPercentageInt = sellerPercentage.toBigDecimal().toBigInteger()
 
-            val function = Function(
-                "resolveDispute",
-                listOf(
+            // Build function using ABI
+            val function = abiLoader.buildFunction(
+                functionName = "resolveDispute",
+                inputValues = listOf(
                     org.web3j.abi.datatypes.generated.Uint256(buyerPercentageInt),
                     org.web3j.abi.datatypes.generated.Uint256(sellerPercentageInt)
                 ),
-                emptyList()
+                fromFactory = false // This is an escrow contract function
             )
 
             val functionData = FunctionEncoder.encode(function)
@@ -646,11 +551,12 @@ class EscrowTransactionService(
             ).send().transactionCount
             
             val gasPrice = gasProvider.getGasPrice("claimFunds")
-            
-            val function = Function(
-                "claimFunds",
-                emptyList(),
-                emptyList()
+
+            // Build function using ABI
+            val function = abiLoader.buildFunction(
+                functionName = "claimFunds",
+                inputValues = emptyList(),
+                fromFactory = false // This is an escrow contract function
             )
             val functionData = FunctionEncoder.encode(function)
             
@@ -745,10 +651,11 @@ class EscrowTransactionService(
 
             val gasPrice = gasProvider.getGasPrice("depositFunds")
 
-            val function = Function(
-                "depositFunds",
-                emptyList(),
-                emptyList()
+            // Build function using ABI
+            val function = abiLoader.buildFunction(
+                functionName = "depositFunds",
+                inputValues = emptyList(),
+                fromFactory = false // This is an escrow contract function
             )
             val functionData = FunctionEncoder.encode(function)
 
@@ -836,11 +743,15 @@ class EscrowTransactionService(
         return try {
             logger.debug("Querying token address from escrow contract: $contractAddress")
 
-            // Create function call for tokenAddress() view function
-            val function = Function(
-                "tokenAddress",
-                emptyList(),
-                listOf(object : org.web3j.abi.TypeReference<Address>() {})
+            // Build function using ABI - contract exposes USDC_TOKEN, not tokenAddress
+            // Get output types dynamically from ABI
+            val outputTypes = abiLoader.getFunctionOutputTypes("USDC_TOKEN", fromFactory = false)
+
+            val function = abiLoader.buildFunction(
+                functionName = "USDC_TOKEN",
+                inputValues = emptyList(),
+                fromFactory = false,
+                outputTypes = outputTypes
             )
 
             val encodedFunction = FunctionEncoder.encode(function)
@@ -854,7 +765,7 @@ class EscrowTransactionService(
             ).send()
 
             if (ethCall.hasError()) {
-                logger.debug("Contract $contractAddress does not support tokenAddress() function: ${ethCall.error.message}")
+                logger.debug("Contract $contractAddress does not support USDC_TOKEN() function: ${ethCall.error.message}")
                 throw IllegalStateException("Failed to query token address: ${ethCall.error.message}")
             }
 
@@ -869,7 +780,7 @@ class EscrowTransactionService(
             logger.info("Escrow contract $contractAddress uses token: $tokenAddress")
             tokenAddress
         } catch (e: Exception) {
-            logger.debug("Contract $contractAddress does not support tokenAddress() function (likely an older contract): ${e.message}")
+            logger.debug("Contract $contractAddress does not support USDC_TOKEN() function (likely an older contract): ${e.message}")
             throw IllegalStateException("Could not determine token address for contract $contractAddress: ${e.message}", e)
         }
     }

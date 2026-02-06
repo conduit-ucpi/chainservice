@@ -211,4 +211,98 @@ class AbiLoader {
         val paramTypes = inputs.joinToString(",") { it.get("type")?.asText() ?: "" }
         return "$eventName($paramTypes)"
     }
+
+    /**
+     * Represents a function input parameter from ABI
+     */
+    data class InputParameter(
+        val name: String,
+        val type: String
+    )
+
+    /**
+     * Get function input parameters from ABI
+     * @param functionName The name of the function
+     * @param fromFactory Whether to look in factory ABI (true) or escrow contract ABI (false)
+     */
+    fun getFunctionInputs(functionName: String, fromFactory: Boolean = false): List<InputParameter> {
+        val abi = if (fromFactory) factoryContractAbi else escrowContractAbi
+        val function = getFunctionFromAbi(abi, functionName)
+            ?: throw IllegalStateException("Function $functionName not found in ${if (fromFactory) "factory" else "escrow"} ABI")
+
+        val inputs = function.get("inputs") ?: return emptyList()
+
+        return inputs.map { input ->
+            val type = input.get("type")?.asText()
+                ?: throw IllegalStateException("No type in input")
+            val name = input.get("name")?.asText() ?: ""
+            InputParameter(name, type)
+        }
+    }
+
+    /**
+     * Build a Web3j Function object for a given function name with provided input values
+     * @param functionName The name of the function in the ABI
+     * @param inputValues The actual values to encode (must match the ABI input types in order)
+     * @param fromFactory Whether to look in factory ABI (true) or escrow contract ABI (false)
+     * @param outputTypes Optional output types for view functions
+     */
+    fun buildFunction(
+        functionName: String,
+        inputValues: List<Type<*>>,
+        fromFactory: Boolean = false,
+        outputTypes: List<TypeReference<out Type<*>>> = emptyList()
+    ): org.web3j.abi.datatypes.Function {
+        val inputs = getFunctionInputs(functionName, fromFactory)
+
+        // Validate that input values match expected count
+        if (inputValues.size != inputs.size) {
+            throw IllegalArgumentException(
+                "Function $functionName expects ${inputs.size} inputs but got ${inputValues.size}"
+            )
+        }
+
+        // Build and return the Function object
+        return org.web3j.abi.datatypes.Function(
+            functionName,
+            inputValues,
+            outputTypes
+        )
+    }
+
+    /**
+     * Get function signature from ABI (e.g., "createEscrowContract(address,address,address,uint256,uint256,string)")
+     */
+    fun getFunctionSignature(functionName: String, fromFactory: Boolean = false): String {
+        val inputs = getFunctionInputs(functionName, fromFactory)
+        val paramTypes = inputs.joinToString(",") { it.type }
+        return "$functionName($paramTypes)"
+    }
+
+    /**
+     * Get function output types from ABI
+     * @param functionName The name of the function
+     * @param fromFactory Whether to look in factory ABI (true) or escrow contract ABI (false)
+     */
+    fun getFunctionOutputTypes(functionName: String, fromFactory: Boolean = false): List<TypeReference<out Type<*>>> {
+        val abi = if (fromFactory) factoryContractAbi else escrowContractAbi
+        val function = getFunctionFromAbi(abi, functionName)
+            ?: throw IllegalStateException("Function $functionName not found in ${if (fromFactory) "factory" else "escrow"} ABI")
+
+        val outputs = function.get("outputs") ?: return emptyList()
+
+        return outputs.map { output ->
+            val type = output.get("type")?.asText()
+                ?: throw IllegalStateException("No type in output")
+
+            when (type) {
+                "address" -> TypeReference.create(Address::class.java)
+                "uint256" -> TypeReference.create(Uint256::class.java)
+                "uint8" -> TypeReference.create(Uint8::class.java)
+                "string" -> TypeReference.create(Utf8String::class.java)
+                "bool" -> TypeReference.create(org.web3j.abi.datatypes.Bool::class.java)
+                else -> throw IllegalStateException("Unsupported output type: $type")
+            }
+        }
+    }
 }

@@ -28,28 +28,6 @@ class ResolveDisputeModelTest {
         assertEquals(60.0, request.buyerPercentage)
         assertEquals(40.0, request.sellerPercentage)
         assertEquals("Test resolution", request.resolutionNote)
-        assertNull(request.recipientAddress)
-    }
-
-    @Test
-    fun `ResolveDisputeRequest should support legacy single recipient resolution`() {
-        val request = ResolveDisputeRequest(
-            contractAddress = "0x1234567890abcdef1234567890abcdef12345678",
-            productName = "Test Product",
-            recipientAddress = "0x9876543210fedcba9876543210fedcba98765432",
-            buyerEmail = "buyer@test.com",
-            sellerEmail = "seller@test.com",
-            contractDescription = "Test contract description",
-            amount = "100.0",
-            currency = "USDC",
-            payoutDateTime = "2024-12-31T23:59:59Z"
-        )
-
-        assertEquals("0x1234567890abcdef1234567890abcdef12345678", request.contractAddress)
-        assertEquals("0x9876543210fedcba9876543210fedcba98765432", request.recipientAddress)
-        assertNull(request.buyerPercentage)
-        assertNull(request.sellerPercentage)
-        assertNull(request.resolutionNote)
     }
 
     @Test
@@ -99,28 +77,4 @@ class ResolveDisputeModelTest {
         assertEquals("Transaction failed: insufficient gas", response.error)
     }
 
-    @Test
-    fun `ResolveDisputeRequest should support both percentage and recipient fields`() {
-        // This tests backward compatibility - the request model can handle both formats
-        val requestWithBoth = ResolveDisputeRequest(
-            contractAddress = "0x1234567890abcdef1234567890abcdef12345678",
-            productName = "Test Product",
-            recipientAddress = "0x9876543210fedcba9876543210fedcba98765432",
-            buyerPercentage = 100.0,
-            sellerPercentage = 0.0,
-            resolutionNote = "Mixed format test",
-            buyerEmail = "buyer@test.com",
-            sellerEmail = "seller@test.com",
-            contractDescription = "Test contract description",
-            amount = "100.0",
-            currency = "USDC",
-            payoutDateTime = "2024-12-31T23:59:59Z"
-        )
-
-        assertEquals("0x1234567890abcdef1234567890abcdef12345678", requestWithBoth.contractAddress)
-        assertEquals("0x9876543210fedcba9876543210fedcba98765432", requestWithBoth.recipientAddress)
-        assertEquals(100.0, requestWithBoth.buyerPercentage)
-        assertEquals(0.0, requestWithBoth.sellerPercentage)
-        assertEquals("Mixed format test", requestWithBoth.resolutionNote)
-    }
 }

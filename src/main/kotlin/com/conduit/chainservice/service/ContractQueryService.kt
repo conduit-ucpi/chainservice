@@ -552,21 +552,12 @@ class ContractQueryService(
         try {
             // Prepare the encoded function calls for each contract using proper Call3 structs
             val calls = contractAddresses.mapIndexed { index, contractAddress ->
-                // Encode the getContractInfo() function call
+                // Encode the getContractInfo() function call using ABI-driven output types
+                val outputTypes = abiLoader.getContractInfoOutputTypes()
                 val function = Function(
                     "getContractInfo",
                     emptyList(),
-                    listOf(
-                        TypeReference.create(Address::class.java),     // buyer
-                        TypeReference.create(Address::class.java),     // seller
-                        TypeReference.create(Uint256::class.java),     // amount
-                        TypeReference.create(Uint256::class.java),     // expiryTimestamp
-                        TypeReference.create(Utf8String::class.java),  // description
-                        TypeReference.create(org.web3j.abi.datatypes.generated.Uint8::class.java),   // currentState
-                        TypeReference.create(Uint256::class.java),     // currentTimestamp
-                        TypeReference.create(Uint256::class.java),     // creatorFee
-                        TypeReference.create(Uint256::class.java)      // createdAt
-                    )
+                    outputTypes
                 )
                 val encodedFunction = FunctionEncoder.encode(function)
 
@@ -739,20 +730,10 @@ class ContractQueryService(
                 null
             }
 
-            // Fallback to 9 fields if 10-field decoding failed
+            // Fallback to current ABI output types (from ABI file) if 10-field decoding failed
             if (decodedOutput == null || decodedOutput.size < 9) {
-                val outputTypesOld = listOf(
-                    TypeReference.create(Address::class.java),     // buyer
-                    TypeReference.create(Address::class.java),     // seller
-                    TypeReference.create(Uint256::class.java),     // amount
-                    TypeReference.create(Uint256::class.java),     // expiryTimestamp
-                    TypeReference.create(Utf8String::class.java),  // description
-                    TypeReference.create(org.web3j.abi.datatypes.generated.Uint8::class.java),   // currentState
-                    TypeReference.create(Uint256::class.java),     // currentTimestamp
-                    TypeReference.create(Uint256::class.java),     // creatorFee
-                    TypeReference.create(Uint256::class.java)      // createdAt
-                )
-                decodedOutput = FunctionReturnDecoder.decode(hexData, outputTypesOld as List<TypeReference<Type<Any>>>)
+                val outputTypesFromAbi = abiLoader.getContractInfoOutputTypes()
+                decodedOutput = FunctionReturnDecoder.decode(hexData, outputTypesFromAbi as List<TypeReference<Type<Any>>>)
             }
 
             if (decodedOutput != null && decodedOutput.size >= 9) {

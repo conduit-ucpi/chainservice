@@ -17,6 +17,7 @@ import org.web3j.protocol.Web3j
 import org.web3j.crypto.Credentials
 import org.web3j.tx.gas.ContractGasProvider
 import com.conduit.chainservice.config.EscrowProperties
+import com.conduit.chainservice.config.AbiLoader
 import java.math.BigInteger
 import org.junit.jupiter.api.Assertions.assertEquals
 
@@ -36,6 +37,8 @@ class StateAwareCacheInvalidationDepositFundsTest {
     private lateinit var gasProvider: ContractGasProvider
 
     private lateinit var escrowProperties: EscrowProperties
+
+    private lateinit var abiLoader: AbiLoader
 
     private lateinit var mutableInfoCache: Cache
 
@@ -79,6 +82,7 @@ class StateAwareCacheInvalidationDepositFundsTest {
             relayerCredentials,
             gasProvider,
             chainId,
+            abiLoader,
             "0x1234567890123456789012345678901234567890",
             "1000000",
             8800L,

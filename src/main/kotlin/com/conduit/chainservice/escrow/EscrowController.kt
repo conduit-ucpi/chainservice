@@ -626,44 +626,32 @@ class EscrowController(
             
             val result = runBlocking {
                 // Check if percentage-based resolution is requested
-                if (request.buyerPercentage != null && request.sellerPercentage != null) {
-                    // Validate percentages
-                    val buyerPct = request.buyerPercentage!!
-                    val sellerPct = request.sellerPercentage!!
-                    
-                    if (buyerPct < 0 || sellerPct < 0) {
-                        return@runBlocking TransactionResult(
-                            success = false,
-                            transactionHash = null,
-                            error = "Percentages cannot be negative"
-                        )
-                    }
-                    
-                    if (Math.abs(buyerPct + sellerPct - 100.0) > 0.01) {
-                        return@runBlocking TransactionResult(
-                            success = false,
-                            transactionHash = null,
-                            error = "Percentages must sum to 100"
-                        )
-                    }
-                    
-                    logger.info("Using percentage-based resolution: buyer=${buyerPct}%, seller=${sellerPct}%")
-                    if (request.resolutionNote != null) {
-                        logger.info("Resolution note: ${request.resolutionNote}")
-                    }
-                    
-                    escrowTransactionService.resolveDisputeWithPercentages(request.contractAddress, buyerPct, sellerPct)
-                } else if (request.recipientAddress != null) {
-                    // Legacy single recipient resolution
-                    logger.warn("Using deprecated single recipient resolution")
-                    escrowTransactionService.resolveDispute(request.contractAddress, request.recipientAddress!!)
-                } else {
-                    TransactionResult(
+                // Validate percentages
+                val buyerPct = request.buyerPercentage
+                val sellerPct = request.sellerPercentage
+
+                if (buyerPct < 0 || sellerPct < 0) {
+                    return@runBlocking TransactionResult(
                         success = false,
                         transactionHash = null,
-                        error = "Either provide buyerPercentage+sellerPercentage or recipientAddress (deprecated)"
+                        error = "Percentages cannot be negative"
                     )
                 }
+
+                if (Math.abs(buyerPct + sellerPct - 100.0) > 0.01) {
+                    return@runBlocking TransactionResult(
+                        success = false,
+                        transactionHash = null,
+                        error = "Percentages must sum to 100"
+                    )
+                }
+
+                logger.info("Resolving dispute with percentages: buyer=${buyerPct}%, seller=${sellerPct}%")
+                if (request.resolutionNote != null) {
+                    logger.info("Resolution note: ${request.resolutionNote}")
+                }
+
+                escrowTransactionService.resolveDisputeWithPercentages(request.contractAddress, buyerPct, sellerPct)
             }
 
             val response = ResolveDisputeResponse(

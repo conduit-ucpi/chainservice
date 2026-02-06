@@ -153,9 +153,8 @@ class AdminController(
             val resolveDisputeRequest = ResolveDisputeRequest(
                 contractAddress = contractAddress,
                 productName = request.productName,
-                recipientAddress = null, // Use percentage-based resolution
-                buyerPercentage = request.buyerPercentage,
-                sellerPercentage = request.sellerPercentage,
+                buyerPercentage = request.buyerPercentage ?: 0.0,
+                sellerPercentage = request.sellerPercentage ?: 0.0,
                 resolutionNote = request.resolutionNote,
                 buyerEmail = request.buyerEmail,
                 sellerEmail = request.sellerEmail,

@@ -49,17 +49,6 @@ class TransactionRelayService(
         )
     }
 
-    suspend fun resolveDispute(contractAddress: String, recipient: String): TransactionResult {
-        // Delegate to escrow transaction service
-        val genericResult = escrowTransactionService.resolveDispute(contractAddress, recipient)
-        // Convert to legacy TransactionResult format
-        return TransactionResult(
-            success = genericResult.success,
-            transactionHash = genericResult.transactionHash,
-            error = genericResult.error
-        )
-    }
-
     suspend fun waitForTransactionReceipt(transactionHash: String): TransactionReceipt? {
         // Delegate to escrow transaction service since gas-payer-service doesn't provide this
         return escrowTransactionService.waitForTransactionReceipt(transactionHash)

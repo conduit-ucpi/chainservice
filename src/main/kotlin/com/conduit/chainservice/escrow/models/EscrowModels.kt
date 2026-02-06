@@ -86,16 +86,13 @@ data class DepositFundsRequest(
 data class ResolveDisputeRequest(
     @field:NotBlank(message = "Contract address is required")
     val contractAddress: String,
-    
+
     @field:NotBlank(message = "Product name is required")
     val productName: String,
-    
-    // For backward compatibility - if recipientAddress is provided, all funds go to this address
-    val recipientAddress: String? = null,
-    
-    // For percentage-based resolution
-    val buyerPercentage: Double? = null,
-    val sellerPercentage: Double? = null,
+
+    // Percentage-based resolution (required)
+    val buyerPercentage: Double,
+    val sellerPercentage: Double,
     val resolutionNote: String? = null,
     
     val buyerEmail: String? = null,

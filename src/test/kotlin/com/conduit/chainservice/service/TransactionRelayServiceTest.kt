@@ -137,7 +137,6 @@ class TransactionRelayServiceTest {
         val expectedMethods = listOf(
             "createContract",
             "relayTransaction",
-            "resolveDispute",
             "raiseDispute",
             "claimFunds",
             "depositFunds",
@@ -146,7 +145,8 @@ class TransactionRelayServiceTest {
             "approveUSDCWithGasTransfer", // Deprecated wrapper
             "claimFundsWithGasTransfer",
             "raiseDisputeWithGasTransfer",
-            "getOperationGasCosts"
+            "getOperationGasCosts",
+            "waitForTransactionReceipt"
         )
         
         val actualMethodNames = serviceSpecificMethods.map { it.name }.sorted()
