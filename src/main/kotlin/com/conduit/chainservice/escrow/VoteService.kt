@@ -23,6 +23,7 @@ class VoteService(
     private val relayerCredentials: Credentials,
     private val gasProvider: ContractGasProvider,
     private val chainId: Long,
+    private val abiLoader: com.conduit.chainservice.config.AbiLoader,
     private val gasPayerServiceClient: com.conduit.chainservice.service.GasPayerServiceClient,
     private val cacheInvalidationService: StateAwareCacheInvalidationService,
     @Value("\${escrow.gas-multiplier}") private val gasMultiplier: Double
@@ -60,11 +61,11 @@ class VoteService(
 
             val gasPrice = gasProvider.getGasPrice("submitResolutionVote")
 
-            // Build function call for submitResolutionVote(uint256 _buyerPercentage)
-            val function = Function(
-                "submitResolutionVote",
-                listOf(Uint256(buyerPercentage)),
-                emptyList()
+            // Build function call for submitResolutionVote(uint256 _buyerPercentage) using ABI
+            val function = abiLoader.buildFunction(
+                functionName = "submitResolutionVote",
+                inputValues = listOf(Uint256(buyerPercentage)),
+                fromFactory = false // This is an escrow contract function
             )
 
             val functionData = FunctionEncoder.encode(function)

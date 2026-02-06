@@ -568,7 +568,18 @@ class EventParsingService(
                 disputeRaisedEvent.nonIndexedParameters
             )
 
-            val eventTimestamp = (nonIndexedValues[0] as Uint256).value
+            // Use ABI-driven dynamic parsing
+            val eventData = mutableMapOf<String, Any>()
+            val nonIndexedParams = disputeRaisedParams.filter { !it.indexed }
+            nonIndexedParams.forEachIndexed { index, param ->
+                val value = when (param.type) {
+                    "address" -> (nonIndexedValues[index] as Address).value
+                    "uint256" -> (nonIndexedValues[index] as Uint256).value
+                    "string" -> (nonIndexedValues[index] as Utf8String).value
+                    else -> nonIndexedValues[index].value
+                }
+                eventData[param.name] = value
+            }
 
             val timestampSeconds = blockTimestampCache.getOrPut(log.blockNumber) {
                 val blockInfo = web3j.ethGetBlockByNumber(
@@ -585,9 +596,7 @@ class EventParsingService(
                 timestamp = timestamp,
                 transactionHash = log.transactionHash,
                 blockNumber = log.blockNumber,
-                data = mapOf(
-                    "eventTimestamp" to eventTimestamp
-                )
+                data = eventData
             )
 
         } catch (e: Exception) {
@@ -648,9 +657,18 @@ class EventParsingService(
                 fundsDepositedEvent.nonIndexedParameters
             )
 
-            val buyer = (nonIndexedValues[0] as Address).value
-            val amount = (nonIndexedValues[1] as Uint256).value
-            val eventTimestamp = (nonIndexedValues[2] as Uint256).value
+            // Use ABI-driven dynamic parsing
+            val eventData = mutableMapOf<String, Any>()
+            val nonIndexedParams = fundsDepositedParams.filter { !it.indexed }
+            nonIndexedParams.forEachIndexed { index, param ->
+                val value = when (param.type) {
+                    "address" -> (nonIndexedValues[index] as Address).value
+                    "uint256" -> (nonIndexedValues[index] as Uint256).value
+                    "string" -> (nonIndexedValues[index] as Utf8String).value
+                    else -> nonIndexedValues[index].value
+                }
+                eventData[param.name] = value
+            }
 
             val timestampSeconds = blockTimestampCache.getOrPut(log.blockNumber) {
                 val blockInfo = web3j.ethGetBlockByNumber(
@@ -667,11 +685,7 @@ class EventParsingService(
                 timestamp = timestamp,
                 transactionHash = log.transactionHash,
                 blockNumber = log.blockNumber,
-                data = mapOf(
-                    "buyer" to buyer,
-                    "amount" to amount,
-                    "eventTimestamp" to eventTimestamp
-                )
+                data = eventData
             )
 
         } catch (e: Exception) {
@@ -687,9 +701,18 @@ class EventParsingService(
                 fundsClaimedEvent.nonIndexedParameters
             )
 
-            val recipient = (nonIndexedValues[0] as Address).value
-            val amount = (nonIndexedValues[1] as Uint256).value
-            val eventTimestamp = (nonIndexedValues[2] as Uint256).value
+            // Use ABI-driven dynamic parsing
+            val eventData = mutableMapOf<String, Any>()
+            val nonIndexedParams = fundsClaimedParams.filter { !it.indexed }
+            nonIndexedParams.forEachIndexed { index, param ->
+                val value = when (param.type) {
+                    "address" -> (nonIndexedValues[index] as Address).value
+                    "uint256" -> (nonIndexedValues[index] as Uint256).value
+                    "string" -> (nonIndexedValues[index] as Utf8String).value
+                    else -> nonIndexedValues[index].value
+                }
+                eventData[param.name] = value
+            }
 
             val timestampSeconds = blockTimestampCache.getOrPut(log.blockNumber) {
                 val blockInfo = web3j.ethGetBlockByNumber(
@@ -706,11 +729,7 @@ class EventParsingService(
                 timestamp = timestamp,
                 transactionHash = log.transactionHash,
                 blockNumber = log.blockNumber,
-                data = mapOf(
-                    "recipient" to recipient,
-                    "amount" to amount,
-                    "eventTimestamp" to eventTimestamp
-                )
+                data = eventData
             )
 
         } catch (e: Exception) {

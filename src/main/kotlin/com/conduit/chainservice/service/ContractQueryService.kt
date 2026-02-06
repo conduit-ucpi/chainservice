@@ -292,15 +292,15 @@ class ContractQueryService(
 
     private suspend fun callGetContractInfo(contractAddress: String): Map<String, Any> {
         return try {
-            // Use ABI loader to get the correct output types from the actual contract ABI
+            // Build function using ABI loader
             val outputTypes = abiLoader.getContractInfoOutputTypes()
-
-            val function = org.web3j.abi.datatypes.Function(
-                "getContractInfo",
-                emptyList(),
-                outputTypes
+            val function = abiLoader.buildFunction(
+                functionName = "getContractInfo",
+                inputValues = emptyList(),
+                fromFactory = false,
+                outputTypes = outputTypes
             )
-            
+
             val encodedFunction = org.web3j.abi.FunctionEncoder.encode(function)
 
             val ethCall: EthCall = web3j.ethCall(
@@ -552,12 +552,13 @@ class ContractQueryService(
         try {
             // Prepare the encoded function calls for each contract using proper Call3 structs
             val calls = contractAddresses.mapIndexed { index, contractAddress ->
-                // Encode the getContractInfo() function call using ABI-driven output types
+                // Build function call using ABI loader
                 val outputTypes = abiLoader.getContractInfoOutputTypes()
-                val function = Function(
-                    "getContractInfo",
-                    emptyList(),
-                    outputTypes
+                val function = abiLoader.buildFunction(
+                    functionName = "getContractInfo",
+                    inputValues = emptyList(),
+                    fromFactory = false,
+                    outputTypes = outputTypes
                 )
                 val encodedFunction = FunctionEncoder.encode(function)
 
@@ -704,79 +705,17 @@ class ContractQueryService(
     
     /**
      * Decode the result from getContractInfo function call
-     * Supports both old contracts (9 fields) and new contracts (10 fields with tokenAddress)
+     * Uses ABI-driven output types to ensure correct decoding regardless of contract version
      */
     private fun decodeContractInfoResult(hexData: String): Map<String, Any> {
         try {
-            // First try to decode with all 10 fields (new contracts with tokenAddress)
-            val outputTypesNew = listOf(
-                TypeReference.create(Address::class.java),     // buyer
-                TypeReference.create(Address::class.java),     // seller
-                TypeReference.create(Uint256::class.java),     // amount
-                TypeReference.create(Uint256::class.java),     // expiryTimestamp
-                TypeReference.create(Utf8String::class.java),  // description
-                TypeReference.create(org.web3j.abi.datatypes.generated.Uint8::class.java),   // currentState
-                TypeReference.create(Uint256::class.java),     // currentTimestamp
-                TypeReference.create(Uint256::class.java),     // creatorFee
-                TypeReference.create(Uint256::class.java),     // createdAt
-                TypeReference.create(Address::class.java)      // tokenAddress (NEW)
-            )
+            // Decode using ABI-driven output types (not hardcoded field counts)
+            val outputTypesFromAbi = abiLoader.getContractInfoOutputTypes()
+            val decodedOutput = FunctionReturnDecoder.decode(hexData, outputTypesFromAbi as List<TypeReference<Type<Any>>>)
 
-            var decodedOutput = try {
-                FunctionReturnDecoder.decode(hexData, outputTypesNew as List<TypeReference<Type<Any>>>)
-            } catch (e: Exception) {
-                // If decoding with 10 fields fails, try with 9 fields (old contracts)
-                logger.debug("Failed to decode with 10 fields, trying 9 fields (old contract)")
-                null
-            }
-
-            // Fallback to current ABI output types (from ABI file) if 10-field decoding failed
-            if (decodedOutput == null || decodedOutput.size < 9) {
-                val outputTypesFromAbi = abiLoader.getContractInfoOutputTypes()
-                decodedOutput = FunctionReturnDecoder.decode(hexData, outputTypesFromAbi as List<TypeReference<Type<Any>>>)
-            }
-
-            if (decodedOutput != null && decodedOutput.size >= 9) {
-                val buyer = (decodedOutput[0] as Address).value
-                val seller = (decodedOutput[1] as Address).value
-                val amount = (decodedOutput[2] as Uint256).value
-                val expiryTimestamp = (decodedOutput[3] as Uint256).value.toLong()
-                val description = (decodedOutput[4] as Utf8String).value
-                val currentState = (decodedOutput[5] as org.web3j.abi.datatypes.generated.Uint8).value.toInt()
-                val currentTimestamp = (decodedOutput[6] as Uint256).value.toLong()
-                val creatorFee = (decodedOutput[7] as Uint256).value
-                val createdAt = (decodedOutput[8] as Uint256).value.toLong()
-
-                // Extract tokenAddress if available (10th field), otherwise assume USDC
-                val tokenAddress = if (decodedOutput.size >= 10) {
-                    (decodedOutput[9] as Address).value
-                } else {
-                    // Old contract - assume USDC as default (Base USDC address)
-                    "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
-                }
-
-                // Determine boolean states from currentState enum
-                val funded = currentState >= 1
-                val disputed = currentState == 2
-                val resolved = currentState == 3
-                val claimed = currentState == 4 || currentState == 5
-
-                return mapOf(
-                    "buyer" to buyer,
-                    "seller" to seller,
-                    "amount" to amount,
-                    "expiryTimestamp" to expiryTimestamp,
-                    "description" to description,
-                    "funded" to funded,
-                    "disputed" to disputed,
-                    "resolved" to resolved,
-                    "claimed" to claimed,
-                    "createdAt" to createdAt,
-                    "currentState" to currentState,
-                    "currentTimestamp" to currentTimestamp,
-                    "creatorFee" to creatorFee,
-                    "tokenAddress" to tokenAddress
-                )
+            if (decodedOutput != null && decodedOutput.size > 0) {
+                // Use ABI to parse ALL fields dynamically - no hardcoded field names or indices
+                return parseNewContractResult(decodedOutput)
             }
         } catch (e: Exception) {
             logger.debug("Failed to decode contract info result: ${e.message}")
