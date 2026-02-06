@@ -2,6 +2,7 @@ package com.conduit.chainservice.service
 
 import com.conduit.chainservice.config.EscrowProperties
 import com.conduit.chainservice.config.BlockchainProperties
+import com.conduit.chainservice.config.AbiLoader
 import com.conduit.chainservice.escrow.models.ContractInfo
 import com.conduit.chainservice.escrow.models.ContractStatus
 import com.conduit.chainservice.escrow.models.ContractInfoResult
@@ -43,7 +44,8 @@ class ContractQueryService(
     private val web3j: Web3j,
     private val escrowProperties: EscrowProperties,
     private val blockchainProperties: BlockchainProperties,
-    private val eventParsingService: EventParsingService
+    private val eventParsingService: EventParsingService,
+    private val abiLoader: AbiLoader
 ) : ContractQueryServiceInterface {
 
     private val logger = LoggerFactory.getLogger(ContractQueryService::class.java)
@@ -290,22 +292,13 @@ class ContractQueryService(
 
     private suspend fun callGetContractInfo(contractAddress: String): Map<String, Any> {
         return try {
-            // Use Web3j to properly encode the function call
+            // Use ABI loader to get the correct output types from the actual contract ABI
+            val outputTypes = abiLoader.getContractInfoOutputTypes()
+
             val function = org.web3j.abi.datatypes.Function(
                 "getContractInfo",
                 emptyList(),
-                listOf(
-                    org.web3j.abi.TypeReference.create(Address::class.java),     // buyer
-                    org.web3j.abi.TypeReference.create(Address::class.java),     // seller
-                    org.web3j.abi.TypeReference.create(Uint256::class.java),     // amount
-                    org.web3j.abi.TypeReference.create(Uint256::class.java),     // expiryTimestamp
-                    org.web3j.abi.TypeReference.create(Utf8String::class.java),  // description
-                    org.web3j.abi.TypeReference.create(org.web3j.abi.datatypes.generated.Uint8::class.java),   // currentState
-                    org.web3j.abi.TypeReference.create(Uint256::class.java),     // currentTimestamp
-                    org.web3j.abi.TypeReference.create(Uint256::class.java),     // creatorFee
-                    org.web3j.abi.TypeReference.create(Uint256::class.java),     // createdAt
-                    org.web3j.abi.TypeReference.create(Address::class.java)      // tokenAddress (NEW)
-                )
+                outputTypes
             )
             
             val encodedFunction = org.web3j.abi.FunctionEncoder.encode(function)
@@ -351,41 +344,58 @@ class ContractQueryService(
 
     private fun parseNewContractResult(result: List<org.web3j.abi.datatypes.Type<*>>): Map<String, Any> {
         return try {
-            // Parse the new contract result
-            // getContractInfo returns: (address _buyer, address _seller, uint256 _amount, uint256 _expiryTimestamp, string _description, uint8 _currentState, uint256 _currentTimestamp, uint256 _creatorFee, uint256 _createdAt)
-            
-            val buyer = (result[0] as Address).value
-            val seller = (result[1] as Address).value
-            val amount = (result[2] as Uint256).value
-            val expiryTimestamp = (result[3] as Uint256).value.toLong()
-            val description = (result[4] as Utf8String).value
-            val state = (result[5] as org.web3j.abi.datatypes.generated.Uint8).value.toInt()
-            val currentTimestamp = (result[6] as Uint256).value.toLong()
-            val creatorFee = (result[7] as Uint256).value
-            val createdAt = (result[8] as Uint256).value.toLong()
-            
-            // Map state values: 0=unfunded, 1=funded, 2=disputed, 3=resolved, 4=claimed
-            val funded = state >= 1
-            val disputed = state == 2
-            val resolved = state == 3
-            val claimed = state == 4
-            
-            mapOf(
-                "buyer" to buyer,
-                "seller" to seller,
-                "amount" to amount,
-                "expiryTimestamp" to expiryTimestamp,
-                "description" to description,
-                "funded" to funded,
-                "disputed" to disputed,
-                "resolved" to resolved,
-                "claimed" to claimed,
-                "creatorFee" to creatorFee,
-                "createdAt" to createdAt
-            )
-            
+            // Dynamically parse based on ABI definition
+            val outputs = abiLoader.getContractInfoOutputs()
+
+            if (result.size != outputs.size) {
+                throw IllegalStateException("Result size ${result.size} doesn't match ABI output size ${outputs.size}")
+            }
+
+            val parsedData = mutableMapOf<String, Any>()
+
+            // Parse each field based on ABI
+            outputs.forEachIndexed { index, output ->
+                val value = when (output.type) {
+                    "address" -> (result[index] as Address).value
+                    "uint256" -> {
+                        val bigIntValue = (result[index] as Uint256).value
+                        // Convert to Long for timestamp fields based on name
+                        if (output.name.contains("imestamp", ignoreCase = true) || output.name == "_createdAt") {
+                            bigIntValue.toLong()
+                        } else {
+                            bigIntValue
+                        }
+                    }
+                    "uint8" -> (result[index] as org.web3j.abi.datatypes.generated.Uint8).value.toInt()
+                    "string" -> (result[index] as Utf8String).value
+                    "bool" -> (result[index] as org.web3j.abi.datatypes.Bool).value
+                    else -> result[index].value
+                }
+
+                // Remove leading underscore from parameter names for consistency
+                val fieldName = output.name.removePrefix("_")
+                parsedData[fieldName] = value
+            }
+
+            // Calculate derived state fields from _currentState if it exists
+            val state = parsedData["currentState"] as? Int
+            if (state != null) {
+                // Map state values: 0=unfunded, 1=funded, 2=disputed, 3=resolved, 4=claimed
+                parsedData["funded"] = state >= 1
+                parsedData["disputed"] = state == 2
+                parsedData["resolved"] = state == 3
+                parsedData["claimed"] = state == 4
+            }
+
+            // Add empty description for backward compatibility (removed from contract for gas savings)
+            if (!parsedData.containsKey("description")) {
+                parsedData["description"] = ""
+            }
+
+            parsedData
+
         } catch (e: Exception) {
-            logger.error("Error parsing new contract result", e)
+            logger.error("Error parsing contract result from ABI", e)
             mapOf(
                 "buyer" to "0x0000000000000000000000000000000000000000",
                 "seller" to "0x0000000000000000000000000000000000000000",

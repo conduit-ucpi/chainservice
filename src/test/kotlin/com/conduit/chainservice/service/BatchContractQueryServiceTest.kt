@@ -2,6 +2,7 @@ package com.conduit.chainservice.service
 
 import com.conduit.chainservice.config.EscrowProperties
 import com.conduit.chainservice.config.BlockchainProperties
+import com.conduit.chainservice.config.AbiLoader
 import com.conduit.chainservice.escrow.models.ContractInfo
 import com.conduit.chainservice.escrow.models.ContractStatus
 import com.conduit.chainservice.escrow.models.ContractInfoResult
@@ -13,6 +14,10 @@ import org.mockito.Mock
 import org.mockito.MockitoAnnotations
 import org.mockito.kotlin.*
 import org.web3j.protocol.Web3j
+import org.web3j.abi.TypeReference
+import org.web3j.abi.datatypes.Address
+import org.web3j.abi.datatypes.generated.Uint256
+import org.web3j.abi.datatypes.generated.Uint8
 import java.math.BigInteger
 import java.time.Instant
 
@@ -20,7 +25,7 @@ class BatchContractQueryServiceTest {
 
     @Mock
     private lateinit var web3j: Web3j
-    
+
     @Mock
     private lateinit var escrowProperties: EscrowProperties
 
@@ -29,6 +34,9 @@ class BatchContractQueryServiceTest {
 
     @Mock
     private lateinit var eventParsingService: EventParsingService
+
+    @Mock
+    private lateinit var abiLoader: AbiLoader
 
     private lateinit var contractQueryService: ContractQueryService
 
@@ -40,7 +48,37 @@ class BatchContractQueryServiceTest {
     fun setUp() {
         MockitoAnnotations.openMocks(this)
         whenever(blockchainProperties.usdcContractAddress).thenReturn("0x5425890298aed601595a70AB815c96711a31Bc65")
-        contractQueryService = spy(ContractQueryService(web3j, escrowProperties, blockchainProperties, eventParsingService))
+
+        // Mock ABI loader to return contract info output types matching current ABI
+        whenever(abiLoader.getContractInfoOutputTypes()).thenReturn(
+            listOf(
+                TypeReference.create(Address::class.java),  // buyer
+                TypeReference.create(Address::class.java),  // seller
+                TypeReference.create(Uint256::class.java),  // amount
+                TypeReference.create(Uint256::class.java),  // expiryTimestamp
+                TypeReference.create(Uint8::class.java),    // currentState
+                TypeReference.create(Uint256::class.java),  // currentTimestamp
+                TypeReference.create(Uint256::class.java),  // creatorFee
+                TypeReference.create(Uint256::class.java),  // createdAt
+                TypeReference.create(Address::class.java)   // tokenAddress
+            )
+        )
+
+        whenever(abiLoader.getContractInfoOutputs()).thenReturn(
+            listOf(
+                AbiLoader.OutputParameter("_buyer", "address", TypeReference.create(Address::class.java)),
+                AbiLoader.OutputParameter("_seller", "address", TypeReference.create(Address::class.java)),
+                AbiLoader.OutputParameter("_amount", "uint256", TypeReference.create(Uint256::class.java)),
+                AbiLoader.OutputParameter("_expiryTimestamp", "uint256", TypeReference.create(Uint256::class.java)),
+                AbiLoader.OutputParameter("_currentState", "uint8", TypeReference.create(Uint8::class.java)),
+                AbiLoader.OutputParameter("_currentTimestamp", "uint256", TypeReference.create(Uint256::class.java)),
+                AbiLoader.OutputParameter("_creatorFee", "uint256", TypeReference.create(Uint256::class.java)),
+                AbiLoader.OutputParameter("_createdAt", "uint256", TypeReference.create(Uint256::class.java)),
+                AbiLoader.OutputParameter("_tokenAddress", "address", TypeReference.create(Address::class.java))
+            )
+        )
+
+        contractQueryService = spy(ContractQueryService(web3j, escrowProperties, blockchainProperties, eventParsingService, abiLoader))
     }
 
     @Test
