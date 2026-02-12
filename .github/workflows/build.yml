@@ -98,6 +98,8 @@ jobs:
             --name ${{ vars.SERVICE_NAME }} \
             --network ${{ vars.DOCKER_NETWORK }} \
             --restart unless-stopped \
+            --memory=768m \
+            -e JAVA_OPTS="-Xmx537m -Xms384m" \
           EOF
           
           # Volume mounts removed - using environment variables instead
