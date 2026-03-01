@@ -169,6 +169,13 @@
   },
   {
     "type": "function",
+    "name": "checkAndActivate",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "depositFunds",
     "inputs": [],
     "outputs": [],

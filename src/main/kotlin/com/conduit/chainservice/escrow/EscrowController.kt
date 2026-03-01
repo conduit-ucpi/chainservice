@@ -441,6 +441,88 @@ class EscrowController(
         }
     }
 
+    @PostMapping("/check-and-activate")
+    @Operation(
+        summary = "Check and Activate Contract",
+        description = "Checks the contract balance and activates it if sufficient funds are present (direct payment). Used when a buyer has transferred tokens directly to the contract address instead of going through the standard approve+deposit flow. The platform pays gas fees. After successful activation, the contract service is notified."
+    )
+    @ApiResponses(value = [
+        ApiResponse(
+            responseCode = "200",
+            description = "Contract activated successfully",
+            content = [Content(schema = Schema(implementation = CheckAndActivateResponse::class))]
+        ),
+        ApiResponse(
+            responseCode = "400",
+            description = "Invalid request or transaction failed",
+            content = [Content(schema = Schema(implementation = CheckAndActivateResponse::class))]
+        ),
+        ApiResponse(
+            responseCode = "500",
+            description = "Internal server error",
+            content = [Content(schema = Schema(implementation = CheckAndActivateResponse::class))]
+        )
+    ])
+    fun checkAndActivate(
+        @Valid @RequestBody
+        @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            content = [Content(
+                examples = [ExampleObject(
+                    name = "Check and Activate Example",
+                    value = """{"contractAddress": "0x1234567890abcdef1234567890abcdef12345678"}"""
+                )]
+            )]
+        )
+        request: CheckAndActivateRequest,
+        httpRequest: HttpServletRequest
+    ): ResponseEntity<CheckAndActivateResponse> {
+        return try {
+            logger.info("Check and activate request received for contract: ${request.contractAddress}")
+
+            val result = runBlocking {
+                escrowTransactionService.checkAndActivateAsGasPayer(request.contractAddress)
+            }
+
+            val response = CheckAndActivateResponse(
+                success = result.success,
+                transactionHash = result.transactionHash,
+                error = result.error
+            )
+
+            if (result.success) {
+                logger.info("Contract activated successfully: ${result.transactionHash}")
+
+                // Notify contract service about the deposit/activation
+                try {
+                    runBlocking {
+                        contractServiceClient.notifyDeposit(
+                            contractHash = request.contractAddress,
+                            request = httpRequest
+                        ).block()
+                    }
+                    logger.info("Contract service notified of activation for contract: ${request.contractAddress}")
+                } catch (e: Exception) {
+                    // Log the error but don't fail the response since the blockchain transaction succeeded
+                    logger.error("Failed to notify contract service of activation for contract: ${request.contractAddress}", e)
+                }
+
+                ResponseEntity.ok(response)
+            } else {
+                logger.error("Contract activation failed: ${result.error}")
+                ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response)
+            }
+
+        } catch (e: Exception) {
+            logger.error("Error in check and activate endpoint", e)
+            val response = CheckAndActivateResponse(
+                success = false,
+                transactionHash = null,
+                error = e.message ?: "Internal server error"
+            )
+            ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response)
+        }
+    }
+
     @PostMapping("/deposit-funds")
     @Operation(
         summary = "Deposit Funds",

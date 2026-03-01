@@ -736,6 +736,106 @@ class EscrowTransactionService(
     }
 
     /**
+     * Checks the contract balance and activates it if sufficient funds are present (direct payment).
+     * This is used when a buyer has transferred tokens directly to the contract address
+     * instead of going through the standard approve+deposit flow.
+     */
+    suspend fun checkAndActivateAsGasPayer(contractAddress: String): TransactionResult {
+        return try {
+            logger.info("Check and activate as gas payer for contract: $contractAddress")
+
+            val nonce = web3j.ethGetTransactionCount(
+                relayerCredentials.address,
+                DefaultBlockParameterName.PENDING
+            ).send().transactionCount
+
+            val gasPrice = gasProvider.getGasPrice("checkAndActivate")
+
+            // Build function using ABI
+            val function = abiLoader.buildFunction(
+                functionName = "checkAndActivate",
+                inputValues = emptyList(),
+                fromFactory = false // This is an escrow contract function
+            )
+            val functionData = FunctionEncoder.encode(function)
+
+            // Estimate gas for the checkAndActivate transaction
+            val gasLimit = estimateGasWithBuffer(
+                relayerCredentials.address,
+                contractAddress,
+                functionData,
+                "checkAndActivate"
+            )
+
+            val rawTransaction = RawTransaction.createTransaction(
+                nonce,
+                gasPrice,
+                gasLimit,
+                contractAddress,
+                BigInteger.ZERO,
+                functionData
+            )
+
+            val signedTransaction = org.web3j.crypto.TransactionEncoder.signMessage(
+                rawTransaction,
+                chainId,
+                relayerCredentials
+            )
+
+            // Send the signed transaction to gas-payer-service
+            val signedTransactionHex = Numeric.toHexString(signedTransaction)
+            val gasPayerResult = gasPayerServiceClient.processTransactionWithGasTransfer(
+                relayerCredentials.address, // Use relayer address as userWalletAddress since we're paying our own gas
+                signedTransactionHex,
+                "checkAndActivateAsGasPayer",
+                gasLimit
+            )
+
+            if (!gasPayerResult.success) {
+                logger.error("Check and activate as gas payer failed via gas-payer-service: ${gasPayerResult.error}")
+                return TransactionResult(
+                    success = false,
+                    transactionHash = gasPayerResult.transactionHash,
+                    error = gasPayerResult.error
+                )
+            }
+
+            val txHash = gasPayerResult.transactionHash!!
+            logger.info("Check and activate as gas payer transaction sent via gas-payer-service: $txHash")
+
+            val receipt = waitForTransactionReceipt(txHash)
+            if (receipt != null && receipt.isStatusOK) {
+                // Invalidate cache for the contract that was activated
+                cacheInvalidationService.invalidateContractCacheIntelligently(
+                    contractAddress = contractAddress,
+                    operationType = "checkAndActivate",
+                    newStatus = com.conduit.chainservice.escrow.models.ContractStatus.ACTIVE,
+                    transactionHash = txHash
+                )
+
+                TransactionResult(
+                    success = true,
+                    transactionHash = txHash
+                )
+            } else {
+                TransactionResult(
+                    success = false,
+                    transactionHash = txHash,
+                    error = "Check and activate transaction failed"
+                )
+            }
+
+        } catch (e: Exception) {
+            logger.error("Error in check and activate as gas payer for contract: $contractAddress", e)
+            TransactionResult(
+                success = false,
+                transactionHash = null,
+                error = e.message ?: "Failed to check and activate as gas payer"
+            )
+        }
+    }
+
+    /**
      * Queries the token address from an escrow contract
      * This allows supporting multiple tokens (USDC, USDT, etc.) dynamically
      */

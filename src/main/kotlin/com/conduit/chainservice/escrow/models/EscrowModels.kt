@@ -149,6 +149,12 @@ data class FundApprovedContractRequest(
     val contractHash: String
 )
 
+data class CheckAndActivateRequest(
+    @field:NotBlank(message = "Contract address is required")
+    @field:Pattern(regexp = "^0x[a-fA-F0-9]{40}$", message = "Invalid contract address format")
+    val contractAddress: String
+)
+
 // Response models
 data class CreateContractResponse(
     val success: Boolean,
@@ -184,6 +190,12 @@ data class ResolveDisputeResponse(
 data class ApproveTokenResponse(
     val success: Boolean,
     val transactionHash: String?,
+    val error: String? = null
+)
+
+data class CheckAndActivateResponse(
+    val success: Boolean,
+    val transactionHash: String? = null,
     val error: String? = null
 )
 
